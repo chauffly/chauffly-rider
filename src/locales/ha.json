@@ -1,0 +1,34 @@
+{
+  "common": {
+    "continue": "Ci gaba",
+    "skip": "Tsallake",
+    "get_started": "Fara",
+    "cancel": "Soke",
+    "save": "Ajiye",
+    "delete": "Share",
+    "loading": "Ana lodi...",
+    "error": "Kuskure",
+    "success": "Nasara",
+    "retry": "Sake gwadawa"
+  },
+  "onboarding": {
+    "slide1_title": "Barka da zuwa chauffly\nTafiya da Kwarin Gwiwa",
+    "slide1_description": "Jin daɗin tafiye-tafiye masu inganci, direbobi abin dogaro, da kwarewar tafiya da aka tsara don jin daɗi da tsaro.",
+    "slide2_title": "Alatu, Kowane Lokaci da Kake Bukata",
+    "slide2_description": "Zaɓi daga Go, Plus, Luxe, ko Black — tafiye-tafiye da aka daidaita daidai da kowane lokaci, daga ayyukan yau da kullum zuwa tafiyar zartarwa.",
+    "slide3_title": "Tsaron Ka Shine Fifikon Mu",
+    "slide3_description": "Direbobi da aka tabbatar, bin diddigin lokaci na gaske, gane fuska, da raba nan take suna kiyaye kowace tafiya cikin tsaro."
+  },
+  "home": {
+    "welcome": "Barka da dawowa, {{name}}!",
+    "title": "Gida"
+  },
+  "settings": {
+    "title": "Saituna",
+    "theme": "Jigo",
+    "theme_light": "Haske",
+    "theme_dark": "Duhu",
+    "theme_system": "Tsarin",
+    "language": "Harshe"
+  }
+}

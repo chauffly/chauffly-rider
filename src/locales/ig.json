@@ -1,0 +1,34 @@
+{
+  "common": {
+    "continue": "Gaa n'ihu",
+    "skip": "Wụfee",
+    "get_started": "Malite",
+    "cancel": "Kagbuo",
+    "save": "Chekwaa",
+    "delete": "Hichapụ",
+    "loading": "Na-ebu...",
+    "error": "Njehie",
+    "success": "Ihe ịga nke ọma",
+    "retry": "Nwaa ọzọ"
+  },
+  "onboarding": {
+    "slide1_title": "Nnọọ na chauffly\nGawa na Ntụkwasị Obi",
+    "slide1_description": "Nwee mmasị na ịnyịnya ọkwa, ndị ọkwọ ụgbọ ala a tụkwasịrị obi, na ahụmịhe njem e wuru gburugburu nkwanye ugwu na nchekwa.",
+    "slide2_title": "Ọmarịcha, Oge ọ bụla Ị Chọrọ Ya",
+    "slide2_description": "Họrọ site na Go, Plus, Luxe, ma ọ bụ Black — njem a haziri nke ọma maka oge ọ bụla, site na ozi kwa ụbọchị ruo njem ndị isi.",
+    "slide3_title": "Nchekwa Gị Bụ Ihe Kasị Mkpa Anyị",
+    "slide3_description": "Ndị ọkwọ ụgbọ ala enyochara, nyocha n'oge n'oge, nchọpụta ihu, na ikekọrịta ozugbo na-echekwa njem ọ bụla n'udo."
+  },
+  "home": {
+    "welcome": "Nnọọ, {{name}}!",
+    "title": "Ụlọ"
+  },
+  "settings": {
+    "title": "Ntọala",
+    "theme": "Isiokwu",
+    "theme_light": "Ìhè",
+    "theme_dark": "Ọchịchịrị",
+    "theme_system": "Usoro",
+    "language": "Asụsụ"
+  }
+}

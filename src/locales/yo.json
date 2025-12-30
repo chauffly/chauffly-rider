@@ -1,0 +1,34 @@
+{
+  "common": {
+    "continue": "Tẹsiwaju",
+    "skip": "Fo",
+    "get_started": "Bẹrẹ",
+    "cancel": "Fagile",
+    "save": "Fipamọ",
+    "delete": "Paarẹ",
+    "loading": "Nwọle...",
+    "error": "Aṣiṣe",
+    "success": "Aṣeyọri",
+    "retry": "Tun gbiyanju"
+  },
+  "onboarding": {
+    "slide1_title": "Kaabọ si chauffly\nRin pẹlu Igboya",
+    "slide1_description": "Gbadun awọn gigun ti o dara julọ, awọn awakọ ti o gbẹkẹle, ati iriri irin-ajo ti a ṣe ni ayika itunu ati aabo.",
+    "slide2_title": "Igbadun, Nigbakugba Ti O Ba Nilo Rẹ",
+    "slide2_description": "Yan lati Go, Plus, Luxe, tabi Black — awọn gigun ti a ṣe ni pipe fun gbogbo akoko, lati awọn iṣẹ ojoojumọ si irin-ajo alaṣẹ.",
+    "slide3_title": "Aabo Rẹ Ni Pataki Julọ Fun Wa",
+    "slide3_description": "Awọn awakọ ti a ṣe ayẹwo, titọpa ni akoko gidi, idanimọ oju, ati pinpin lẹsẹkẹsẹ jẹ ki gbogbo irin-ajo wa ni aabo."
+  },
+  "home": {
+    "welcome": "Kaabọ pada, {{name}}!",
+    "title": "Ile"
+  },
+  "settings": {
+    "title": "Eto",
+    "theme": "Akori",
+    "theme_light": "Imọlẹ",
+    "theme_dark": "Dudu",
+    "theme_system": "Eto",
+    "language": "Ede"
+  }
+}
