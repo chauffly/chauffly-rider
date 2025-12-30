@@ -28,7 +28,7 @@ const variantStyles: Record<TextVariant, { size: number; weight: FontFamily; lin
   body: { size: fontSize.lg, weight: 'regular', lineHeight: 22 },
   bodySmall: { size: fontSize.md, weight: 'regular', lineHeight: 20 },
   caption: { size: fontSize.sm, weight: 'regular', lineHeight: 16 },
-  label: { size: fontSize.lg, weight: 'semiBold', lineHeight: 24 },
+  label: { size: fontSize.md, weight: 'regular', lineHeight: 24 },
   button: { size: fontSize.lg, weight: 'medium', lineHeight: 24 },
 };
 

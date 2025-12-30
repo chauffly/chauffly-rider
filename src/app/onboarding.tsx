@@ -72,12 +72,12 @@ export default function OnboardingScreen() {
   }).current;
 
   const handleSkip = () => {
-    router.replace('/(tabs)');
+    router.replace('/(auth)/login');
   };
 
   const handleContinue = () => {
     if (isLastSlide) {
-      router.replace('/(tabs)');
+      router.replace('/(auth)/login');
     } else {
       flatListRef.current?.scrollToIndex({
         index: currentIndex + 1,
@@ -104,8 +104,8 @@ export default function OnboardingScreen() {
           />
           <Text
             variant="body"
-            color="muted"
             translationKey={item.descriptionKey}
+            style={{ color: "rgba(196, 196, 196, .75)" }}
           />
         </View>
 

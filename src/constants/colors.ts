@@ -8,7 +8,7 @@ export const lightTheme = {
   white: palette.white,
   accent: palette.accent,
   primary: palette.primaryGold,
-  background: '#FFFFFF',
+  background: '#F7F7F7',
   surface: '#FFFFFF',
 
   // Text
@@ -16,10 +16,14 @@ export const lightTheme = {
   textSecondary: '#757575',
   textDisabled: '#BDBDBD',
   textInverse: '#FFFFFF',
-  textMuted: '#9E9E9E',
+  textMuted: "rgba(14, 27, 43, .56)",
 
   // UI Elements
   border: '#E0E0E0',
+  error: '#E53935',
+  error50: 'rgba(229, 83, 77, 0.15)',
+  success: '#43A047',
+  success50: 'rgba(67, 160, 72, 0.15)',
 
   // Button specific
   buttonPrimary: palette.primaryGold,
@@ -36,8 +40,8 @@ export const darkTheme = {
   white: palette.white,
   accent: palette.accent,
   primary: palette.primaryGold,
-  background: '#0D1117',
-  surface: '#161B22',
+  background: '#09111C',
+  surface: '#0E1B2B',
 
   // Text
   textPrimary: '#FFFFFF',
@@ -48,6 +52,8 @@ export const darkTheme = {
 
   // UI Elements
   border: '#30363D',
+  error: '#EF5350',
+  success: '#66BB6A',
 
   // Button specific
   buttonPrimary: palette.primaryGold,
