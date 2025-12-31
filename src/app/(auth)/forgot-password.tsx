@@ -15,46 +15,31 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
 import { Button } from '@/components/common/button';
-import { SocialButton } from '@/components/common/social-button';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { spacing } from '@/constants/spacing';
 import CallOutline from '@/components/svg/CallOutline';
-import Password from '@/components/svg/Password';
 
-export default function LoginScreen() {
+export default function ForgotPasswordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
 
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [password, setPassword] = useState('');
   const [phoneError, setPhoneError] = useState('');
 
-  const handleLogin = () => {
+  const handleSendResetCode = () => {
     if (!phoneNumber || phoneNumber.length < 10) {
       setPhoneError(t('auth.invalid_phone'));
       return;
     }
     setPhoneError('');
-    router.replace('/(tabs)');
+    router.push('/(auth)/verify-otp');
   };
 
-  const handleForgotPassword = () => {
-    router.push('/(auth)/forgot-password');
-  };
-
-  const handleSignUp = () => {
-    router.push('/(auth)/register');
-  };
-
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google login
-  };
-
-  const handleAppleLogin = () => {
-    // TODO: Implement Apple login
+  const handleLogin = () => {
+    router.push('/(auth)/login');
   };
 
   return (
@@ -77,11 +62,11 @@ export default function LoginScreen() {
             style={styles.logo}
             contentFit="contain"
           />
-          <Text variant="h1" font='medium' align="center" style={styles.title}>
-            {t('auth.welcome_back')}
+          <Text variant="h1" font="medium" align="center" style={styles.title}>
+            {t('auth.reset_password')}
           </Text>
           <Text variant="body" color="muted" align="center">
-            {t('auth.login_subtitle')}
+            {t('auth.reset_password_subtitle')}
           </Text>
         </View>
 
@@ -99,50 +84,22 @@ export default function LoginScreen() {
             error={phoneError}
           />
 
-          <TextInput
-            labelTranslationKey="auth.password"
-            placeholderTranslationKey="auth.password_placeholder"
-            leftIcon={<Password />}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-
-          <Pressable onPress={handleForgotPassword} style={styles.forgotPassword}>
-            <Text variant="bodySmall" weight="medium" style={{ textDecorationLine: 'underline' }}>
-              {t('auth.forgot_password')}
-            </Text>
-          </Pressable>
-
           <Button
-            translationKey="auth.log_in"
+            translationKey="auth.send_reset_code"
             variant="primary"
             fullWidth
-            onPress={handleLogin}
-            style={styles.loginButton}
+            onPress={handleSendResetCode}
+            style={styles.submitButton}
           />
-        </View>
-
-        <View style={styles.dividerContainer}>
-          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-          <Text variant="caption" color="muted" style={styles.dividerText}>
-            {t('auth.or_continue_with')}
-          </Text>
-          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-        </View>
-
-        <View style={styles.socialButtons}>
-          <SocialButton provider="google" onPress={handleGoogleLogin} />
-          <SocialButton provider="apple" onPress={handleAppleLogin} />
         </View>
 
         <View style={styles.footer}>
           <Text variant="bodySmall" color="muted">
-            {t('auth.no_account')}{' '}
+            {t('auth.remember_password')}{' '}
           </Text>
-          <Pressable onPress={handleSignUp}>
+          <Pressable onPress={handleLogin}>
             <Text variant="bodySmall" weight="medium" style={{ textDecorationLine: 'underline' }}>
-              {t('auth.sign_up')}
+              {t('auth.log_in')}
             </Text>
           </Pressable>
         </View>
@@ -162,6 +119,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: spacing.xxxl,
+    marginTop: spacing.xxxxl,
   },
   logo: {
     width: 100,
@@ -173,29 +131,8 @@ const styles = StyleSheet.create({
   form: {
     marginBottom: spacing.xxl,
   },
-  forgotPassword: {
-    alignSelf: 'flex-start',
-    marginBottom: spacing.xl,
-  },
-  loginButton: {
-    marginTop: spacing.md,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xxl,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    marginHorizontal: spacing.lg,
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    marginBottom: spacing.xxxl,
+  submitButton: {
+    marginTop: spacing.xl,
   },
   footer: {
     flexDirection: 'row',

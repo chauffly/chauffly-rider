@@ -53,7 +53,9 @@ export const darkTheme = {
   // UI Elements
   border: '#30363D',
   error: '#EF5350',
+  error50: '#ef535036',
   success: '#66BB6A',
+  success50: 'rgba(34, 197, 94, 0.25)',
 
   // Button specific
   buttonPrimary: palette.primaryGold,
