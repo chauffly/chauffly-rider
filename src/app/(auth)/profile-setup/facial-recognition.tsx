@@ -1,0 +1,178 @@
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { Text } from '@/components/common/text';
+import { Button } from '@/components/common/button';
+import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
+import { spacing } from '@/constants/spacing';
+import ChevronLeft from '@/components/svg/ChevronLeft';
+import FaceOutline from '@/components/svg/FaceOutline';
+
+export default function FacialRecognitionScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
+  const handleBack = () => {
+    router.back();
+  };
+
+  const handleSkip = () => {
+    // Navigate to main app
+    router.replace('/(tabs)');
+  };
+
+  const handleSetUp = () => {
+    // Navigate to facial verification success screen
+    router.push('/(auth)/profile-setup/facial-verification-success');
+  };
+
+  const bulletPoints = [
+    t('profile_setup.facial_bullet_1'),
+    t('profile_setup.facial_bullet_2'),
+    t('profile_setup.facial_bullet_3'),
+  ];
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={colors.statusBar as 'light' | 'dark'} />
+
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+        <Pressable onPress={handleBack} style={styles.backButton} hitSlop={8}>
+          <ChevronLeft color={colors.textPrimary} />
+        </Pressable>
+        <Text variant="body" weight="semiBold" style={styles.headerTitle}>
+          {t('profile_setup.facial_recognition')}
+        </Text>
+        <Text variant="bodySmall" color="muted">
+          3 {t('common.of')} 3
+        </Text>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + spacing.xxl },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Face Icon */}
+        <View style={styles.iconContainer}>
+          <FaceOutline size={120} color={colors.textPrimary} />
+        </View>
+
+        {/* Title */}
+        <Text variant="body" weight="medium" style={styles.title}>
+          {t('profile_setup.enable_facial_verification')}
+        </Text>
+
+        {/* Description */}
+        <Text variant="bodySmall" color="muted" style={styles.description}>
+          {t('profile_setup.facial_verification_description')}
+        </Text>
+
+        {/* Bullet Points */}
+        <View style={styles.bulletContainer}>
+          {bulletPoints.map((point, index) => (
+            <View key={index} style={styles.bulletItem}>
+              <Text variant="bodySmall" color="muted" style={styles.bulletDot}>
+                {'\u2022'}
+              </Text>
+              <Text variant="bodySmall" color="muted" style={styles.bulletText}>
+                {point}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Buttons */}
+        <View style={styles.buttonContainer}>
+          <Button
+            translationKey="common.skip"
+            variant="outline"
+            onPress={handleSkip}
+            style={styles.skipButton}
+          />
+          <Button
+            translationKey="common.set_up_now"
+            variant="primary"
+            onPress={handleSetUp}
+            style={styles.setupButton}
+          />
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  backButton: {
+    padding: spacing.xs,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.xxxl,
+  },
+  title: {
+    marginBottom: spacing.lg,
+  },
+  description: {
+    marginBottom: spacing.xxl,
+    paddingHorizontal: spacing.md,
+  },
+  bulletContainer: {
+    marginBottom: spacing.xxxl,
+  },
+  bulletItem: {
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  bulletDot: {
+    marginRight: spacing.sm,
+    fontSize: 18,
+  },
+  bulletText: {
+    flex: 1,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: 'auto',
+  },
+  skipButton: {
+    flex: 1,
+  },
+  setupButton: {
+    flex: 1,
+  },
+});

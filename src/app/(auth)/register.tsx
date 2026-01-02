@@ -36,7 +36,7 @@ export default function RegisterScreen() {
 
   const handleCreateAccount = () => {
     // TODO: Implement account creation
-    router.replace('/(tabs)');
+    router.push('/(auth)/profile-setup/role-selection');
   };
 
   const handleLogin = () => {
