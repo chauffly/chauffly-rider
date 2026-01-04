@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useTheme } from '@/context/theme-context';
 
 export default function TabLayout() {
@@ -24,17 +24,44 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons 
+              name="map-marker-path" 
+              size={26} 
+              color={color} 
+            />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="your-route"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
+          title: 'Rides',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="paperplane.fill" color={color} />
+            <MaterialCommunityIcons 
+              name="history" 
+              size={26} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: 'Account',
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons 
+              name={focused ? "account-cog" : "account-cog-outline"} 
+              size={26} 
+              color={color} 
+            />
           ),
         }}
       />

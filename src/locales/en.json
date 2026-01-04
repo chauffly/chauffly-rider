@@ -119,5 +119,29 @@
     "theme_dark": "Dark",
     "theme_system": "System",
     "language": "Language"
+  },
+  "location": {
+    "enable_location": "Enable Location",
+    "enable_location_description": "To be able to use the service, we require permission to access your location.",
+    "grant_permission": "Grant Permission",
+    "maybe_later": "Maybe Later",
+    "where_to": "Where to?",
+    "enter_location": "Enter Location",
+    "your_route": "Your route?",
+    "your_current_location": "Your current location",
+    "set_location": "Set location",
+    "home": "Home",
+    "office": "Office",
+    "apartment": "Apartment",
+    "next": "Next",
+    "search_location": "Search for a location...",
+    "recent_locations": "Recent Locations",
+    "no_recent_locations": "No recent locations",
+    "no_results": "No results found",
+    "add_stop": "Add stop",
+    "destination_added": "Destination Added",
+    "add_more_stops_question": "Would you like to add another stop to your trip?",
+    "add_another_stop": "Add stop",
+    "continue_booking": "Continue"
   }
 }

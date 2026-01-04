@@ -119,5 +119,24 @@
     "theme_dark": "Dudu",
     "theme_system": "Eto",
     "language": "Ede"
+  },
+  "location": {
+    "enable_location": "Mu Ipo Ṣiṣẹ",
+    "enable_location_description": "Lati le lo iṣẹ yii, a nilo igbanilaaye lati wọle si ipo rẹ.",
+    "grant_permission": "Fun ni Igbanilaaye",
+    "maybe_later": "Boya Nigbamii",
+    "where_to": "Si ibi wo?",
+    "enter_location": "Tẹ Ipo sii",
+    "your_route": "Ipa-ọna rẹ?",
+    "your_current_location": "Ipo rẹ lọwọlọwọ",
+    "set_location": "Ṣeto ipo",
+    "home": "Ile",
+    "office": "Ọfiisi",
+    "apartment": "Ile iyalo",
+    "next": "Tẹsiwaju",
+    "search_location": "Wa ipo...",
+    "recent_locations": "Awọn ipo aipẹ",
+    "no_recent_locations": "Ko si awọn ipo aipẹ",
+    "no_results": "Ko ri awọn abajade"
   }
 }

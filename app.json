@@ -10,7 +10,15 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.chauffly.chauffly"
+      "bundleIdentifier": "com.chauffly.chauffly",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Chauffly needs your location to show nearby drivers and calculate routes.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Chauffly needs your location to provide ride services even when the app is in the background.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyC4ClbG_GZXQxSlPKCIcB4iM9378vDdVYQ"
+      }
     },
     "android": {
       "package": "com.chauffly.chauffly",
@@ -21,7 +29,19 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyC4ClbG_GZXQxSlPKCIcB4iM9378vDdVYQ"
+        }
+      }
     },
     "web": {
       "output": "static",
@@ -44,6 +64,12 @@
           "dark": {
             "backgroundColor": "#09111c"
           }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Chauffly needs your location to provide ride services."
         }
       ]
     ],

@@ -19,25 +19,9 @@ import 'react-native-reanimated';
 
 import { ThemeProvider, useTheme } from '@/context/theme-context';
 import { LanguageProvider } from '@/context/language-context';
+import { LocationProvider } from '@/context/location-context';
 
 SplashScreen.preventAutoHideAsync();
-
-function RootLayoutNav() {
-  const { isDark, colors } = useTheme();
-
-  return (
-    <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style={colors.statusBar as 'light' | 'dark'} />
-    </NavigationThemeProvider>
-  );
-}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -65,8 +49,27 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <LanguageProvider>
-        <RootLayoutNav />
+        <LocationProvider>
+          <RootLayoutNav />
+        </LocationProvider>
       </LanguageProvider>
     </ThemeProvider>
+  );
+}
+
+function RootLayoutNav() {
+  const { isDark, colors } = useTheme();
+
+  return (
+    <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+      </Stack>
+      <StatusBar style={colors.statusBar as 'light' | 'dark'} />
+    </NavigationThemeProvider>
   );
 }

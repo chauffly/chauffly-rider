@@ -119,5 +119,24 @@
     "theme_dark": "Duhu",
     "theme_system": "Tsarin",
     "language": "Harshe"
+  },
+  "location": {
+    "enable_location": "Kunna Wuri",
+    "enable_location_description": "Don samun damar amfani da sabis, muna buƙatar izinin samun wurin da kake.",
+    "grant_permission": "Ba da Izini",
+    "maybe_later": "Watakila Daga baya",
+    "where_to": "Zuwa ina?",
+    "enter_location": "Shigar da Wuri",
+    "your_route": "Hanyarka?",
+    "your_current_location": "Wurin da kake yanzu",
+    "set_location": "Saita wuri",
+    "home": "Gida",
+    "office": "Ofis",
+    "apartment": "Gidan haya",
+    "next": "Gaba",
+    "search_location": "Nemo wuri...",
+    "recent_locations": "Wuraren da aka yi kwanan nan",
+    "no_recent_locations": "Babu wuraren da aka yi kwanan nan",
+    "no_results": "Ba a samu sakamako ba"
   }
 }
