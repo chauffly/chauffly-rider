@@ -485,7 +485,7 @@ export default function HomeScreen() {
           styles.bottomCard,
           {
             backgroundColor: colors.surface,
-            paddingBottom: insets.bottom + spacing.lg,
+            paddingBottom: spacing.lg,
           },
         ]}
         onLayout={(event) => {
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   nextButton: {
-    marginTop: spacing.sm,
+    marginTop: spacing.xxl,
   },
   // Map markers for set-location
   userMarkerContainer: {

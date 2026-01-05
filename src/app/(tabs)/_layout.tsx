@@ -25,10 +25,10 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons 
-              name="map-marker-path" 
-              size={26} 
-              color={color} 
+            <MaterialCommunityIcons
+              name="map-marker-path"
+              size={26}
+              color={color}
             />
           ),
         }}
@@ -44,10 +44,10 @@ export default function TabLayout() {
         options={{
           title: 'Rides',
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons 
-              name="history" 
-              size={26} 
-              color={color} 
+            <MaterialCommunityIcons
+              name="format-list-bulleted"
+              size={26}
+              color={color}
             />
           ),
         }}
@@ -57,10 +57,10 @@ export default function TabLayout() {
         options={{
           title: 'Account',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons 
-              name={focused ? "account-cog" : "account-cog-outline"} 
-              size={26} 
-              color={color} 
+            <MaterialCommunityIcons
+              name={focused ? "account-cog" : "account-cog-outline"}
+              size={26}
+              color={color}
             />
           ),
         }}
