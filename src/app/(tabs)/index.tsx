@@ -673,3 +673,17 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
 });
+
+
+
+/**
+ * 
+ * 
+ * 
+ *  Tesla Model Y
+    Mercedes-Benz E350 (2019)
+    BMW 530i
+    Hyundai Sonata (2020)
+    Land Cruiser (2019, 2020)
+
+ */
