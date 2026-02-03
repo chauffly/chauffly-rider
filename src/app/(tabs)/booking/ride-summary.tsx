@@ -1,7 +1,8 @@
+import { useEffect, useRef, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { addMinutes, format } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View, } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/common/button';
@@ -19,6 +20,9 @@ export default function RideSummaryScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const { width: screenWidth } = useWindowDimensions();
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const [isShimmering, setIsShimmering] = useState(true);
    const params = useLocalSearchParams<{
     originName?: string;
     originAddress?: string;
@@ -51,6 +55,24 @@ export default function RideSummaryScreen() {
     : t('booking.now');
   const dropoffTimeDisplay = format(addMinutes(pickupDateTime, durationMinutes), 'h:mm a');
   const showDriver = !!params.driverName;
+
+  useEffect(() => {
+    const shimmerLoop = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      }),
+      { iterations: 2 }
+    );
+    shimmerLoop.start(({ finished }) => {
+      if (finished) {
+        setIsShimmering(false);
+      }
+    });
+    return () => shimmerLoop.stop();
+  }, [shimmerAnim]);
 
  
 
@@ -178,16 +200,49 @@ export default function RideSummaryScreen() {
           <Pressable
             style={[
               styles.card,
-              { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 2 },
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.primary,
+                borderWidth: 2,
+                overflow: 'hidden',
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingRight: spacing.md,
+              },
             ]}
             onPress={() => router.push('/(tabs)/booking/personalization')}
             accessibilityRole="button"
             accessibilityLabel={t('booking.enhance_ride_title')}
           >
+            {isShimmering && (
+              <Animated.View
+                style={[
+                  styles.shimmerOverlay,
+                  {
+                    backgroundColor: colors.white,
+                    transform: [
+                      {
+                        translateX: shimmerAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-screenWidth, screenWidth],
+                        }),
+                      },
+                      { rotate: '-20deg' },
+                    ],
+                  },
+                ]}
+                pointerEvents="none"
+              />
+            )}
+            <View>
+
             <Text variant="bodySmall" font="medium" translationKey="booking.enhance_ride_title" />
             <Text variant="caption" color="muted">
               {t('booking.enhance_ride_subtitle')}
             </Text>
+            </View>
+            <MaterialCommunityIcons name='chevron-double-right' size={24}  color={colors.primary} />
           </Pressable>
         </View>
       </ScrollView>
@@ -236,6 +291,13 @@ const styles = StyleSheet.create({
   },
   premiumCardWrapper: {
     position: 'relative',
+  },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: -20,
+    bottom: -20,
+    width: 140,
+    opacity: 0.25,
   },
   premiumRing: {
     position: 'absolute',
