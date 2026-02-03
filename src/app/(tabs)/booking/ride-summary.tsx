@@ -182,11 +182,11 @@ export default function RideSummaryScreen() {
             ]}
             onPress={() => router.push('/(tabs)/booking/personalization')}
             accessibilityRole="button"
-            accessibilityLabel={t('booking.experience_add_ons')}
+            accessibilityLabel={t('booking.enhance_ride_title')}
           >
-            <Text variant="bodySmall" font="medium" translationKey="booking.experience_add_ons" />
+            <Text variant="bodySmall" font="medium" translationKey="booking.enhance_ride_title" />
             <Text variant="caption" color="muted">
-              {t('booking.experience_add_ons_items')}
+              {t('booking.enhance_ride_subtitle')}
             </Text>
           </Pressable>
         </View>
