@@ -16,8 +16,8 @@ export interface Origin {
 
 export interface RideOption {
   id: string;
-  name: string;
-  subtitle: string;
-  price: string;
+  nameKey: string;
+  subtitleKey: string;
+  priceKey: string;
   image: ImageSourcePropType;
 }

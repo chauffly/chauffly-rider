@@ -7,6 +7,7 @@ import Check from '@/components/svg/Check';
 import Schedule from '@/components/svg/Schedule';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
 import { RideOption } from './types';
 
 interface RideOptionsContentProps {
@@ -14,6 +15,10 @@ interface RideOptionsContentProps {
   selectedRideId: string;
   onSelectRide: (id: string) => void;
   onProceed?: () => void;
+  onSchedule?: () => void;
+  etaMinutes?: number;
+  isLoading?: boolean;
+  hasError?: boolean;
 }
 
 export function RideOptionsContent({
@@ -21,24 +26,31 @@ export function RideOptionsContent({
   selectedRideId,
   onSelectRide,
   onProceed,
+  onSchedule,
+  etaMinutes,
+  isLoading,
+  hasError,
 }: RideOptionsContentProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.rideOptionsContainer}>
       <View style={styles.rideOptionsHeader}>
         <View>
-          <Text variant="h3" font="medium">
-            Choose a ride
-          </Text>
-          <Text variant="caption" color="muted">
-            Prices are estimates
-          </Text>
+          <Text variant="h3" font="medium" translationKey="booking.choose_ride" />
+          <Text variant="caption" color="muted" translationKey="booking.prices_estimates" />
         </View>
         <View style={[styles.etaPill, { backgroundColor: colors.accent }]}>
-          <Text variant="caption" color="muted">
-            3 min away
-          </Text>
+          {isLoading ? (
+            <Text variant="caption" color="muted" translationKey="booking.eta_loading" />
+          ) : hasError ? (
+            <Text variant="caption" color="muted" translationKey="booking.eta_estimate" />
+          ) : (
+            <Text variant="caption" color="muted">
+              {t('booking.eta_minutes', { minutes: etaMinutes || 3 })}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -52,6 +64,8 @@ export function RideOptionsContent({
             <Pressable
               key={option.id}
               onPress={() => onSelectRide(option.id)}
+              accessibilityRole="button"
+              accessibilityLabel={t(option.nameKey)}
               style={[
                 styles.rideOptionCard,
                 {
@@ -63,7 +77,7 @@ export function RideOptionsContent({
               <View
                 style={[
                   styles.rideOptionImageWrap,
-                  { backgroundColor: isSelected ? colors.surface : '#F2F2F2' },
+                  { backgroundColor: isSelected ? colors.surface : colors.background },
                 ]}
               >
                 <ExpoImage
@@ -75,7 +89,7 @@ export function RideOptionsContent({
               <View style={styles.rideOptionInfo}>
                 <View style={styles.rideOptionTopRow}>
                   <Text variant="body" font="medium" numberOfLines={1}>
-                    {option.name}
+                    {t(option.nameKey)}
                   </Text>
                   {isSelected && (
                     <View style={styles.rideOptionCheck}>
@@ -84,16 +98,25 @@ export function RideOptionsContent({
                   )}
                 </View>
                 <Text variant="caption" color="muted" numberOfLines={1}>
-                  {option.subtitle}
+                  {t(option.subtitleKey)}
                 </Text>
               </View>
               <View style={styles.rideOptionPriceWrap}>
                 <Text variant="body" font="medium">
-                  {option.price}
+                  {t(option.priceKey)}
                 </Text>
-                <Text variant="caption" color="muted">
-                  2-4 min
-                </Text>
+                {isLoading ? (
+                  <Text variant="caption" color="muted" translationKey="booking.eta_loading" />
+                ) : etaMinutes ? (
+                  <Text
+                    variant="caption"
+                    color="muted"
+                  >
+                    {t('booking.eta_minutes_short', { minutes: etaMinutes })}
+                  </Text>
+                ) : (
+                  <Text variant="caption" color="muted" translationKey="booking.eta_range_short" />
+                )}
               </View>
             </Pressable>
           );
@@ -101,9 +124,7 @@ export function RideOptionsContent({
       </ScrollView>
 
       <View style={styles.paymentRow}>
-        <Text variant="body" font="medium">
-          Payment
-        </Text>
+        <Text variant="body" font="medium" translationKey="booking.payment" />
         <View style={styles.paymentMethod}>
           <ExpoImage
             source={require('../../../assets/images/master-card.png')}
@@ -117,8 +138,17 @@ export function RideOptionsContent({
       </View>
 
       <View style={styles.proceedRow}>
-        <Button title="Proceed" style={styles.proceedButton} onPress={onProceed} />
-        <Pressable style={[styles.walletButton, { backgroundColor: colors.primary }]}>
+        <Button
+          translationKey="booking.proceed"
+          style={styles.proceedButton}
+          onPress={onProceed}
+        />
+        <Pressable
+          style={[styles.walletButton, { backgroundColor: colors.primary }]}
+          onPress={onSchedule}
+          accessibilityRole="button"
+          accessibilityLabel={t('booking.schedule_ride')}
+        >
           <Schedule />
         </Pressable>
       </View>

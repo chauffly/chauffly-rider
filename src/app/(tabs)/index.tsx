@@ -15,10 +15,14 @@ import { Origin, RouteStop, RideOption } from "@/components/home/types";
 import { useTheme } from '@/context/theme-context';
 import { useLocation } from "@/context/location-context";
 import { spacing, borderRadius } from '@/constants/spacing';
+import { mockDriver } from '@/constants/mock-driver';
+import { rideOptions } from '@/constants/ride-options';
 import {
   locationHistoryService,
   SavedLocation,
 } from "@/services/location-history";
+import { estimateDurationMinutes, getRouteDistanceKm } from '@/utils/route';
+import { googleDirectionsService } from '@/services/google-directions';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -59,6 +63,10 @@ export default function HomeScreen() {
   const [modalHeight, setModalHeight] = useState(0);
   const [selectedRideId, setSelectedRideId] = useState("go");
   const [showAllDestinations, setShowAllDestinations] = useState(false);
+  const [routeDistanceKm, setRouteDistanceKm] = useState(0);
+  const [routeDurationMinutes, setRouteDurationMinutes] = useState(0);
+  const [routeMetricsLoading, setRouteMetricsLoading] = useState(false);
+  const [routeMetricsError, setRouteMetricsError] = useState<string | null>(null);
 
   // Route state for set-location view
   const [origin, setOrigin] = useState<Origin | null>(null);
@@ -244,42 +252,61 @@ export default function HomeScreen() {
     setViewMode("ride-options");
   };
 
+  const handleProceedInstantRide = () => {
+    if (!origin || destinations.length === 0) {
+      return;
+    }
+    router.push({
+      pathname: "/(tabs)/booking/ride-summary",
+      params: {
+        originName: origin.name,
+        originAddress: origin.address,
+        originLat: origin.coordinates.latitude.toString(),
+        originLng: origin.coordinates.longitude.toString(),
+        destinations: JSON.stringify(destinations),
+        selectedRideId,
+        bookingType: "instant",
+        estimatedDurationMinutes: (routeDurationMinutes || estimatedDurationMinutes).toString(),
+        distanceKm: (routeDistanceKm || totalDistanceKm).toString(),
+        driverName: mockDriver.name,
+        driverPhone: mockDriver.phone,
+        driverRating: mockDriver.rating,
+        driverVehicle: mockDriver.vehicle,
+      },
+    });
+  };
+
+  const handleScheduleRide = () => {
+    if (!origin || destinations.length === 0) {
+      return;
+    }
+    router.push({
+      pathname: "/(tabs)/booking/select-pickup-time",
+      params: {
+        originName: origin.name,
+        originAddress: origin.address,
+        originLat: origin.coordinates.latitude.toString(),
+        originLng: origin.coordinates.longitude.toString(),
+        destinations: JSON.stringify(destinations),
+        selectedRideId,
+        bookingType: "scheduled",
+        estimatedDurationMinutes: (routeDurationMinutes || estimatedDurationMinutes).toString(),
+        distanceKm: (routeDistanceKm || totalDistanceKm).toString(),
+        driverName: mockDriver.name,
+        driverPhone: mockDriver.phone,
+        driverRating: mockDriver.rating,
+        driverVehicle: mockDriver.vehicle,
+      },
+    });
+  };
+
   const quickLocations = [
     { key: "home", translationKey: "location.home" },
     { key: "office", translationKey: "location.office" },
     { key: "apartment", translationKey: "location.apartment" },
   ];
 
-  const rideOptions: RideOption[] = [
-    {
-      id: "go",
-      name: "Go",
-      image: require("../../../assets/images/ride-options/go.png"),
-      subtitle: "BMW 530i",
-      price: "₦ 10,000",
-    },
-    {
-      id: "plus",
-      name: "Plus",
-      image: require("../../../assets/images/ride-options/plus.png"),
-      subtitle: "Tesla Model Y",
-      price: "₦ 15,000",
-    },
-    {
-      id: "luxe",
-      name: "Luxe",
-      image: require("../../../assets/images/ride-options/luxe.png"),
-      subtitle: "Land Cruiser",
-      price: "₦ 20,000",
-    },
-    {
-      id: "black",
-      name: "Black",
-      image: require("../../../assets/images/ride-options/black.png"),
-      subtitle: "Mercedes-Benz E350",
-      price: "₦ 25,000",
-    },
-  ];
+  const rideOptionsList: RideOption[] = rideOptions;
 
   const mapRegion = currentLocation
     ? {
@@ -294,6 +321,43 @@ export default function HomeScreen() {
   const routeCoordinates = origin
     ? [origin.coordinates, ...destinations.map((d) => d.coordinates)]
     : [];
+
+  const totalDistanceKm = routeCoordinates.length >= 2
+    ? getRouteDistanceKm(routeCoordinates)
+    : 0;
+  const estimatedDurationMinutes = estimateDurationMinutes(totalDistanceKm);
+
+  useEffect(() => {
+    const loadRouteMetrics = async () => {
+      if (!origin || destinations.length === 0) {
+        setRouteDistanceKm(0);
+        setRouteDurationMinutes(0);
+        setRouteMetricsLoading(false);
+        setRouteMetricsError(null);
+        return;
+      }
+
+      setRouteMetricsLoading(true);
+      setRouteMetricsError(null);
+
+      try {
+        const metrics = await googleDirectionsService.getRouteMetrics(
+          origin.coordinates,
+          destinations.map((stop) => stop.coordinates)
+        );
+        setRouteDistanceKm(metrics.distanceKm);
+        setRouteDurationMinutes(metrics.durationMinutes);
+      } catch (error) {
+        setRouteDistanceKm(totalDistanceKm);
+        setRouteDurationMinutes(estimatedDurationMinutes);
+        setRouteMetricsError('fallback');
+      } finally {
+        setRouteMetricsLoading(false);
+      }
+    };
+
+    loadRouteMetrics();
+  }, [origin, destinations, totalDistanceKm, estimatedDurationMinutes]);
 
   const renderHomeContent = () => (
     <HomeContent
@@ -315,9 +379,14 @@ export default function HomeScreen() {
 
   const renderRideOptionsContent = () => (
     <RideOptionsContent
-      rideOptions={rideOptions}
+      rideOptions={rideOptionsList}
       selectedRideId={selectedRideId}
       onSelectRide={setSelectedRideId}
+      onProceed={handleProceedInstantRide}
+      onSchedule={handleScheduleRide}
+      etaMinutes={routeDurationMinutes || estimatedDurationMinutes || undefined}
+      isLoading={routeMetricsLoading}
+      hasError={!!routeMetricsError}
     />
   );
 

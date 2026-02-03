@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -43,6 +43,11 @@ export function LocationProvider({ children }: LocationProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<LocationAddress | null>(null);
   const [hasAskedPermission, setHasAskedPermissionState] = useState(false);
+  const lastGeocodeRef = useRef<{
+    key: string;
+    time: number;
+    address: LocationAddress | null;
+  } | null>(null);
 
   useEffect(() => {
     checkPermissionStatus();
@@ -156,6 +161,13 @@ export function LocationProvider({ children }: LocationProviderProps) {
 
   const reverseGeocode = async (coordinates: LocationCoordinates): Promise<LocationAddress | null> => {
     try {
+      const key = `${coordinates.latitude.toFixed(5)},${coordinates.longitude.toFixed(5)}`;
+      const now = Date.now();
+      const last = lastGeocodeRef.current;
+      if (last && last.key === key && now - last.time < 15000) {
+        return last.address;
+      }
+
       const results = await Location.reverseGeocodeAsync(coordinates);
 
       if (results.length > 0) {
@@ -166,7 +178,7 @@ export function LocationProvider({ children }: LocationProviderProps) {
           result.district,
         ].filter(Boolean);
 
-        return {
+        const address: LocationAddress = {
           coordinates,
           address: addressParts.join(' ') || result.name || 'Unknown location',
           name: result.name || undefined,
@@ -175,9 +187,16 @@ export function LocationProvider({ children }: LocationProviderProps) {
           country: result.country || undefined,
           postalCode: result.postalCode || undefined,
         };
+        lastGeocodeRef.current = { key, time: now, address };
+        return address;
       }
       return null;
     } catch (error) {
+      lastGeocodeRef.current = {
+        key: `${coordinates.latitude.toFixed(5)},${coordinates.longitude.toFixed(5)}`,
+        time: Date.now(),
+        address: lastGeocodeRef.current?.address || null,
+      };
       console.error('Error reverse geocoding:', error);
       return null;
     }
