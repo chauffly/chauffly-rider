@@ -21,7 +21,7 @@ import { Divider } from '@/components/ui/divider';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { useLocation, LocationCoordinates } from '@/context/location-context';
-import { spacing } from '@/constants/spacing';
+import { borderRadius, spacing } from "@/constants/spacing";
 import {
   locationHistoryService,
   LocationHistoryItem as HistoryItemType,
@@ -410,29 +410,56 @@ export default function YourRouteScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Pressable onPress={handleClose} style={styles.closeButton}>
           <CloseIcon size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" font='medium' translationKey="location.your_route" />
+        <Text variant="h3" font="medium" translationKey="location.your_route" />
         <View style={styles.headerSpacer} />
+        <Pressable
+          onPress={handleContinue}
+          disabled={!origin || destinations.length === 0}
+          style={({ pressed }) => [
+            styles.continueButton,
+            {
+              backgroundColor: colors.primary,
+              borderColor: colors.primary,
+              opacity:
+                !origin || destinations.length === 0 ? 0.4 : pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          <Text variant="bodySmall" weight="semiBold" color="inverse">
+            Continue
+          </Text>
+        </Pressable>
       </View>
 
       <View style={[styles.inputsContainer, { borderColor: colors.border }]}>
         {/* Origin Input */}
         <View style={styles.inputWrapper}>
-          <View style={[styles.routeLine, { backgroundColor: colors.border }]} />
+          <View
+            style={[styles.routeLine, { backgroundColor: colors.border }]}
+          />
           <LocationInput
             type="origin"
             leftIcon={<LocationPinGreen size={20} />}
-            style={{ borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }}
+            style={{
+              borderWidth: 0,
+              backgroundColor: "transparent",
+              paddingHorizontal: 0,
+            }}
             value={activeInputIndex === -1 ? searchQuery : undefined}
             displayValue={activeInputIndex === -1 ? undefined : origin?.name}
             placeholderKey="location.your_current_location"
-            onPress={activeInputIndex !== -1 ? () => handleInputFocus(-1) : undefined}
-            onChangeText={activeInputIndex === -1 ? handleSearchChange : undefined}
+            onPress={
+              activeInputIndex !== -1 ? () => handleInputFocus(-1) : undefined
+            }
+            onChangeText={
+              activeInputIndex === -1 ? handleSearchChange : undefined
+            }
             isEditable={activeInputIndex === -1}
             ref={activeInputIndex === -1 ? inputRef : undefined}
             returnKeyType="done"
@@ -448,12 +475,22 @@ export default function YourRouteScreen() {
             <LocationInput
               type="destination"
               leftIcon={<LocationPinRed size={20} />}
-              style={{ borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }}
+              style={{
+                borderWidth: 0,
+                backgroundColor: "transparent",
+                paddingHorizontal: 0,
+              }}
               value={activeInputIndex === index ? searchQuery : undefined}
               displayValue={activeInputIndex === index ? undefined : dest.name}
               placeholderKey="location.where_to"
-              onPress={activeInputIndex !== index ? () => handleInputFocus(index) : undefined}
-              onChangeText={activeInputIndex === index ? handleSearchChange : undefined}
+              onPress={
+                activeInputIndex !== index
+                  ? () => handleInputFocus(index)
+                  : undefined
+              }
+              onChangeText={
+                activeInputIndex === index ? handleSearchChange : undefined
+              }
               isEditable={activeInputIndex === index}
               ref={activeInputIndex === index ? inputRef : undefined}
               rightIcon={
@@ -469,8 +506,8 @@ export default function YourRouteScreen() {
                 destinations.length > 1
                   ? () => handleRemoveDestination(index)
                   : index === destinations.length - 1
-                  ? handleAddStop
-                  : undefined
+                    ? handleAddStop
+                    : undefined
               }
               returnKeyType="done"
               onSubmitEditing={handleKeyboardDone}
@@ -484,13 +521,33 @@ export default function YourRouteScreen() {
             <LocationInput
               type="destination"
               leftIcon={<LocationPinRed size={20} />}
-              style={{ borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }}
-              value={activeInputIndex !== null && activeInputIndex >= 0 ? searchQuery : ''}
+              style={{
+                borderWidth: 0,
+                backgroundColor: "transparent",
+                paddingHorizontal: 0,
+              }}
+              value={
+                activeInputIndex !== null && activeInputIndex >= 0
+                  ? searchQuery
+                  : ""
+              }
               placeholderKey="location.where_to"
-              onPress={activeInputIndex === null || activeInputIndex === -1 ? () => handleInputFocus(destinations.length) : undefined}
-              onChangeText={activeInputIndex !== null && activeInputIndex >= 0 ? handleSearchChange : undefined}
+              onPress={
+                activeInputIndex === null || activeInputIndex === -1
+                  ? () => handleInputFocus(destinations.length)
+                  : undefined
+              }
+              onChangeText={
+                activeInputIndex !== null && activeInputIndex >= 0
+                  ? handleSearchChange
+                  : undefined
+              }
               isEditable={activeInputIndex !== null && activeInputIndex >= 0}
-              ref={activeInputIndex !== null && activeInputIndex >= 0 ? inputRef : undefined}
+              ref={
+                activeInputIndex !== null && activeInputIndex >= 0
+                  ? inputRef
+                  : undefined
+              }
               returnKeyType="done"
               onSubmitEditing={handleKeyboardDone}
             />
@@ -508,10 +565,10 @@ export default function YourRouteScreen() {
       >
         <View style={styles.actionSheetContent}>
           <Text variant="h3" font="medium" style={styles.actionSheetTitle}>
-            {t('location.destination_added')}
+            {t("location.destination_added")}
           </Text>
           <Text variant="body" color="muted" style={styles.actionSheetSubtitle}>
-            {t('location.add_more_stops_question')}
+            {t("location.add_more_stops_question")}
           </Text>
 
           <View style={styles.actionButtons}>
@@ -541,8 +598,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
   },
@@ -553,6 +610,12 @@ const styles = StyleSheet.create({
   headerSpacer: {
     flex: 1,
   },
+  continueButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
   inputsContainer: {
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
@@ -562,10 +625,10 @@ const styles = StyleSheet.create({
     margin: spacing.lg,
   },
   inputWrapper: {
-    position: 'relative',
+    position: "relative",
   },
   routeLine: {
-    position: 'absolute',
+    position: "absolute",
     left: 22,
     top: 52,
     width: 2,
@@ -585,15 +648,15 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
   },
   actionSheetTitle: {
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: spacing.sm,
   },
   actionSheetSubtitle: {
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: spacing.xl,
   },
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.md,
   },
   actionButton: {
