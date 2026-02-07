@@ -209,9 +209,9 @@ export default function SelectPickupTimeScreen() {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
                 shadowColor: colors.textPrimary,
-                left: getPopoverLeft(timeAnchor.x, 180),
+                left: getPopoverLeft(timeAnchor.x, 240),
                 top: timeAnchor.y + timeAnchor.height + spacing.sm,
-                width: 180,
+                width: 240,
               },
             ]}
           >
