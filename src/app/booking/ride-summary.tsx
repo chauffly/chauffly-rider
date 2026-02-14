@@ -87,7 +87,7 @@ export default function RideSummaryScreen() {
         >
           <ChevronLeft size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" font="medium" translationKey="booking.ride_summary" />
+        <Text variant="h3" font="medium" size={"xl"} translationKey="booking.ride_summary" />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -211,7 +211,7 @@ export default function RideSummaryScreen() {
                 paddingRight: spacing.md,
               },
             ]}
-            onPress={() => router.push('/(tabs)/booking/personalization')}
+            onPress={() => router.push('/booking/personalization')}
             accessibilityRole="button"
             accessibilityLabel={t('booking.enhance_ride_title')}
           >
@@ -253,7 +253,7 @@ export default function RideSummaryScreen() {
           fullWidth
           onPress={() =>
             router.push({
-              pathname: '/(tabs)/booking/driver-accepts',
+              pathname: '/booking/driver-accepts',
               params,
             })
           }

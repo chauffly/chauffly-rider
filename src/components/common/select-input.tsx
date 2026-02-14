@@ -51,30 +51,54 @@ export function SelectInput({
   const [isOpen, setIsOpen] = useState(false);
 
   const labelText = labelTranslationKey ? t(labelTranslationKey) : label;
-  const placeholderText = placeholderTranslationKey ? t(placeholderTranslationKey) : placeholder;
+  const placeholderText = placeholderTranslationKey
+    ? t(placeholderTranslationKey)
+    : placeholder;
   const errorText = errorTranslationKey ? t(errorTranslationKey) : error;
   const hasError = !!errorText;
-
-  const selectedOption = options.find(opt => opt.value === value);
-  const displayText = selectedOption
-    ? (selectedOption.translationKey ? t(selectedOption.translationKey) : selectedOption.label)
-    : placeholderText;
-
   const hasValue = !!value;
 
+  const selectedOption = options.find((opt) => opt.value === value);
+  const displayText = selectedOption
+    ? selectedOption.translationKey
+      ? t(selectedOption.translationKey)
+      : selectedOption.label
+    : placeholderText;
+  const isFocused = isOpen;
+
+  const getInputState = () => {
+    if (hasError && hasValue) return "error";
+    if (hasValue && !hasError) return "valid";
+    if (isFocused) return "focused";
+    return "default";
+  };
+
+  const inputState = getInputState();
+
   const getBorderStyle = () => {
-    if (hasError) {
-      return { borderWidth: 1, borderColor: colors.error };
+    switch (inputState) {
+      case "error":
+        return { borderWidth: 1, borderColor: colors.error };
+      case "valid":
+        return { borderWidth: 1, borderColor: colors.success };
+      case "focused":
+        return { borderWidth: 0.5, borderColor: colors.border };
+      default:
+        return { borderWidth: 0, borderColor: "transparent" };
     }
-    return { borderWidth: 0, borderColor: 'transparent' };
   };
 
   const getOutlineStyle = () => {
-    if (hasError) {
+    if (inputState === "error") {
       return { borderWidth: 4, borderColor: colors.error50 };
     }
-    return { borderWidth: 0, borderColor: 'transparent', padding: 0 };
+    if (inputState === "valid") {
+      return { borderWidth: 4, borderColor: colors.success50 };
+    }
+    return { borderWidth: 0, borderColor: "transparent", padding: 0 };
   };
+
+  const showOutline = inputState === "error" || inputState === "valid";
 
   const handleSelect = (optionValue: string) => {
     onValueChange?.(optionValue);
@@ -91,7 +115,7 @@ export function SelectInput({
       <View
         style={[
           styles.outlineWrapper,
-          hasError && getOutlineStyle(),
+          showOutline && getOutlineStyle(),
         ]}
       >
         <Pressable
@@ -102,11 +126,7 @@ export function SelectInput({
             { backgroundColor: colors.surface },
           ]}
         >
-          {leftIcon && (
-            <View style={styles.leftIcon}>
-              {leftIcon}
-            </View>
-          )}
+          {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
           <Text
             style={[
               styles.input,
@@ -124,39 +144,41 @@ export function SelectInput({
         </Pressable>
       </View>
       {hasError && (
-        <Text variant="caption" style={[styles.errorText, { color: colors.error }]}>
+        <Text
+          variant="caption"
+          style={[styles.errorText, { color: colors.error }]}
+        >
           {errorText}
         </Text>
       )}
 
-      <BottomSheet
-        visible={isOpen}
-        onClose={() => setIsOpen(false)}
-      >
+      <BottomSheet visible={isOpen} onClose={() => setIsOpen(false)}>
         <FlatList
           data={options}
           keyExtractor={(item) => item.value}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={[
-                styles.optionItem,
-                value === item.value && { backgroundColor: colors.accent },
-              ]}
+              style={[styles.optionItem]}
               onPress={() => handleSelect(item.value)}
             >
               <Text
                 style={[
                   styles.optionText,
                   { color: colors.textPrimary },
-                  value === item.value && { color: colors.primary },
+                  value === item.value && {
+                    color: colors.primary,
+                  },
                 ]}
+                font={value === item.value ? "medium" : "regular"}
               >
                 {item.translationKey ? t(item.translationKey) : item.label}
               </Text>
             </TouchableOpacity>
           )}
           ItemSeparatorComponent={() => (
-            <View style={[styles.separator, { backgroundColor: colors.border }]} />
+            <View
+              style={[styles.separator, { backgroundColor: colors.border }]}
+            />
           )}
         />
       </BottomSheet>
@@ -175,8 +197,8 @@ const styles = StyleSheet.create({
     borderRadius: 50,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 50,
     paddingHorizontal: spacing.lg,
     minHeight: 50,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -6,21 +6,21 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Text } from '@/components/common/text';
-import { TextInput } from '@/components/common/text-input';
-import { Button } from '@/components/common/button';
-import { SocialButton } from '@/components/common/social-button';
-import { useTheme } from '@/context/theme-context';
-import { useTranslation } from '@/context/language-context';
-import { spacing } from '@/constants/spacing';
-import CallOutline from '@/components/svg/CallOutline';
-import Password from '@/components/svg/Password';
+import { Text } from "@/components/common/text";
+import { TextInput } from "@/components/common/text-input";
+import { Button } from "@/components/common/button";
+import { SocialButton } from "@/components/common/social-button";
+import { useTheme } from "@/context/theme-context";
+import { useTranslation } from "@/context/language-context";
+import { spacing } from "@/constants/spacing";
+import CallOutline from "@/components/svg/CallOutline";
+import Password from "@/components/svg/Password";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -28,25 +28,29 @@ export default function LoginScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [password, setPassword] = useState('');
-  const [phoneError, setPhoneError] = useState('');
+  useEffect(() => {
+    router.push("/booking/personalization");
+  }, []);
+
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [password, setPassword] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   const handleLogin = () => {
     if (!phoneNumber || phoneNumber.length < 10) {
-      setPhoneError(t('auth.invalid_phone'));
+      setPhoneError(t("auth.invalid_phone"));
       return;
     }
-    setPhoneError('');
-    router.replace('/(tabs)');
+    setPhoneError("");
+    router.replace("/(tabs)");
   };
 
   const handleForgotPassword = () => {
-    router.push('/(auth)/forgot-password');
+    router.push("/(auth)/forgot-password");
   };
 
   const handleSignUp = () => {
-    router.push('/(auth)/register');
+    router.push("/(auth)/register");
   };
 
   const handleGoogleLogin = () => {
@@ -60,28 +64,31 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <StatusBar style={colors.statusBar as 'light' | 'dark'} />
+      <StatusBar style={colors.statusBar as "light" | "dark"} />
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xxl },
+          {
+            paddingTop: insets.top + spacing.xxl,
+            paddingBottom: insets.bottom + spacing.xxl,
+          },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
           <Image
-            source={require('../../../assets/images/logo-sm.png')}
+            source={require("../../../assets/images/logo-sm.png")}
             style={styles.logo}
             contentFit="contain"
           />
-          <Text variant="h1" font='medium' align="center" style={styles.title}>
-            {t('auth.welcome_back')}
+          <Text variant="h1" font="medium" align="center" style={styles.title}>
+            {t("auth.welcome_back")}
           </Text>
           <Text variant="body" color="muted" align="center">
-            {t('auth.login_subtitle')}
+            {t("auth.login_subtitle")}
           </Text>
         </View>
 
@@ -94,7 +101,7 @@ export default function LoginScreen() {
             value={phoneNumber}
             onChangeText={(text) => {
               setPhoneNumber(text);
-              if (phoneError) setPhoneError('');
+              if (phoneError) setPhoneError("");
             }}
             error={phoneError}
           />
@@ -108,9 +115,16 @@ export default function LoginScreen() {
             onChangeText={setPassword}
           />
 
-          <Pressable onPress={handleForgotPassword} style={styles.forgotPassword}>
-            <Text variant="bodySmall" weight="medium" style={{ textDecorationLine: 'underline' }}>
-              {t('auth.forgot_password')}
+          <Pressable
+            onPress={handleForgotPassword}
+            style={styles.forgotPassword}
+          >
+            <Text
+              variant="bodySmall"
+              weight="medium"
+              style={{ textDecorationLine: "underline" }}
+            >
+              {t("auth.forgot_password")}
             </Text>
           </Pressable>
 
@@ -124,11 +138,15 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.dividerContainer}>
-          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+          <View
+            style={[styles.dividerLine, { backgroundColor: colors.border }]}
+          />
           <Text variant="caption" color="muted" style={styles.dividerText}>
-            {t('auth.or_continue_with')}
+            {t("auth.or_continue_with")}
           </Text>
-          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+          <View
+            style={[styles.dividerLine, { backgroundColor: colors.border }]}
+          />
         </View>
 
         <View style={styles.socialButtons}>
@@ -138,11 +156,15 @@ export default function LoginScreen() {
 
         <View style={styles.footer}>
           <Text variant="bodySmall" color="muted">
-            {t('auth.no_account')}{' '}
+            {t("auth.no_account")}{" "}
           </Text>
           <Pressable onPress={handleSignUp}>
-            <Text variant="bodySmall" weight="medium" style={{ textDecorationLine: 'underline' }}>
-              {t('auth.sign_up')}
+            <Text
+              variant="bodySmall"
+              weight="medium"
+              style={{ textDecorationLine: "underline" }}
+            >
+              {t("auth.sign_up")}
             </Text>
           </Pressable>
         </View>
@@ -160,7 +182,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: spacing.xxxl,
   },
   logo: {
@@ -174,15 +196,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxl,
   },
   forgotPassword: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     marginBottom: spacing.xl,
   },
   loginButton: {
     marginTop: spacing.md,
   },
   dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: spacing.xxl,
   },
   dividerLine: {
@@ -193,13 +215,13 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
   },
   socialButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.lg,
     marginBottom: spacing.xxxl,
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

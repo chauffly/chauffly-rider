@@ -23,7 +23,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: "Home",
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               name="map-marker-path"
@@ -34,21 +34,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="your-route"
+        name="rides"
         options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="booking"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Rides',
+          title: "Rides",
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons
               name="format-list-bulleted"
@@ -61,7 +49,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Account',
+          title: "Account",
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               name={focused ? "account-cog" : "account-cog-outline"}

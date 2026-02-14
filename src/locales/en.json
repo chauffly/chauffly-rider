@@ -162,7 +162,7 @@
     "concierge_visual_preparation": "Visual Preparation Checklists",
     "concierge_timing_coordination": "Timing Coordination",
     "arrival_time_placeholder": "Arrival time",
-    "early_arrival_buffer_placeholder": "Optional Early Arrival Buffer",
+    "early_arrival_buffer_placeholder": "Early Arrival Buffer (Optional)",
     "additional_notes_placeholder": "Additional Notes (Optional)",
     "save_preference": "Save Preference",
     "lounge_pickup_coordination": "Lounge Pickup Coordination",

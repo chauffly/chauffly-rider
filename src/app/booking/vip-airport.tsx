@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
+import { DatePicker } from '@/components/common/date-picker';
+import { TimePicker } from '@/components/common/time-picker';
 import { SelectInput } from '@/components/common/select-input';
 import { Button } from '@/components/common/button';
 import ChevronLeft from '@/components/svg/ChevronLeft';
@@ -11,11 +14,13 @@ import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 
-export default function SpecialOccasionScreen() {
+export default function VipAirportCoordinationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const [flightDate, setFlightDate] = useState<Date | null>(null);
+  const [arrivalTime, setArrivalTime] = useState<Date | null>(null);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.md }]}>
@@ -28,36 +33,43 @@ export default function SpecialOccasionScreen() {
         >
           <ChevronLeft size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" font="medium" translationKey="booking.special_occasion_packages" />
+        <Text variant="h3" font="medium" size={"xl"} translationKey="booking.vip_airport_coordination" />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text variant="label" translationKey="booking.decor_section" />
-        <SelectInput
-          placeholderTranslationKey="booking.decor_type_placeholder"
-          options={[
-            { value: 'minimal', label: t('booking.decor_minimal') },
-            { value: 'romantic', label: t('booking.decor_romantic') },
-            { value: 'celebration', label: t('booking.decor_celebration') },
-          ]}
-        />
-        <SelectInput
-          placeholderTranslationKey="booking.color_theme_placeholder"
-          options={[
-            { value: 'gold', label: t('booking.color_gold') },
-            { value: 'black', label: t('booking.color_black') },
-            { value: 'white', label: t('booking.color_white') },
-          ]}
-        />
-        <TextInput placeholderTranslationKey="booking.custom_decor_request_placeholder" />
+        <Text variant="label" translationKey="booking.lounge_pickup_coordination" />
+        <TextInput placeholderTranslationKey="booking.airport_name_placeholder" />
+        <TextInput placeholderTranslationKey="booking.terminal_information_placeholder" />
+        <TextInput placeholderTranslationKey="booking.lounge_name_placeholder" />
+        <TextInput placeholderTranslationKey="booking.preferred_pickup_location_placeholder" />
 
-        <Text variant="label" translationKey="booking.timing_section" />
+        <Text variant="label" translationKey="booking.flight_tracking" />
+        <TextInput placeholderTranslationKey="booking.flight_number_placeholder" />
         <View style={styles.row}>
           <View style={styles.half}>
-            <TextInput placeholderTranslationKey="booking.preferred_time_placeholder" />
+            <DatePicker
+              placeholderTranslationKey="booking.date_placeholder"
+              value={flightDate}
+              onChange={setFlightDate}
+            />
           </View>
           <View style={styles.half}>
-            <TextInput placeholderTranslationKey="booking.time_window_placeholder" />
+            <TimePicker
+              placeholderTranslationKey="booking.arrival_time_placeholder"
+              value={arrivalTime}
+              onChange={setArrivalTime}
+            />
+          </View>
+        </View>
+        <TextInput placeholderTranslationKey="booking.airline_name_placeholder" />
+
+        <Text variant="label" translationKey="booking.arrival_timing_sync" />
+        <View style={styles.row}>
+          <View style={styles.half}>
+            <TextInput placeholderTranslationKey="booking.landing_time_placeholder" />
+          </View>
+          <View style={styles.half}>
+            <TextInput placeholderTranslationKey="booking.pickup_time_placeholder" />
           </View>
         </View>
         <SelectInput
@@ -68,18 +80,6 @@ export default function SpecialOccasionScreen() {
             { value: '45', label: t('booking.buffer_45') },
           ]}
         />
-
-        <Text variant="label" translationKey="booking.chauffeur_briefing_section" />
-        <SelectInput
-          placeholderTranslationKey="booking.briefing_type_placeholder"
-          options={[
-            { value: 'discreet', label: t('booking.briefing_discreet') },
-            { value: 'celebratory', label: t('booking.briefing_celebratory') },
-            { value: 'formal', label: t('booking.briefing_formal') },
-          ]}
-        />
-        <TextInput placeholderTranslationKey="booking.instructions_placeholder" />
-        <TextInput placeholderTranslationKey="booking.additional_notes_placeholder" />
       </ScrollView>
 
       <View style={styles.footer}>

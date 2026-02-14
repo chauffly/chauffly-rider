@@ -178,7 +178,7 @@ export default function DriverAcceptsScreen() {
 
         <View style={styles.footerButtons}>
           <Button translationKey="common.back" variant="outline" style={styles.footerButton} onPress={() => router.back()} />
-          <Button translationKey="booking.view_rides" style={styles.footerButton} onPress={() => router.push('/(tabs)/explore')} />
+          <Button translationKey="booking.view_rides" style={styles.footerButton} onPress={() => router.push('/(tabs)/rides')} />
         </View>
       </View>
     </View>

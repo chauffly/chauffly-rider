@@ -16,12 +16,12 @@ interface PersonalizationItem {
 }
 
 const personalizationItems: PersonalizationItem[] = [
-  { key: 'ridePreference', titleKey: 'booking.ride_preference', route: '/(tabs)/booking/ride-preference' },
-  { key: 'concierge', titleKey: 'booking.concierge_pre_trip_setup', route: '/(tabs)/booking/concierge-pre-trip' },
-  { key: 'chauffeurMatching', titleKey: 'booking.preferred_chauffeur_matching', route: '/(tabs)/booking/preferred-chauffeur-matching' },
-  { key: 'vipAirport', titleKey: 'booking.vip_airport_coordination', route: '/(tabs)/booking/vip-airport' },
-  { key: 'redCarpet', titleKey: 'booking.red_carpet_event_service', route: '/(tabs)/booking/red-carpet-event' },
-  { key: 'specialOccasion', titleKey: 'booking.special_occasion_packages', route: '/(tabs)/booking/special-occasion' },
+  { key: 'ridePreference', titleKey: 'booking.ride_preference', route: '/booking/ride-preference' },
+  { key: 'concierge', titleKey: 'booking.concierge_pre_trip_setup', route: '/booking/concierge-pre-trip' },
+  { key: 'chauffeurMatching', titleKey: 'booking.preferred_chauffeur_matching', route: '/booking/preferred-chauffeur-matching' },
+  { key: 'vipAirport', titleKey: 'booking.vip_airport_coordination', route: '/booking/vip-airport' },
+  { key: 'redCarpet', titleKey: 'booking.red_carpet_event_service', route: '/booking/red-carpet-event' },
+  { key: 'specialOccasion', titleKey: 'booking.special_occasion_packages', route: '/booking/special-occasion' },
 ];
 
 export default function PersonalizationScreen() {
@@ -109,7 +109,7 @@ export default function PersonalizationScreen() {
           style={styles.footerButton}
           onPress={() =>
             router.push({
-              pathname: "/(tabs)/booking/ride-summary",
+              pathname: "/booking/ride-summary",
               params,
             })
           }

@@ -196,7 +196,7 @@ export default function HomeScreen() {
   };
 
   const handleEnterLocationPress = () => {
-    router.push("/(tabs)/your-route");
+    router.push("/your-route");
   };
 
   const handleCurrentLocationPress = async () => {
@@ -209,7 +209,7 @@ export default function HomeScreen() {
 
   const handleQuickLocationPress = (location: SavedLocation) => {
     router.push({
-      pathname: "/(tabs)/your-route",
+      pathname: "/your-route",
       params: {
         destinationName: location.name,
         destinationAddress: location.address,
@@ -232,7 +232,7 @@ export default function HomeScreen() {
   const handleEditRoute = () => {
     // Go to your-route to edit, pass current route data
     router.push({
-      pathname: "/(tabs)/your-route",
+      pathname: "/your-route",
       params: {
         editMode: "true",
         originName: origin?.name,
@@ -257,7 +257,7 @@ export default function HomeScreen() {
       return;
     }
     router.push({
-      pathname: "/(tabs)/booking/ride-summary",
+      pathname: "/booking/ride-summary",
       params: {
         originName: origin.name,
         originAddress: origin.address,
@@ -281,7 +281,7 @@ export default function HomeScreen() {
       return;
     }
     router.push({
-      pathname: "/(tabs)/booking/select-pickup-time",
+      pathname: "/booking/select-pickup-time",
       params: {
         originName: origin.name,
         originAddress: origin.address,

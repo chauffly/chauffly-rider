@@ -143,7 +143,7 @@ export default function SelectPickupTimeScreen() {
           fullWidth
           onPress={() =>
             router.push({
-              pathname: '/(tabs)/booking/personalization',
+              pathname: '/booking/personalization',
               params: {
                 ...params,
                 pickupDate: format(selectedDate, 'yyyy-MM-dd'),

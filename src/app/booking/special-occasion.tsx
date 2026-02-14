@@ -11,7 +11,7 @@ import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 
-export default function VipAirportCoordinationScreen() {
+export default function SpecialOccasionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -28,35 +28,36 @@ export default function VipAirportCoordinationScreen() {
         >
           <ChevronLeft size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" font="medium" translationKey="booking.vip_airport_coordination" />
+        <Text variant="h3" font="medium" size={"xl"} translationKey="booking.special_occasion_packages" />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text variant="label" translationKey="booking.lounge_pickup_coordination" />
-        <TextInput placeholderTranslationKey="booking.airport_name_placeholder" />
-        <TextInput placeholderTranslationKey="booking.terminal_information_placeholder" />
-        <TextInput placeholderTranslationKey="booking.lounge_name_placeholder" />
-        <TextInput placeholderTranslationKey="booking.preferred_pickup_location_placeholder" />
+        <Text variant="label" translationKey="booking.decor_section" />
+        <SelectInput
+          placeholderTranslationKey="booking.decor_type_placeholder"
+          options={[
+            { value: 'minimal', label: t('booking.decor_minimal') },
+            { value: 'romantic', label: t('booking.decor_romantic') },
+            { value: 'celebration', label: t('booking.decor_celebration') },
+          ]}
+        />
+        <SelectInput
+          placeholderTranslationKey="booking.color_theme_placeholder"
+          options={[
+            { value: 'gold', label: t('booking.color_gold') },
+            { value: 'black', label: t('booking.color_black') },
+            { value: 'white', label: t('booking.color_white') },
+          ]}
+        />
+        <TextInput placeholderTranslationKey="booking.custom_decor_request_placeholder" />
 
-        <Text variant="label" translationKey="booking.flight_tracking" />
-        <TextInput placeholderTranslationKey="booking.flight_number_placeholder" />
+        <Text variant="label" translationKey="booking.timing_section" />
         <View style={styles.row}>
           <View style={styles.half}>
-            <TextInput placeholderTranslationKey="booking.date_placeholder" />
+            <TextInput placeholderTranslationKey="booking.preferred_time_placeholder" />
           </View>
           <View style={styles.half}>
-            <TextInput placeholderTranslationKey="booking.arrival_time_placeholder" />
-          </View>
-        </View>
-        <TextInput placeholderTranslationKey="booking.airline_name_placeholder" />
-
-        <Text variant="label" translationKey="booking.arrival_timing_sync" />
-        <View style={styles.row}>
-          <View style={styles.half}>
-            <TextInput placeholderTranslationKey="booking.landing_time_placeholder" />
-          </View>
-          <View style={styles.half}>
-            <TextInput placeholderTranslationKey="booking.pickup_time_placeholder" />
+            <TextInput placeholderTranslationKey="booking.time_window_placeholder" />
           </View>
         </View>
         <SelectInput
@@ -67,6 +68,18 @@ export default function VipAirportCoordinationScreen() {
             { value: '45', label: t('booking.buffer_45') },
           ]}
         />
+
+        <Text variant="label" translationKey="booking.chauffeur_briefing_section" />
+        <SelectInput
+          placeholderTranslationKey="booking.briefing_type_placeholder"
+          options={[
+            { value: 'discreet', label: t('booking.briefing_discreet') },
+            { value: 'celebratory', label: t('booking.briefing_celebratory') },
+            { value: 'formal', label: t('booking.briefing_formal') },
+          ]}
+        />
+        <TextInput placeholderTranslationKey="booking.instructions_placeholder" />
+        <TextInput placeholderTranslationKey="booking.additional_notes_placeholder" />
       </ScrollView>
 
       <View style={styles.footer}>

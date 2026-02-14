@@ -28,7 +28,7 @@ export default function RedCarpetEventScreen() {
         >
           <ChevronLeft size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" font="medium" translationKey="booking.red_carpet_event_service" />
+        <Text variant="h3" font="medium" size={"xl"} translationKey="booking.red_carpet_event_service" />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

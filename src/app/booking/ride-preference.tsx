@@ -1,7 +1,7 @@
-import { useLayoutEffect, useState } from "react";
+import { useState } from "react";
 import { StyleSheet, View, Pressable, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter, useNavigation } from "expo-router";
+import { useRouter } from "expo-router";
 
 import { Text } from "@/components/common/text";
 import { Button } from "@/components/common/button";
@@ -75,7 +75,6 @@ const amenityOptions = [
 
 export default function RidePreferenceScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -96,22 +95,6 @@ export default function RidePreferenceScreen() {
   const toggleAmenity = (key: string) => {
     setAmenities((prev) => ({ ...prev, [key]: !prev[key] }));
   };
-
-  useLayoutEffect(() => {
-    const parent = navigation.getParent();
-    parent?.setOptions({
-      tabBarStyle: { display: "none" },
-    });
-
-    return () => {
-      parent?.setOptions({
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-        },
-      });
-    };
-  }, [navigation, colors.border, colors.surface]);
 
   const renderPills = (
     options: PillOption[],
@@ -166,6 +149,7 @@ export default function RidePreferenceScreen() {
         <Text
           variant="h3"
           font="medium"
+          size={"xl"}
           translationKey="booking.ride_preference"
         />
       </View>
@@ -175,7 +159,7 @@ export default function RidePreferenceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.labelWrapper}>
-          <Temperature />
+          <Temperature color={colors.textPrimary} />
           <Text
             variant="label"
             size={"lg"}
@@ -184,7 +168,7 @@ export default function RidePreferenceScreen() {
         </View>
         {renderPills(cabinOptions, cabinTemp, setCabinTemp)}
         <View style={styles.labelWrapper}>
-          <Music />
+          <Music color={colors.textPrimary} />
           <Text
             variant="label"
             size={"lg"}
@@ -194,7 +178,7 @@ export default function RidePreferenceScreen() {
         {renderPills(musicOptions, musicGenre, setMusicGenre)}
 
         <View style={styles.labelWrapper}>
-          <Message />
+          <Message color={colors.textPrimary} />
           <Text
             variant="label"
             size={"lg"}
@@ -209,7 +193,7 @@ export default function RidePreferenceScreen() {
 
         <View style={styles.toggleRow}>
           <View style={styles.labelWrapper}>
-            <Door />
+            <Door color={colors.textPrimary} />
             <Text
               variant="label"
               size={"lg"}
@@ -227,7 +211,7 @@ export default function RidePreferenceScreen() {
         </View>
 
         <View style={styles.labelWrapper}>
-          <AmbientScent />
+          <AmbientScent color={colors.textPrimary} />
           <Text
             variant="label"
             size={"lg"}
@@ -237,7 +221,7 @@ export default function RidePreferenceScreen() {
         {renderPills(scentOptions, ambientScent, setAmbientScent)}
 
         <View style={styles.labelWrapper}>
-          <Amenities />
+          <Amenities color={colors.textPrimary} />
           <Text
             variant="label"
             size={"lg"}
@@ -279,7 +263,7 @@ export default function RidePreferenceScreen() {
 
         <View style={styles.toggleRow}>
           <View style={styles.labelWrapper}>
-            <Security />
+            <Security color={colors.textPrimary} />
             <Text
               variant="label"
               size={"lg"}
