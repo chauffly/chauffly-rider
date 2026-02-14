@@ -15,18 +15,19 @@ import { borderRadius, spacing } from '@/constants/spacing';
 import { fontFamily, fontSize } from '@/constants/typography';
 import Check from '../svg/Check';
 
-export interface TextInputProps extends Omit<RNTextInputProps, 'placeholder'> {
+export interface TextInputProps extends Omit<RNTextInputProps, "placeholder"> {
   label?: string;
   labelTranslationKey?: string;
   placeholder?: string;
   placeholderTranslationKey?: string;
   leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
   error?: string;
   errorTranslationKey?: string;
   secureTextEntry?: boolean;
 }
 
-const VALID_COLOR = '#318D5B';
+ 
 
 
 export function TextInput({
@@ -35,6 +36,7 @@ export function TextInput({
   placeholder,
   placeholderTranslationKey,
   leftIcon,
+  rightIcon,
   error,
   errorTranslationKey,
   secureTextEntry,
@@ -47,13 +49,15 @@ export function TextInput({
   const { t } = useTranslation();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const [internalValue, setInternalValue] = useState('');
+  const [internalValue, setInternalValue] = useState("");
 
   const currentValue = value !== undefined ? value : internalValue;
   const hasText = currentValue.length > 0;
 
   const labelText = labelTranslationKey ? t(labelTranslationKey) : label;
-  const placeholderText = placeholderTranslationKey ? t(placeholderTranslationKey) : placeholder;
+  const placeholderText = placeholderTranslationKey
+    ? t(placeholderTranslationKey)
+    : placeholder;
   const errorText = errorTranslationKey ? t(errorTranslationKey) : error;
   const hasError = !!errorText;
 
@@ -65,38 +69,38 @@ export function TextInput({
   };
 
   const getInputState = () => {
-    if (hasError && hasText) return 'error';
-    if (hasText && !hasError) return 'valid';
-    if (isFocused) return 'focused';
-    return 'default';
+    if (hasError && hasText) return "error";
+    if (hasText && !hasError) return "valid";
+    if (isFocused) return "focused";
+    return "default";
   };
 
   const inputState = getInputState();
 
   const getBorderStyle = () => {
     switch (inputState) {
-      case 'error':
+      case "error":
         return { borderWidth: 1, borderColor: colors.error };
-      case 'valid':
+      case "valid":
         return { borderWidth: 1, borderColor: colors.success };
-      case 'focused':
+      case "focused":
         return { borderWidth: 0.5, borderColor: colors.border };
       default:
-        return { borderWidth: 0, borderColor: 'transparent' };
+        return { borderWidth: 0, borderColor: "transparent" };
     }
   };
 
   const getOutlineStyle = () => {
-    if (inputState === 'error') {
-      return { borderWidth: 4, borderColor: colors.error50, };
+    if (inputState === "error") {
+      return { borderWidth: 4, borderColor: colors.error50 };
     }
-    if (inputState === 'valid') {
-      return { borderWidth: 4, borderColor: colors.success50, };
+    if (inputState === "valid") {
+      return { borderWidth: 4, borderColor: colors.success50 };
     }
-    return { borderWidth: 0, borderColor: 'transparent', padding: 0 };
+    return { borderWidth: 0, borderColor: "transparent", padding: 0 };
   };
 
-  const showOutline = inputState === 'error' || inputState === 'valid';
+  const showOutline = inputState === "error" || inputState === "valid";
 
   return (
     <View style={styles.container}>
@@ -120,17 +124,15 @@ export function TextInput({
             { backgroundColor: colors.surface },
           ]}
         >
-          {leftIcon && (
-            <View style={styles.leftIcon}>
-              {leftIcon}
-            </View>
-          )}
+          {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
           <RNTextInput
             style={[
               styles.input,
               {
                 color: colors.textPrimary,
                 fontFamily: fontFamily.regular,
+                height: rest.multiline ? 80 : undefined,
+                textAlignVertical: rest.multiline ? 'top' : 'center',
               },
               style,
             ]}
@@ -143,6 +145,7 @@ export function TextInput({
             onBlur={() => setIsFocused(false)}
             {...rest}
           />
+          {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
           {secureTextEntry && (
             <Pressable
               onPress={() => setIsPasswordVisible(!isPasswordVisible)}
@@ -150,7 +153,7 @@ export function TextInput({
               hitSlop={8}
             >
               <Ionicons
-                name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
+                name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
                 size={20}
                 color={colors.textMuted}
               />
@@ -158,13 +161,9 @@ export function TextInput({
           )}
           {hasError && !secureTextEntry ? (
             <View style={styles.rightIcon}>
-              <Ionicons
-                name="alert-circle"
-                size={20}
-                color={colors.error}
-              />
+              <Ionicons name="alert-circle" size={20} color={colors.error} />
             </View>
-          ) : inputState === 'valid' && !secureTextEntry ? (
+          ) : inputState === "valid" && !secureTextEntry ? (
             <View style={styles.rightIcon}>
               <Check />
             </View>
@@ -172,7 +171,10 @@ export function TextInput({
         </View>
       </View>
       {hasError && (
-        <Text variant="caption" style={[styles.errorText, { color: colors.error }]}>
+        <Text
+          variant="caption"
+          style={[styles.errorText, { color: colors.error }]}
+        >
           {errorText}
         </Text>
       )}
@@ -191,9 +193,9 @@ const styles = StyleSheet.create({
     borderRadius: 50,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 30,
     paddingHorizontal: spacing.lg,
     minHeight: 50,
   },

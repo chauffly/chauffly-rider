@@ -4,7 +4,7 @@ import { Calendar } from "react-native-calendars";
 import { format } from "date-fns";
 
 import { TextInput, TextInputProps } from "./text-input";
-import { Text } from "./text";
+import CalendarOutline from "@/components/svg/CalendarOutline";
 import { spacing, borderRadius } from "@/constants/spacing";
 import { useTheme } from "@/context/theme-context";
 
@@ -23,7 +23,7 @@ export function DatePicker({
   ...rest
 }: DatePickerProps) {
   const { colors } = useTheme();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<View>(null);
   const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -38,16 +38,19 @@ export function DatePicker({
     });
   };
 
-  const getPopoverLeft = (anchorX: number, popoverWidth: number) => {
-    const minLeft = spacing.lg;
-    const maxLeft = screenWidth - popoverWidth - spacing.lg;
-    return Math.min(Math.max(anchorX, minLeft), maxLeft);
-  };
+  const getPopoverLeft = (popoverWidth: number) => (screenWidth - popoverWidth) / 2;
+  const getPopoverTop = (popoverHeight: number) => (screenHeight - popoverHeight) / 2;
 
   return (
     <>
       <Pressable ref={buttonRef} onPress={openPopover}>
-        <TextInput value={displayValue} editable={false} pointerEvents="none" {...rest} />
+        <TextInput
+          value={displayValue}
+          editable={false}
+          pointerEvents="none"
+          rightIcon={<CalendarOutline color={colors.textMuted} />}
+          {...rest}
+        />
       </Pressable>
       {isOpen && anchor && (
         <Modal transparent animationType="fade" visible onRequestClose={() => setIsOpen(false)}>
@@ -60,8 +63,8 @@ export function DatePicker({
                   backgroundColor: colors.surface,
                   borderColor: colors.border,
                   shadowColor: colors.textPrimary,
-                  left: getPopoverLeft(anchor.x, 320),
-                  top: anchor.y + anchor.height + spacing.sm,
+                  left: getPopoverLeft(320),
+                  top: getPopoverTop(360),
                   width: 320,
                 },
               ]}

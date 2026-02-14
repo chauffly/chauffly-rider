@@ -1,44 +1,67 @@
-import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useState } from "react";
+import { StyleSheet, View, ScrollView, Pressable } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
-import { Text } from '@/components/common/text';
-import { TextInput } from '@/components/common/text-input';
-import { SelectInput } from '@/components/common/select-input';
-import { Button } from '@/components/common/button';
-import ChevronLeft from '@/components/svg/ChevronLeft';
-import { spacing } from '@/constants/spacing';
-import { useTheme } from '@/context/theme-context';
-import { useTranslation } from '@/context/language-context';
+import { Text } from "@/components/common/text";
+import { TextInput } from "@/components/common/text-input";
+import { SelectInput } from "@/components/common/select-input";
+import { TimePicker } from "@/components/common/time-picker";
+import { Button } from "@/components/common/button";
+import ChevronLeft from "@/components/svg/ChevronLeft";
+import { spacing } from "@/constants/spacing";
+import { useTheme } from "@/context/theme-context";
+import { useTranslation } from "@/context/language-context";
 
 export default function RedCarpetEventScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const [eventType, setEventType] = useState<string | undefined>(undefined);
+  const [arrivalTime, setArrivalTime] = useState<Date | null>(null);
+  const [pickupTime, setPickupTime] = useState<Date | null>(null);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.md }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.background,
+          paddingTop: insets.top + spacing.md,
+        },
+      ]}
+    >
       <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}
           style={styles.backButton}
           accessibilityRole="button"
-          accessibilityLabel={t('common.cancel')}
+          accessibilityLabel={t("common.cancel")}
         >
           <ChevronLeft size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" font="medium" size={"xl"} translationKey="booking.red_carpet_event_service" />
+        <Text
+          variant="h3"
+          font="medium"
+          size={"xl"}
+          translationKey="booking.red_carpet_event_service"
+        />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <Text variant="label" translationKey="booking.event_type_label" />
         <SelectInput
           placeholderTranslationKey="booking.event_type_placeholder"
+          value={eventType}
+          onValueChange={setEventType}
           options={[
-            { value: 'awards', label: t('booking.event_awards') },
-            { value: 'gala', label: t('booking.event_gala') },
-            { value: 'premiere', label: t('booking.event_premiere') },
+            { value: "awards", label: t("booking.event_awards") },
+            { value: "gala", label: t("booking.event_gala") },
+            { value: "premiere", label: t("booking.event_premiere") },
           ]}
         />
 
@@ -46,15 +69,38 @@ export default function RedCarpetEventScreen() {
         <TextInput placeholderTranslationKey="booking.venue_placeholder" />
 
         <Text variant="label" translationKey="booking.arrival_label" />
-        <TextInput placeholderTranslationKey="booking.arrival_time_placeholder" />
-        <TextInput placeholderTranslationKey="booking.pickup_time_placeholder" />
+        <View style={styles.row}>
+          <View style={styles.half}>
+            <TimePicker
+              placeholderTranslationKey="booking.arrival_time_placeholder"
+              value={arrivalTime}
+              onChange={setArrivalTime}
+            />
+          </View>
+          <View style={styles.half}>
+            <TimePicker
+              placeholderTranslationKey="booking.pickup_time_placeholder"
+              value={pickupTime}
+              onChange={setPickupTime}
+            />
+          </View>
+        </View>
 
         <Text variant="label" translationKey="booking.additional_notes_label" />
-        <TextInput placeholderTranslationKey="booking.additional_notes_placeholder" />
+        <TextInput
+          placeholderTranslationKey="booking.additional_notes_placeholder"
+          multiline
+          numberOfLines={4}
+          style={styles.notesInput}
+        />
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button translationKey="booking.save_preference" fullWidth onPress={() => router.back()} />
+        <Button
+          translationKey="booking.save_preference"
+          fullWidth
+          onPress={() => router.back()}
+        />
       </View>
     </View>
   );
@@ -66,8 +112,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
     marginBottom: spacing.lg,
   },
@@ -75,12 +121,22 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   content: {
     paddingBottom: spacing.xl,
     gap: spacing.sm,
+  },
+  row: {
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  half: {
+    flex: 1,
+  },
+  notesInput: {
+    textAlignVertical: "top",
   },
   footer: {
     paddingBottom: spacing.lg,

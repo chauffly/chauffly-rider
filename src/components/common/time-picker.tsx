@@ -4,6 +4,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { format } from "date-fns";
 
 import { TextInput, TextInputProps } from "./text-input";
+import ClockIcon from "@/components/svg/ClockIcon";
 import { Text } from "./text";
 import { spacing, borderRadius } from "@/constants/spacing";
 import { useTheme } from "@/context/theme-context";
@@ -21,7 +22,7 @@ export function TimePicker({
   ...rest
 }: TimePickerProps) {
   const { colors } = useTheme();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [isOpen, setIsOpen] = useState(false);
   const [draftTime, setDraftTime] = useState<Date>(value ?? new Date());
   const buttonRef = useRef<View>(null);
@@ -37,22 +38,36 @@ export function TimePicker({
     });
   };
 
-  const getPopoverLeft = (anchorX: number, popoverWidth: number) => {
-    const minLeft = spacing.lg;
-    const maxLeft = screenWidth - popoverWidth - spacing.lg;
-    return Math.min(Math.max(anchorX, minLeft), maxLeft);
-  };
+  const getPopoverLeft = (popoverWidth: number) =>
+    (screenWidth - popoverWidth) / 2;
   const TIME_POPOVER_WIDTH = 260;
+  const TIME_POPOVER_HEIGHT = 260;
+  const getPopoverTop = (popoverHeight: number) =>
+    (screenHeight - popoverHeight) / 2;
 
   return (
     <>
       <Pressable ref={buttonRef} onPress={openPopover}>
-        <TextInput value={displayValue} editable={false} pointerEvents="none" {...rest} />
+        <TextInput
+          value={displayValue}
+          editable={false}
+          pointerEvents="none"
+          rightIcon={<ClockIcon size={20} color={colors.textMuted} />}
+          {...rest}
+        />
       </Pressable>
       {isOpen && anchor && (
-        <Modal transparent animationType="fade" visible onRequestClose={() => setIsOpen(false)}>
+        <Modal
+          transparent
+          animationType="fade"
+          visible
+          onRequestClose={() => setIsOpen(false)}
+        >
           <View style={styles.popoverOverlay} pointerEvents="box-none">
-            <Pressable style={styles.popoverBackdrop} onPress={() => setIsOpen(false)} />
+            <Pressable
+              style={styles.popoverBackdrop}
+              onPress={() => setIsOpen(false)}
+            />
             <View
               style={[
                 styles.popoverCard,
@@ -61,8 +76,8 @@ export function TimePicker({
                   backgroundColor: colors.surface,
                   borderColor: colors.border,
                   shadowColor: colors.textPrimary,
-                  left: getPopoverLeft(anchor.x, TIME_POPOVER_WIDTH),
-                  top: anchor.y + anchor.height + spacing.sm,
+                  left: getPopoverLeft(TIME_POPOVER_WIDTH),
+                  top: getPopoverTop(TIME_POPOVER_HEIGHT),
                   width: TIME_POPOVER_WIDTH,
                 },
               ]}
@@ -88,7 +103,10 @@ export function TimePicker({
               <View style={styles.timeActions}>
                 <Pressable
                   onPress={() => setIsOpen(false)}
-                  style={[styles.timeActionButton, { backgroundColor: colors.accent }]}
+                  style={[
+                    styles.timeActionButton,
+                    { backgroundColor: colors.accent },
+                  ]}
                 >
                   <Text variant="bodySmall" color="muted">
                     Cancel
@@ -99,7 +117,10 @@ export function TimePicker({
                     onChange(draftTime);
                     setIsOpen(false);
                   }}
-                  style={[styles.timeActionButton, { backgroundColor: colors.primary }]}
+                  style={[
+                    styles.timeActionButton,
+                    { backgroundColor: colors.primary },
+                  ]}
                 >
                   <Text variant="bodySmall" color="inverse">
                     Set time
@@ -134,9 +155,11 @@ const styles = StyleSheet.create({
   },
   timePopoverCard: {
     paddingBottom: spacing.lg,
+    alignItems: "center",
   },
   picker: {
     height: 160,
+    width: "100%",
   },
   timeActions: {
     flexDirection: "row",

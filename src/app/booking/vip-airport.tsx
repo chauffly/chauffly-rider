@@ -21,6 +21,9 @@ export default function VipAirportCoordinationScreen() {
   const { t } = useTranslation();
   const [flightDate, setFlightDate] = useState<Date | null>(null);
   const [arrivalTime, setArrivalTime] = useState<Date | null>(null);
+  const [landingTime, setLandingTime] = useState<Date | null>(null);
+  const [pickupTime, setPickupTime] = useState<Date | null>(null);
+  const [bufferTime, setBufferTime] = useState<string | undefined>(undefined);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.md }]}>
@@ -66,14 +69,24 @@ export default function VipAirportCoordinationScreen() {
         <Text variant="label" translationKey="booking.arrival_timing_sync" />
         <View style={styles.row}>
           <View style={styles.half}>
-            <TextInput placeholderTranslationKey="booking.landing_time_placeholder" />
+            <TimePicker
+              placeholderTranslationKey="booking.landing_time_placeholder"
+              value={landingTime}
+              onChange={setLandingTime}
+            />
           </View>
           <View style={styles.half}>
-            <TextInput placeholderTranslationKey="booking.pickup_time_placeholder" />
+            <TimePicker
+              placeholderTranslationKey="booking.pickup_time_placeholder"
+              value={pickupTime}
+              onChange={setPickupTime}
+            />
           </View>
         </View>
         <SelectInput
           placeholderTranslationKey="booking.buffer_time_placeholder"
+          value={bufferTime}
+          onValueChange={setBufferTime}
           options={[
             { value: '15', label: t('booking.buffer_15') },
             { value: '30', label: t('booking.buffer_30') },
