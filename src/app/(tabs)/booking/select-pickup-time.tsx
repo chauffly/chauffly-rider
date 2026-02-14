@@ -47,6 +47,7 @@ export default function SelectPickupTimeScreen() {
 
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [selectedTime, setSelectedTime] = useState(initialTime);
+  const [draftTime, setDraftTime] = useState(initialTime);
 
   const pickupDateDisplay = format(selectedDate, 'dd MMM yyyy');
   const pickupTimeDisplay = format(selectedTime, 'h:mm a');
@@ -73,6 +74,7 @@ export default function SelectPickupTimeScreen() {
   const openTimePopover = () => {
     timeButtonRef.current?.measureInWindow((x, y, width, height) => {
       setTimeAnchor({ x, y, width, height });
+      setDraftTime(selectedTime);
       setIsTimeOpen(true);
     });
   };
@@ -82,6 +84,7 @@ export default function SelectPickupTimeScreen() {
     const maxLeft = screenWidth - popoverWidth - spacing.lg;
     return Math.min(Math.max(anchorX, minLeft), maxLeft);
   };
+  const TIME_POPOVER_WIDTH = 260;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.lg }]}>
@@ -209,14 +212,14 @@ export default function SelectPickupTimeScreen() {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
                 shadowColor: colors.textPrimary,
-                left: getPopoverLeft(timeAnchor.x, 240),
+                left: getPopoverLeft(timeAnchor.x, TIME_POPOVER_WIDTH),
                 top: timeAnchor.y + timeAnchor.height + spacing.sm,
-                width: 240,
+                width: TIME_POPOVER_WIDTH,
               },
             ]}
           >
           <DateTimePicker
-            value={selectedTime}
+            value={draftTime}
             mode="time"
             display={Platform.OS === 'ios' ? 'spinner' : 'spinner'}
             minuteInterval={5}
@@ -226,14 +229,30 @@ export default function SelectPickupTimeScreen() {
                 return;
               }
               if (date) {
-                setSelectedTime(date);
-                setIsTimeOpen(false);
+                setDraftTime(date);
               }
             }}
             textColor={colors.textPrimary}
             accentColor={colors.primary}
             style={styles.picker}
           />
+          <View style={styles.timeActions}>
+            <Pressable
+              onPress={() => setIsTimeOpen(false)}
+              style={[styles.timeActionButton, { backgroundColor: colors.accent }]}
+            >
+              <Text variant="bodySmall" color="muted">Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setSelectedTime(draftTime);
+                setIsTimeOpen(false);
+              }}
+              style={[styles.timeActionButton, { backgroundColor: colors.primary }]}
+            >
+              <Text variant="bodySmall" color="inverse">Set time</Text>
+            </Pressable>
+          </View>
           </View>
         </View>
       )}
@@ -290,11 +309,29 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   timePopoverCard: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 0,
     paddingVertical: spacing.md,
+    overflow: 'hidden',
+    alignItems: 'center',
   },
   picker: {
     height: 160,
+    width: 260,
+    alignSelf: 'center',
+  },
+  timeActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  timeActionButton: {
+    flex: 1,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   note: {
     marginTop: spacing.xs,

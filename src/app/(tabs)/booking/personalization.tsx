@@ -1,6 +1,6 @@
 import { StyleSheet, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from "expo-router";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Text } from '@/components/common/text';
@@ -12,7 +12,7 @@ import { useTranslation } from '@/context/language-context';
 interface PersonalizationItem {
   key: string;
   titleKey: string;
-  route: string;
+  route: Href<string>;
 }
 
 const personalizationItems: PersonalizationItem[] = [
@@ -42,10 +42,41 @@ export default function PersonalizationScreen() {
   }>();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: insets.bottom + spacing.lg }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.background,
+          paddingBottom: insets.bottom + spacing.lg,
+        },
+      ]}
+    >
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.lg }]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel={t("common.back")}
+          hitSlop={8}
+        >
+          <MaterialCommunityIcons
+            name="chevron-left"
+            size={26}
+            color={colors.textPrimary}
+          />
+        </Pressable>
+      </View>
       <View style={styles.header}>
-        <Text variant="h3" font="medium" translationKey="booking.personalization_title" />
-        <Text variant="caption" color="muted" translationKey="booking.personalization_subtitle" />
+        <Text
+          variant="h3"
+          font="medium"
+          translationKey="booking.personalization_title"
+        />
+        <Text
+          variant="caption"
+          color="muted"
+          translationKey="booking.personalization_subtitle"
+        />
       </View>
 
       <View style={styles.list}>
@@ -58,36 +89,27 @@ export default function PersonalizationScreen() {
                 params,
               })
             }
-            style={[styles.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.listItem, { backgroundColor: colors.surface }]}
             accessibilityRole="button"
             accessibilityLabel={t(item.titleKey)}
           >
-            <Text variant="body" font="medium">
-              {t(item.titleKey)}
-            </Text>
-            <MaterialCommunityIcons name="chevron-right" size={22} color={colors.textSecondary} />
+            <Text variant="body">{t(item.titleKey)}</Text>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={22}
+              color={colors.textSecondary}
+            />
           </Pressable>
         ))}
       </View>
 
       <View style={styles.footer}>
         <Button
-          translationKey="common.skip"
-          variant="outline"
-          style={styles.footerButton}
-          onPress={() =>
-            router.push({
-              pathname: '/(tabs)/booking/ride-summary',
-              params,
-            })
-          }
-        />
-        <Button
           translationKey="booking.proceed"
           style={styles.footerButton}
           onPress={() =>
             router.push({
-              pathname: '/(tabs)/booking/ride-summary',
+              pathname: "/(tabs)/booking/ride-summary",
               params,
             })
           }
@@ -101,28 +123,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xxxl,
+  },
+  topBar: {
+    width: "100%",
+    alignItems: "flex-start",
+    paddingBottom: spacing.lg,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: spacing.xl,
     gap: spacing.xs,
   },
   list: {
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   listItem: {
-    borderWidth: 1,
     borderRadius: borderRadius.full,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   footer: {
-    marginTop: 'auto',
-    flexDirection: 'row',
+    marginTop: "auto",
+    flexDirection: "row",
     gap: spacing.md,
   },
   footerButton: {
