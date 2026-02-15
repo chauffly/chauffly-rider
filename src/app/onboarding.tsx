@@ -1,24 +1,23 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   StyleSheet,
   Dimensions,
   FlatList,
   ViewToken,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Text } from '@/components/common/text';
-import { Button } from '@/components/common/button';
-import { useTheme } from '@/context/theme-context';
-import { useTranslation } from '@/context/language-context';
-import { spacing } from '@/constants/spacing';
-import { palette } from '@/constants/colors';
+import { Text } from "@/components/common/text";
+import { Button } from "@/components/common/button";
+import { useTheme } from "@/context/theme-context";
+import { spacing } from "@/constants/spacing";
+import { palette } from "@/constants/colors";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 interface OnboardingSlide {
   id: string;
@@ -29,22 +28,22 @@ interface OnboardingSlide {
 
 const slides: OnboardingSlide[] = [
   {
-    id: '1',
-    titleKey: 'onboarding.slide1_title',
-    descriptionKey: 'onboarding.slide1_description',
-    image: require('../../assets/images/onboarding-1.png'),
+    id: "1",
+    titleKey: "onboarding.slide1_title",
+    descriptionKey: "onboarding.slide1_description",
+    image: require("../../assets/images/onboarding-1.png"),
   },
   {
-    id: '2',
-    titleKey: 'onboarding.slide2_title',
-    descriptionKey: 'onboarding.slide2_description',
-    image: require('../../assets/images/onboarding-2.png'),
+    id: "2",
+    titleKey: "onboarding.slide2_title",
+    descriptionKey: "onboarding.slide2_description",
+    image: require("../../assets/images/onboarding-2.png"),
   },
   {
-    id: '3',
-    titleKey: 'onboarding.slide3_title',
-    descriptionKey: 'onboarding.slide3_description',
-    image: require('../../assets/images/onboarding-3.png'),
+    id: "3",
+    titleKey: "onboarding.slide3_title",
+    descriptionKey: "onboarding.slide3_description",
+    image: require("../../assets/images/onboarding-3.png"),
   },
 ];
 
@@ -64,7 +63,7 @@ export default function OnboardingScreen() {
         setCurrentIndex(viewableItems[0].index);
       }
     },
-    []
+    [],
   );
 
   const viewabilityConfig = useRef({
@@ -72,12 +71,12 @@ export default function OnboardingScreen() {
   }).current;
 
   const handleSkip = () => {
-    router.replace('/(auth)/login');
+    router.replace("/(auth)/login");
   };
 
   const handleContinue = () => {
     if (isLastSlide) {
-      router.replace('/(auth)/login');
+      router.replace("/(auth)/login");
     } else {
       flatListRef.current?.scrollToIndex({
         index: currentIndex + 1,
@@ -86,15 +85,17 @@ export default function OnboardingScreen() {
     }
   };
 
+  useEffect(() => {
+    router.push("/(tabs)");
+  }, []);
+
   const renderSlide = ({ item }: { item: OnboardingSlide }) => (
     <View style={styles.slide}>
-      <Image
-        source={item.image}
-        style={styles.image}
-        contentFit="cover"
-      />
+      <Image source={item.image} style={styles.image} contentFit="cover" />
       <View style={styles.overlay} />
-      <View style={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}>
+      <View
+        style={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
+      >
         <View style={styles.textContainer}>
           <Text
             variant="h1"
@@ -137,7 +138,13 @@ export default function OnboardingScreen() {
                 <Button
                   translationKey="common.skip"
                   textStyle={{ color: colors.white }}
-                  style={{ borderWidth: isDark ? 1 : 0, borderColor: "#D9D9D940", backgroundColor: isDark ? colors.transparent : colors.accent }}
+                  style={{
+                    borderWidth: isDark ? 1 : 0,
+                    borderColor: "#D9D9D940",
+                    backgroundColor: isDark
+                      ? colors.transparent
+                      : colors.accent,
+                  }}
                   fullWidth
                   onPress={handleSkip}
                 />
@@ -192,11 +199,11 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   content: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
     paddingHorizontal: spacing.xxl,
   },
   textContainer: {
@@ -207,9 +214,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: spacing.xxxl,
     gap: spacing.sm,
   },
@@ -222,13 +229,13 @@ const styles = StyleSheet.create({
   },
   dotInactive: {
     width: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: "rgba(255, 255, 255, 0.4)",
   },
   buttonContainer: {
-    width: '100%',
+    width: "100%",
   },
   buttonRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.lg,
   },
   buttonWrapper: {

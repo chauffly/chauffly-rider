@@ -27,27 +27,58 @@ export default function ConciergePreTripScreen() {
     value ? format(value, 'h:mm a') : '';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.md }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.background,
+          paddingTop: insets.top + spacing.md,
+        },
+      ]}
+    >
       <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}
           style={styles.backButton}
           accessibilityRole="button"
-          accessibilityLabel={t('common.cancel')}
+          accessibilityLabel={t("common.cancel")}
         >
           <ChevronLeft size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" font="medium" size={"xl"} translationKey="booking.concierge_pre_trip_setup" />
+        <Text
+          variant="h3"
+          font="medium"
+          size={"xl"}
+          translationKey="booking.concierge_pre_trip_setup"
+        />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text variant="label" translationKey="booking.concierge_chauffeur_briefing" />
-        <TextInput placeholderTranslationKey="booking.concierge_chauffeur_briefing" multiline  />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text
+          variant="label"
+          translationKey="booking.concierge_chauffeur_briefing"
+        />
+        <TextInput
+          placeholderTranslationKey="booking.concierge_chauffeur_briefing"
+          multiline
+        />
 
-        <Text variant="label" translationKey="booking.concierge_visual_preparation"  />
-        <TextInput placeholderTranslationKey="booking.concierge_visual_preparation" multiline/>
+        <Text
+          variant="label"
+          translationKey="booking.concierge_visual_preparation"
+        />
+        <TextInput
+          placeholderTranslationKey="booking.concierge_visual_preparation"
+          multiline
+        />
 
-        <Text variant="label" translationKey="booking.concierge_timing_coordination" />
+        <Text
+          variant="label"
+          translationKey="booking.concierge_timing_coordination"
+        />
         <Pressable onPress={() => setShowArrivalPicker(true)}>
           <TextInput
             placeholderTranslationKey="booking.arrival_time_placeholder"
@@ -60,11 +91,11 @@ export default function ConciergePreTripScreen() {
           <DateTimePicker
             value={arrivalTime ?? new Date()}
             mode="time"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            display={Platform.OS === "ios" ? "spinner" : "default"}
             minuteInterval={5}
             onChange={(event, date) => {
               setShowArrivalPicker(false);
-              if (event.type !== 'dismissed' && date) {
+              if (event.type !== "dismissed" && date) {
                 setArrivalTime(date);
               }
             }}
@@ -84,11 +115,11 @@ export default function ConciergePreTripScreen() {
           <DateTimePicker
             value={bufferTime ?? new Date()}
             mode="time"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            display={Platform.OS === "ios" ? "spinner" : "default"}
             minuteInterval={5}
             onChange={(event, date) => {
               setShowBufferPicker(false);
-              if (event.type !== 'dismissed' && date) {
+              if (event.type !== "dismissed" && date) {
                 setBufferTime(date);
               }
             }}
@@ -96,11 +127,18 @@ export default function ConciergePreTripScreen() {
             accentColor={colors.primary}
           />
         )}
-        <TextInput placeholderTranslationKey="booking.additional_notes_placeholder" multiline />
+        <TextInput
+          placeholderTranslationKey="booking.additional_notes_placeholder"
+          multiline
+        />
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button translationKey="booking.save_preference" fullWidth onPress={() => router.back()} />
+        <Button
+          translationKey="booking.save_preference"
+          fullWidth
+          onPress={() => router.back()}
+        />
       </View>
     </View>
   );

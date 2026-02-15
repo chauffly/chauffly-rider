@@ -28,9 +28,7 @@ export default function LoginScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  useEffect(() => {
-    router.push("/booking/personalization");
-  }, []);
+
 
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");

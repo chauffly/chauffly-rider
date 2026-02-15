@@ -8,6 +8,7 @@ export const lightTheme = {
   white: palette.white,
   accent: palette.accent,
   primary: palette.primaryGold,
+  brandBlue: '#2563EB',
   background: '#F7F7F7',
   surface: '#FFFFFF',
 
@@ -40,6 +41,7 @@ export const darkTheme = {
   white: palette.white,
   accent: palette.accent,
   primary: palette.primaryGold,
+  brandBlue: '#2563EB',
   background: '#09111C',
   surface: '#0E1B2B',
 

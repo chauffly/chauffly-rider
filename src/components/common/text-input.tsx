@@ -50,6 +50,7 @@ export function TextInput({
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [internalValue, setInternalValue] = useState("");
+  const isMultiline = !!rest.multiline;
 
   const currentValue = value !== undefined ? value : internalValue;
   const hasText = currentValue.length > 0;
@@ -115,6 +116,7 @@ export function TextInput({
           showOutline && {
             ...getOutlineStyle(),
           },
+          isMultiline && styles.multilineRadius,
         ]}
       >
         <View
@@ -122,6 +124,7 @@ export function TextInput({
             styles.inputContainer,
             getBorderStyle(),
             { backgroundColor: colors.surface },
+            isMultiline && styles.multilineRadius,
           ]}
         >
           {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
@@ -131,8 +134,8 @@ export function TextInput({
               {
                 color: colors.textPrimary,
                 fontFamily: fontFamily.regular,
-                height: rest.multiline ? 80 : undefined,
-                textAlignVertical: rest.multiline ? 'top' : 'center',
+                height: isMultiline ? 80 : undefined,
+                textAlignVertical: isMultiline ? "top" : "center",
               },
               style,
             ]}
@@ -184,7 +187,7 @@ export function TextInput({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
   label: {
     marginBottom: spacing.xs,
@@ -198,6 +201,9 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     paddingHorizontal: spacing.lg,
     minHeight: 50,
+  },
+  multilineRadius: {
+    borderRadius: 24,
   },
   leftIcon: {
     marginRight: spacing.md,

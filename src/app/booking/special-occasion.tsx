@@ -19,6 +19,8 @@ export default function SpecialOccasionScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const [preferredTime, setPreferredTime] = useState<Date | null>(null);
+  const [colorTheme, setColorTheme] = useState<string | undefined>(undefined);
+  const [customColor, setCustomColor] = useState("");
 
   return (
     <View
@@ -66,8 +68,18 @@ export default function SpecialOccasionScreen() {
             { value: "gold", label: t("booking.color_gold") },
             { value: "black", label: t("booking.color_black") },
             { value: "white", label: t("booking.color_white") },
+            { value: "custom", label: t("booking.color_custom") },
           ]}
+          value={colorTheme}
+          onValueChange={setColorTheme}
         />
+        {colorTheme === "custom" && (
+          <TextInput
+            placeholderTranslationKey="booking.custom_color_placeholder"
+            value={customColor}
+            onChangeText={setCustomColor}
+          />
+        )}
         <TextInput
           placeholderTranslationKey="booking.custom_decor_request_placeholder"
           multiline

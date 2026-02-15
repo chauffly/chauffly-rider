@@ -188,7 +188,7 @@ export function SelectInput({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
   label: {
     marginBottom: spacing.xs,
