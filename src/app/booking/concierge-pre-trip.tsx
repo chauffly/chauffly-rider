@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
 import { Button } from '@/components/common/button';
-import ChevronLeft from '@/components/svg/ChevronLeft';
+import { StackHeader } from '@/components/common/stack-header';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
@@ -36,22 +36,10 @@ export default function ConciergePreTripScreen() {
         },
       ]}
     >
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityRole="button"
-          accessibilityLabel={t("common.cancel")}
-        >
-          <ChevronLeft size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text
-          variant="h3"
-          font="medium"
-          size={"xl"}
-          translationKey="booking.concierge_pre_trip_setup"
-        />
-      </View>
+      <StackHeader
+        translationKey="booking.concierge_pre_trip_setup"
+        onBack={() => router.back()}
+      />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -148,19 +136,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: spacing.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   content: {
     paddingBottom: spacing.xl,

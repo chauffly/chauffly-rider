@@ -108,7 +108,7 @@ export function BottomSheet({
               styles.backdropOverlay,
               {
                 opacity,
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
               },
             ]}
           />
@@ -118,7 +118,7 @@ export function BottomSheet({
           style={[
             styles.sheet,
             {
-              backgroundColor: colors.surface,
+              backgroundColor: colors.background,
               maxHeight,
               transform: [{ translateY }],
             },

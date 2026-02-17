@@ -5,9 +5,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/common/text';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { Button } from '@/components/common/button';
+
+interface AccountMenuItem {
+  key: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  labelKey: string;
+  showChevron: boolean;
+  route?: Href;
+}
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
@@ -15,7 +23,7 @@ export default function AccountScreen() {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const menuItems = [
+  const menuItems: AccountMenuItem[] = [
     {
       key: 'saved_addresses',
       icon: 'location-outline',
@@ -28,18 +36,21 @@ export default function AccountScreen() {
       icon: 'notifications-outline',
       labelKey: 'account.notifications',
       showChevron: true,
+      route: '/account/notifications',
     },
     {
-      key: 'payment_method',
-      icon: 'card-outline',
-      labelKey: 'account.payment_method',
+      key: 'ride_preference',
+      icon: 'car-sport-outline',
+      labelKey: 'account.ride_preference',
       showChevron: true,
+      route: '/booking/ride-preference',
     },
     {
       key: 'app_appearance',
       icon: 'color-palette-outline',
       labelKey: 'account.app_appearance',
       showChevron: false,
+      route: '/account/appearance',
     },
     {
       key: 'help_support',
@@ -52,6 +63,7 @@ export default function AccountScreen() {
       icon: 'shield-checkmark-outline',
       labelKey: 'account.account_security',
       showChevron: true,
+      route: '/account/security',
     },
     {
       key: 'rate_us',
@@ -65,7 +77,7 @@ export default function AccountScreen() {
       labelKey: 'account.log_out',
       showChevron: false,
     },
-  ] as const;
+  ];
 
   const avatarSize = spacing.xxxxl + spacing.lg;
   const walletSize = spacing.xxxxl + spacing.xs;
@@ -89,6 +101,8 @@ export default function AccountScreen() {
           style={[styles.profileCard, { backgroundColor: colors.surface }]}
           accessibilityRole="button"
           accessibilityLabel={t("account.profile")}
+          accessibilityHint={t("account.open_personal_info_hint")}
+          onPress={() => router.push('/account/personal-info')}
         >
           <View style={styles.profileHeader}>
             <Image

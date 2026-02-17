@@ -8,7 +8,7 @@ import { addMinutes, format } from 'date-fns';
 
 import { Text } from '@/components/common/text';
 import { Button } from '@/components/common/button';
-import CloseIcon from '@/components/svg/CloseIcon';
+import { StackHeader } from '@/components/common/stack-header';
 import { spacing, borderRadius } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
@@ -88,16 +88,12 @@ export default function SelectPickupTimeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.lg }]}>
-      <Pressable
-        onPress={() => router.back()}
-        style={styles.closeButton}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.cancel')}
-      >
-        <CloseIcon size={24} color={colors.textPrimary} />
-      </Pressable>
-
-      <Text variant="h2" font="medium" translationKey="booking.select_pickup_time_title" />
+      <StackHeader
+        translationKey="booking.select_pickup_time_title"
+        leftIcon="close"
+        onBack={() => router.back()}
+        titleVariant="h2"
+      />
       <Text variant="caption" color="muted" style={styles.subtitle} translationKey="booking.select_pickup_time_subtitle" />
 
       <View style={styles.section}>
@@ -264,14 +260,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: spacing.lg,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
   },
   subtitle: {
     marginTop: spacing.xs,

@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Text } from '@/components/common/text';
 import { Button } from '@/components/common/button';
+import { StackHeader } from '@/components/common/stack-header';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
@@ -51,33 +52,18 @@ export default function PersonalizationScreen() {
         },
       ]}
     >
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.lg }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityRole="button"
-          accessibilityLabel={t("common.back")}
-          hitSlop={8}
-        >
-          <MaterialCommunityIcons
-            name="chevron-left"
-            size={26}
-            color={colors.textPrimary}
-          />
-        </Pressable>
-      </View>
-      <View style={styles.header}>
-        <Text
-          variant="h3"
-          font="medium"
+      <View style={{ paddingTop: insets.top + spacing.lg }}>
+        <StackHeader
           translationKey="booking.personalization_title"
-        />
-        <Text
-          variant="caption"
-          color="muted"
-          translationKey="booking.personalization_subtitle"
+          onBack={() => router.back()}
         />
       </View>
+      <Text
+        variant="caption"
+        color="muted"
+        style={styles.subtitle}
+        translationKey="booking.personalization_subtitle"
+      />
 
       <View style={styles.list}>
         {personalizationItems.map((item) => (
@@ -124,22 +110,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
   },
-  topBar: {
-    width: "100%",
-    alignItems: "flex-start",
-    paddingBottom: spacing.lg,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  header: {
-    alignItems: "center",
+  subtitle: {
+    marginTop: -spacing.sm,
     marginBottom: spacing.xl,
-    gap: spacing.xs,
+    alignSelf: "center",
   },
   list: {
     gap: spacing.md,

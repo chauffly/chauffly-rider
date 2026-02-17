@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { StyleSheet, View, ScrollView, Pressable } from "react-native";
+import { StyleSheet, View, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
@@ -8,7 +8,7 @@ import { TextInput } from "@/components/common/text-input";
 import { SelectInput } from "@/components/common/select-input";
 import { TimePicker } from "@/components/common/time-picker";
 import { Button } from "@/components/common/button";
-import ChevronLeft from "@/components/svg/ChevronLeft";
+import { StackHeader } from "@/components/common/stack-header";
 import { spacing } from "@/constants/spacing";
 import { useTheme } from "@/context/theme-context";
 import { useTranslation } from "@/context/language-context";
@@ -32,22 +32,10 @@ export default function RedCarpetEventScreen() {
         },
       ]}
     >
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityRole="button"
-          accessibilityLabel={t("common.cancel")}
-        >
-          <ChevronLeft size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text
-          variant="h3"
-          font="medium"
-          size={"xl"}
-          translationKey="booking.red_carpet_event_service"
-        />
-      </View>
+      <StackHeader
+        translationKey="booking.red_carpet_event_service"
+        onBack={() => router.back()}
+      />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -110,19 +98,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: spacing.lg,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
   },
   content: {
     paddingBottom: spacing.xl,

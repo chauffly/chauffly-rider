@@ -23,9 +23,9 @@ import EmailOutline from '@/components/svg/EmailOutline';
 import CallOutline from '@/components/svg/CallOutline';
 import GenderOutline from '@/components/svg/GenderOutline';
 import CalendarOutline from '@/components/svg/CalendarOutline';
-import ChevronLeft from '@/components/svg/ChevronLeft';
 import CameraOutline from '@/components/svg/CameraOutline';
 import PersonPlaceholder from '@/components/svg/PersonPlaceholder';
+import { StackHeader } from '@/components/common/stack-header';
 
 const genderOptions = [
   { label: 'Male', value: 'male', translationKey: 'profile_setup.gender_male' },
@@ -69,17 +69,18 @@ export default function PersonalInfoScreen() {
       <StatusBar style={colors.statusBar as 'light' | 'dark'} />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Pressable onPress={handleBack} style={styles.backButton} hitSlop={8}>
-          <ChevronLeft color={colors.textPrimary} />
-        </Pressable>
-        <Text variant="body" weight="semiBold" style={styles.headerTitle}>
-          {t('profile_setup.fill_personal_info')}
-        </Text>
-        <Text variant="bodySmall" color="muted">
-          1 {t('common.of')} 3
-        </Text>
-      </View>
+      <StackHeader
+        translationKey="profile_setup.fill_personal_info"
+        onBack={handleBack}
+        style={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg }}
+        titleVariant="body"
+        titleWeight="semiBold"
+        right={
+          <Text variant="bodySmall" color="muted">
+            1 {t('common.of')} 3
+          </Text>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={[
@@ -165,20 +166,6 @@ export default function PersonalInfoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
-  backButton: {
-    padding: spacing.xs,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
   },
   scrollContent: {
     flexGrow: 1,

@@ -147,6 +147,14 @@ const { t } = useTranslation();
 
 ---
 
+## 3.1 Stack Headers
+
+- **Always disable native stack headers** (`headerShown: false`) for stack screens.
+- **Use the shared `StackHeader` component** (`/src/components/common/stack-header.tsx`) for screens that need a title + back/close control.
+- Keep header text translated and use the custom `Text` component.
+
+---
+
 ## 4. Color Management & Theming
 
 ### Color Constants

@@ -13,8 +13,8 @@ import { Button } from '@/components/common/button';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { spacing } from '@/constants/spacing';
-import ChevronLeft from '@/components/svg/ChevronLeft';
 import FaceOutline from '@/components/svg/FaceOutline';
+import { StackHeader } from '@/components/common/stack-header';
 
 export default function FacialRecognitionScreen() {
   const router = useRouter();
@@ -47,17 +47,18 @@ export default function FacialRecognitionScreen() {
       <StatusBar style={colors.statusBar as 'light' | 'dark'} />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Pressable onPress={handleBack} style={styles.backButton} hitSlop={8}>
-          <ChevronLeft color={colors.textPrimary} />
-        </Pressable>
-        <Text variant="body" weight="semiBold" style={styles.headerTitle}>
-          {t('profile_setup.facial_recognition')}
-        </Text>
-        <Text variant="bodySmall" color="muted">
-          3 {t('common.of')} 3
-        </Text>
-      </View>
+      <StackHeader
+        translationKey="profile_setup.facial_recognition"
+        onBack={handleBack}
+        style={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg }}
+        titleVariant="body"
+        titleWeight="semiBold"
+        right={
+          <Text variant="bodySmall" color="muted">
+            3 {t('common.of')} 3
+          </Text>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={[
@@ -118,20 +119,6 @@ export default function FacialRecognitionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
-  backButton: {
-    padding: spacing.xs,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
   },
   scrollContent: {
     flexGrow: 1,
