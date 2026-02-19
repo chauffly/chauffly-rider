@@ -74,6 +74,13 @@ function RootLayoutNav() {
         <Stack.Screen name="account/appearance" options={{ headerShown: false }} />
         <Stack.Screen name="account/personal-info" options={{ headerShown: false }} />
         <Stack.Screen name="account/security" options={{ headerShown: false }} />
+        <Stack.Screen name="account/top-up" options={{ headerShown: false }} />
+        <Stack.Screen name="account/help-support" options={{ headerShown: false }} />
+        <Stack.Screen name="account/help-faq" options={{ headerShown: false }} />
+        <Stack.Screen name="account/contact-support" options={{ headerShown: false }} />
+        <Stack.Screen name="account/privacy-policy" options={{ headerShown: false }} />
+        <Stack.Screen name="account/terms-of-use" options={{ headerShown: false }} />
+        <Stack.Screen name="account/visit-website" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"
           options={{ presentation: "modal", title: "Modal" }}

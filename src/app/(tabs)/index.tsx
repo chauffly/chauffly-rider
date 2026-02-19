@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Image } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { Text } from "@/components/common/text";
 import { LocationPermissionModal } from '@/components/common/location-permission-modal';
@@ -67,6 +67,7 @@ export default function HomeScreen() {
   const [routeDurationMinutes, setRouteDurationMinutes] = useState(0);
   const [routeMetricsLoading, setRouteMetricsLoading] = useState(false);
   const [routeMetricsError, setRouteMetricsError] = useState<string | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   // Route state for set-location view
   const [origin, setOrigin] = useState<Origin | null>(null);
@@ -131,7 +132,13 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    if (currentLocation && mapRef.current && viewMode === "home") {
+    if (permissionStatus === "granted" && !currentLocation) {
+      getCurrentLocation();
+    }
+  }, [permissionStatus, currentLocation, getCurrentLocation]);
+
+  useEffect(() => {
+    if (isMapReady && currentLocation && mapRef.current && viewMode === "home") {
       console.log("🗺️ Animating map to:", currentLocation.coordinates);
       mapRef.current.animateToRegion(
         {
@@ -143,7 +150,7 @@ export default function HomeScreen() {
         1000,
       );
     }
-  }, [currentLocation, viewMode]);
+  }, [isMapReady, currentLocation, viewMode]);
 
   // Fit map to route in set-location or ride-options mode
   useEffect(() => {
@@ -397,6 +404,12 @@ export default function HomeScreen() {
           ref={mapRef}
           style={styles.map}
           initialRegion={mapRegion}
+          onMapReady={() => setIsMapReady(true)}
+          provider={PROVIDER_GOOGLE}
+          mapType="standard"
+          showsBuildings
+          showsIndoors
+          showsPointsOfInterest
           showsUserLocation={permissionStatus === "granted"}
           showsMyLocationButton={false}
           showsCompass={false}

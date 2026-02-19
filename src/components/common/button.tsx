@@ -5,6 +5,7 @@ import {
   TextStyle,
   ViewStyle,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { Text } from './text';
 import { useTheme } from '@/context/theme-context';
@@ -21,6 +22,8 @@ export interface ButtonProps extends Omit<PressableProps, 'children'> {
   size?: ButtonSize;
   textStyle?: TextStyle;
   fullWidth?: boolean;
+  navigateTo?: string;
+  navigateParams?: Record<string, string | number | boolean | undefined>;
 }
 
 export function Button({
@@ -32,8 +35,12 @@ export function Button({
   textStyle,
   style,
   disabled,
+  onPress,
+  navigateTo,
+  navigateParams,
   ...rest
 }: ButtonProps) {
+  const router = useRouter();
   const { colors } = useTheme();
   const { t } = useTranslation();
 
@@ -105,6 +112,16 @@ export function Button({
 
   const buttonText = translationKey ? t(translationKey) : title;
 
+  const handlePress: PressableProps['onPress'] = (event) => {
+    onPress?.(event);
+    if (navigateTo) {
+      router.push({
+        pathname: navigateTo as never,
+        params: navigateParams as never,
+      });
+    }
+  };
+
   return (
     <Pressable
       style={({ pressed }) => [
@@ -119,6 +136,7 @@ export function Button({
         fullWidth && styles.fullWidth,
         style as ViewStyle,
       ]}
+      onPress={handlePress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={buttonText}

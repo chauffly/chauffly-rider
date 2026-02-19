@@ -1,13 +1,21 @@
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { useState } from "react";
+import {
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Text } from '@/components/common/text';
-import { useTheme } from '@/context/theme-context';
-import { useTranslation } from '@/context/language-context';
-import { type Href, useRouter } from 'expo-router';
-import { borderRadius, spacing } from '@/constants/spacing';
-import { Button } from '@/components/common/button';
+import { Text } from "@/components/common/text";
+import { useTheme } from "@/context/theme-context";
+import { useTranslation } from "@/context/language-context";
+import { type Href, useRouter } from "expo-router";
+import { borderRadius, spacing } from "@/constants/spacing";
+import { Button } from "@/components/common/button";
 
 interface AccountMenuItem {
   key: string;
@@ -22,59 +30,61 @@ export default function AccountScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
 
   const menuItems: AccountMenuItem[] = [
     {
-      key: 'saved_addresses',
-      icon: 'location-outline',
-      labelKey: 'account.saved_addresses',
+      key: "saved_addresses",
+      icon: "location-outline",
+      labelKey: "account.saved_addresses",
       showChevron: true,
-      route: '/account/saved-addresses',
+      route: "/account/saved-addresses",
     },
     {
-      key: 'notifications',
-      icon: 'notifications-outline',
-      labelKey: 'account.notifications',
+      key: "notifications",
+      icon: "notifications-outline",
+      labelKey: "account.notifications",
       showChevron: true,
-      route: '/account/notifications',
+      route: "/account/notifications",
     },
     {
-      key: 'ride_preference',
-      icon: 'car-sport-outline',
-      labelKey: 'account.ride_preference',
+      key: "ride_preference",
+      icon: "car-sport-outline",
+      labelKey: "account.ride_preference",
       showChevron: true,
-      route: '/booking/ride-preference',
+      route: "/booking/ride-preference",
     },
     {
-      key: 'app_appearance',
-      icon: 'color-palette-outline',
-      labelKey: 'account.app_appearance',
+      key: "app_appearance",
+      icon: "color-palette-outline",
+      labelKey: "account.app_appearance",
       showChevron: false,
-      route: '/account/appearance',
+      route: "/account/appearance",
     },
     {
-      key: 'help_support',
-      icon: 'help-circle-outline',
-      labelKey: 'account.help_support',
-      showChevron: false,
-    },
-    {
-      key: 'account_security',
-      icon: 'shield-checkmark-outline',
-      labelKey: 'account.account_security',
+      key: "help_support",
+      icon: "help-circle-outline",
+      labelKey: "account.help_support",
       showChevron: true,
-      route: '/account/security',
+      route: "/account/help-support",
     },
     {
-      key: 'rate_us',
-      icon: 'star-outline',
-      labelKey: 'account.rate_us',
+      key: "account_security",
+      icon: "shield-checkmark-outline",
+      labelKey: "account.account_security",
+      showChevron: true,
+      route: "/account/security",
+    },
+    {
+      key: "rate_us",
+      icon: "star-outline",
+      labelKey: "account.rate_us",
       showChevron: false,
     },
     {
-      key: 'log_out',
-      icon: 'log-out-outline',
-      labelKey: 'account.log_out',
+      key: "log_out",
+      icon: "log-out-outline",
+      labelKey: "account.log_out",
       showChevron: false,
     },
   ];
@@ -102,7 +112,7 @@ export default function AccountScreen() {
           accessibilityRole="button"
           accessibilityLabel={t("account.profile")}
           accessibilityHint={t("account.open_personal_info_hint")}
-          onPress={() => router.push('/account/personal-info')}
+          onPress={() => router.push("/account/personal-info")}
         >
           <View style={styles.profileHeader}>
             <Image
@@ -166,12 +176,28 @@ export default function AccountScreen() {
                 translationKey="account.available_balance"
               />
             </View>
-            <Button
-              size="sm"
-              variant="outline"
-              translationKey="account.top_up"
-              style={styles.topUpButton}
-            />
+            <Pressable
+              style={[
+                styles.topUpButton,
+                {
+                  backgroundColor: colors.buttonPrimary,
+                },
+              ]}
+              onPress={(event) => {
+                event.stopPropagation();
+                router.push("/account/top-up");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t("account.top_up")}
+            >
+              <Ionicons name="add" size={20} color={colors.buttonPrimaryText} />
+              <Text
+                variant="bodySmall"
+                weight="medium"
+                color="inverse"
+                translationKey="account.top_up"
+              />
+            </Pressable>
           </View>
         </Pressable>
 
@@ -183,6 +209,10 @@ export default function AccountScreen() {
               accessibilityRole="button"
               accessibilityLabel={t(item.labelKey)}
               onPress={() => {
+                if (item.key === "log_out") {
+                  setIsLogoutModalVisible(true);
+                  return;
+                }
                 if (item.route) {
                   router.push(item.route);
                 }
@@ -219,6 +249,56 @@ export default function AccountScreen() {
           ))}
         </View>
       </ScrollView>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={isLogoutModalVisible}
+        onRequestClose={() => setIsLogoutModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setIsLogoutModalVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel={t("common.cancel")}
+        >
+          <Pressable
+            style={[styles.modalCard, { backgroundColor: colors.surface }]}
+            onPress={() => {}}
+          >
+            <Text
+              variant="h3"
+              size="xxl"
+              weight="medium"
+              align="center"
+              translationKey="account.logout_confirm_title"
+            />
+            <Text
+              variant="body"
+              color="muted"
+              align="center"
+              translationKey="account.logout_confirm_message"
+            />
+            <View style={styles.modalActions}>
+              <Button
+                translationKey="account.logout_cancel_action"
+                onPress={() => setIsLogoutModalVisible(false)}
+                style={[styles.modalButton, { backgroundColor: colors.border }]}
+                textStyle={{ color: colors.textPrimary }}
+              />
+              <Button
+                translationKey="account.logout_yes_action"
+                onPress={() => {
+                  setIsLogoutModalVisible(false);
+                  router.replace("/(auth)/login");
+                }}
+                style={[styles.modalButton, { backgroundColor: colors.error }]}
+                textStyle={{ color: colors.textInverse }}
+              />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -262,7 +342,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topUpButton: {
-    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
   },
   menuList: {
     gap: spacing.md,
@@ -283,5 +369,28 @@ const styles = StyleSheet.create({
   menuIcon: {
     alignItems: "center",
     justifyContent: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xxxl,
+  },
+  modalCard: {
+    width: "100%",
+    borderRadius: borderRadius.xxl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xxl,
+    gap: spacing.lg,
+  },
+  modalActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  modalButton: {
+    flex: 1,
   },
 });

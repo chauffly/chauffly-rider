@@ -121,9 +121,12 @@ export function LocationProvider({ children }: LocationProviderProps) {
       };
 
       const address = await reverseGeocode(coordinates);
-      if (address) {
-        setCurrentLocation(address);
-      }
+      setCurrentLocation(
+        address ?? {
+          coordinates,
+          address: 'Unknown location',
+        }
+      );
     } catch (error) {
       console.error('Error fetching current location:', error);
     }
@@ -145,12 +148,13 @@ export function LocationProvider({ children }: LocationProviderProps) {
         longitude: location.coords.longitude,
       };
 
-      const address = await reverseGeocode(coordinates);
-      if (address) {
-        setCurrentLocation(address);
-        return address;
-      }
-      return null;
+      const address =
+        (await reverseGeocode(coordinates)) ?? {
+          coordinates,
+          address: 'Unknown location',
+        };
+      setCurrentLocation(address);
+      return address;
     } catch (error) {
       console.error('Error getting current location:', error);
       return null;

@@ -20,7 +20,7 @@ export const lightTheme = {
   textMuted: "rgba(14, 27, 43, .56)",
 
   // UI Elements
-  border: '#E0E0E0',
+  border: '#E5E7EB',
   error: '#E53935',
   error50: 'rgba(229, 83, 77, 0.15)',
   success: '#43A047',

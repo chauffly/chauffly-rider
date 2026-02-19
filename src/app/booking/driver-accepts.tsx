@@ -1,17 +1,15 @@
-import { StyleSheet, View, Pressable } from 'react-native';
+import { StyleSheet, View, Pressable, Linking } from 'react-native';
+import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { addMinutes, format } from 'date-fns';
 
-import { Text } from '@/components/common/text';
-import { Button } from '@/components/common/button';
+import { Text } from "@/components/common/text";
 import ChevronLeft from '@/components/svg/ChevronLeft';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
-import { rideOptions } from '@/constants/ride-options';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -40,26 +38,92 @@ export default function DriverAcceptsScreen() {
     driverVehicle?: string;
   }>();
 
-  const destinations = params.destinations ? JSON.parse(params.destinations) : [];
-  const selectedRide = rideOptions.find((option) => option.id === params.selectedRideId) ?? rideOptions[0];
-  const durationMinutes = params.estimatedDurationMinutes
-    ? Number(params.estimatedDurationMinutes)
-    : 45;
-  const distanceKm = params.distanceKm ? Number(params.distanceKm) : null;
-  const pickupDateTime = params.pickupDate && params.pickupTime
-    ? new Date(`${params.pickupDate}T${params.pickupTime}:00`)
-    : new Date();
-  const pickupTimeDisplay = params.pickupDate && params.pickupTime
-    ? format(pickupDateTime, 'h:mm a')
-    : t('booking.now');
-  const dropoffTimeDisplay = format(addMinutes(pickupDateTime, durationMinutes), 'h:mm a');
+  const [rideArrivalState, setRideArrivalState] = useState<
+    "accepted" | "heading" | "arrived"
+  >("accepted");
+
+  useEffect(() => {
+    // TODO: Replace timer-based state simulation with backend/socket ride status events.
+    const toHeading = setTimeout(() => {
+      setRideArrivalState("heading");
+    }, 1800);
+
+    const toArrived = setTimeout(() => {
+      setRideArrivalState("arrived");
+    }, 5000);
+
+    return () => {
+      clearTimeout(toHeading);
+      clearTimeout(toArrived);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (rideArrivalState !== "arrived") {
+      return;
+    }
+
+    // TODO: Replace auto-navigation with backend trip-start event.
+    const timer = setTimeout(() => {
+      router.push({
+        pathname: "/booking/heading-destination",
+        params,
+      });
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [rideArrivalState, router, params]);
+
+  const statusTitle =
+    rideArrivalState === "accepted"
+      ? t("booking.chauffeur_accepts_ride")
+      : rideArrivalState === "heading"
+        ? t("booking.driver_heading_to_location")
+        : t("booking.chauffeur_has_arrived");
+
+  const statusSubtitle =
+    rideArrivalState === "accepted"
+      ? t("booking.driver_assigned_later_note")
+      : rideArrivalState === "heading"
+        ? t("booking.arriving_in_one_minute")
+        : t("booking.arrival_waiting_note");
+
+  const handleCallDriver = async () => {
+    const driverPhone = (params.driverPhone || t("booking.sample_driver_phone")).replace(
+      /[^0-9+]/g,
+      "",
+    );
+    const phoneUrl = `tel:${driverPhone}`;
+    const supported = await Linking.canOpenURL(phoneUrl);
+    if (supported) {
+      await Linking.openURL(phoneUrl);
+    }
+  };
+
+  const openDriverChat = () => {
+    router.push({
+      pathname: "/booking/message-driver",
+      params,
+    });
+  };
+
+  const openDriverInfo = () => {
+    router.push({
+      pathname: "/booking/driver-info",
+      params,
+    });
+  };
 
   return (
     <View style={styles.container}>
       <MapView style={styles.map} initialRegion={DEFAULT_REGION}>
         <Marker coordinate={{ latitude: 9.18, longitude: 7.55 }}>
           <View style={[styles.marker, { backgroundColor: colors.primary }]}>
-            <MaterialCommunityIcons name="car" size={18} color={colors.textInverse} />
+            <MaterialCommunityIcons
+              name="car"
+              size={18}
+              color={colors.textInverse}
+            />
           </View>
         </Marker>
         <Polyline
@@ -83,7 +147,7 @@ export default function DriverAcceptsScreen() {
           },
         ]}
         accessibilityRole="button"
-        accessibilityLabel={t('common.cancel')}
+        accessibilityLabel={t("common.cancel")}
       >
         <ChevronLeft size={24} color={colors.textPrimary} />
       </Pressable>
@@ -98,88 +162,81 @@ export default function DriverAcceptsScreen() {
           },
         ]}
       >
-        <Text variant="body" font="medium" translationKey="booking.driver_accepts" />
+        <Text variant="h3" font="medium" style={styles.statusTitle}>
+          {statusTitle}
+        </Text>
+        <Text variant="body" color="muted" style={styles.statusSubtitle}>
+          {statusSubtitle}
+        </Text>
+        <Text variant="body" style={styles.vehicleText}>
+          {params.driverVehicle}
+        </Text>
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-        <View style={[styles.routeCard, { backgroundColor: colors.background }]}>
-          <View style={styles.routeRow}>
-            <Text variant="bodySmall" font="medium">
-              {t(selectedRide.nameKey)}
-            </Text>
-            <Text variant="bodySmall" font="medium">
-              {t(selectedRide.priceKey)}
-            </Text>
+        <Pressable style={styles.driverRow} onPress={openDriverInfo}>
+          <View style={[styles.avatar, { backgroundColor: colors.border }]}>
+            <MaterialCommunityIcons
+              name="account"
+              size={28}
+              color={colors.textSecondary}
+            />
           </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.routeRow}>
-            <Text variant="bodySmall" color="muted">
-              {params.originName || t('booking.sample_pickup_location')}
-            </Text>
-            <Text variant="caption" color="muted">
-              {pickupTimeDisplay}
-            </Text>
-          </View>
-          <View style={styles.routeRow}>
-            <Text variant="bodySmall" color="muted">
-              {destinations[destinations.length - 1]?.name || t('booking.sample_dropoff_location')}
-            </Text>
-            <Text variant="caption" color="muted">
-              {dropoffTimeDisplay}
-            </Text>
-          </View>
-          <Text variant="caption" color="muted">
-            {t('booking.estimated_duration_minutes', { minutes: durationMinutes })}
-          </Text>
-          {distanceKm ? (
-            <Text variant="caption" color="muted">
-              {t('booking.route_distance', { distance: distanceKm.toFixed(1) })}
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={styles.driverRow}>
-          <View style={[styles.driverAvatar, { backgroundColor: colors.border }]} />
           <View style={styles.driverInfo}>
-            <Text variant="bodySmall" font="medium">
-              {params.driverName || t('booking.sample_driver_name')}
+            <Text variant="body" font="medium">
+              {params.driverName || t("booking.sample_driver_name")}
             </Text>
             <View style={styles.ratingRow}>
-              <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
-              <Text variant="caption" color="muted">
-                {params.driverRating || t('booking.sample_rating')}
+              <MaterialCommunityIcons
+                name="star"
+                size={14}
+                color={colors.primary}
+              />
+              <Text variant="bodySmall" color="muted">
+                {params.driverRating || t("booking.sample_rating")}
               </Text>
-              <Text variant="caption" color="muted">
-                {params.driverPhone || t('booking.sample_driver_phone')}
+              <Text variant="bodySmall" color="muted">
+                {params.driverPhone || t("booking.sample_driver_phone")}
               </Text>
             </View>
-            {params.driverVehicle ? (
-              <Text variant="caption" color="muted">
-                {params.driverVehicle}
-              </Text>
-            ) : null}
           </View>
           <View style={styles.actionIcons}>
             <Pressable
               style={[styles.iconButton, { backgroundColor: colors.accent }]}
               accessibilityRole="button"
-              accessibilityLabel={t('booking.message_driver')}
+              accessibilityLabel={t("booking.message_driver")}
+              onPress={(event) => {
+                event.stopPropagation();
+                openDriverChat();
+              }}
             >
-              <MaterialCommunityIcons name="message-text-outline" size={18} color={colors.primary} />
+              <MaterialCommunityIcons
+                name="message-text-outline"
+                size={20}
+                color={colors.primary}
+              />
             </Pressable>
             <Pressable
               style={[styles.iconButton, { backgroundColor: colors.accent }]}
               accessibilityRole="button"
-              accessibilityLabel={t('booking.call_driver')}
+              accessibilityLabel={t("booking.call_driver")}
+              onPress={async (event) => {
+                event.stopPropagation();
+                await handleCallDriver();
+              }}
             >
-              <MaterialCommunityIcons name="phone-outline" size={18} color={colors.primary} />
+              <MaterialCommunityIcons
+                name="phone-outline"
+                size={20}
+                color={colors.primary}
+              />
             </Pressable>
           </View>
-        </View>
+        </Pressable>
 
-        <View style={styles.footerButtons}>
+        {/* <View style={styles.footerButtons}>
           <Button translationKey="common.back" variant="outline" style={styles.footerButton} onPress={() => router.back()} />
           <Button translationKey="booking.view_rides" style={styles.footerButton} onPress={() => router.push('/(tabs)/rides')} />
-        </View>
+        </View> */}
       </View>
     </View>
   );
@@ -196,24 +253,24 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   backButton: {
-    position: 'absolute',
+    position: "absolute",
     left: spacing.lg,
     width: 48,
     height: 48,
     borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
   bottomCard: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
@@ -229,49 +286,51 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: spacing.md,
   },
-  routeCard: {
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
+  statusTitle: {
+    textAlign: "center",
+    marginBottom: spacing.xs,
   },
-  routeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  statusSubtitle: {
+    textAlign: "center",
+  },
+  vehicleText: {
+    textAlign: "center",
+    marginTop: spacing.sm,
   },
   driverRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
   },
-  driverAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
   driverInfo: {
     flex: 1,
     gap: spacing.xs,
   },
   ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   actionIcons: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+    flexDirection: "row",
+    gap: spacing.md,
   },
   iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   footerButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.md,
     marginTop: spacing.lg,
   },
