@@ -10,6 +10,7 @@ import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { rideOptions } from '@/constants/ride-options';
 import { Button } from '@/components/common/button';
+import { localJsonApi } from '@/api/local-json-api';
 
 export default function RateDriverScreen() {
   const { colors } = useTheme();
@@ -18,20 +19,18 @@ export default function RateDriverScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     selectedRideId?: string;
-    sampleTripFare?: string;
-    sampleTax?: string;
-    sampleTotal?: string;
   }>();
   const [rating, setRating] = useState(0);
+  const activeBooking = localJsonApi.getActiveBooking();
 
   const selectedRide = useMemo(
     () => rideOptions.find((option) => option.id === params.selectedRideId) ?? rideOptions[0],
     [params.selectedRideId],
   );
 
-  const tripFare = params.sampleTripFare || '₦8,000';
-  const tax = params.sampleTax || '₦100';
-  const total = params.sampleTotal || '₦8,100';
+  const tripFare = activeBooking.fare_breakdown.trip_fare;
+  const tax = activeBooking.fare_breakdown.tax;
+  const total = activeBooking.fare_breakdown.total;
   const selectedRideTitle = selectedRide?.nameKey ? t(selectedRide.nameKey) : 'Chauffly Go';
 
   return (

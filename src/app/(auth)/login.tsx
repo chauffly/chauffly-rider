@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   View,
   StyleSheet,
@@ -21,6 +21,7 @@ import { useTranslation } from "@/context/language-context";
 import { spacing } from "@/constants/spacing";
 import CallOutline from "@/components/svg/CallOutline";
 import Password from "@/components/svg/Password";
+import { localJsonApi } from '@/api/local-json-api';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -30,8 +31,9 @@ export default function LoginScreen() {
 
 
 
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [password, setPassword] = useState("");
+  const authDefaults = localJsonApi.getAuthDefaults();
+  const [phoneNumber, setPhoneNumber] = useState(authDefaults.login.phone_number);
+  const [password, setPassword] = useState(authDefaults.login.password);
   const [phoneError, setPhoneError] = useState("");
 
   const handleLogin = () => {

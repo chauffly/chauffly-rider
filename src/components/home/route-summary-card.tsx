@@ -7,6 +7,7 @@ import PlusCircle from '@/components/svg/PlusCircle';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { Origin, RouteStop } from './types';
+import { localJsonApi } from '@/api/local-json-api';
 
 interface RouteSummaryCardProps {
   origin: Origin | null;
@@ -26,6 +27,7 @@ export function RouteSummaryCard({
   onAddStop,
 }: RouteSummaryCardProps) {
   const { colors } = useTheme();
+  const uiDefaults = localJsonApi.getUiDefaults();
 
   return (
     <View
@@ -46,7 +48,7 @@ export function RouteSummaryCard({
             numberOfLines={1}
             style={styles.routeSummaryText}
           >
-            {origin?.name || 'Pickup Location'}
+            {origin?.name || uiDefaults.booking.pickup_placeholder}
           </Text>
         </View>
         <Pressable style={styles.routeSummaryAdd} onPress={onAddStop}>

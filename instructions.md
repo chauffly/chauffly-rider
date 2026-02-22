@@ -257,6 +257,21 @@ export const useTheme = () => {
     /ig.json
     /yo.json
     /index.ts
+
+---
+
+## 6. JSON API Data Source (Required)
+
+- All app domain data must come from root-level JSON API files at:
+  - `/Users/thecodingchef/Documents/projects/chauffly/api-data`
+- Do not introduce inline sample/fallback domain records in screens (users, drivers, rides, fares, addresses, chat, auth defaults).
+- Keep data grouped by entity file (for example: `users.json`, `drivers.json`, `rides.json`, `bookings.json`, `addresses.json`, `auth.json`).
+- Shape JSON records with PostgreSQL migration in mind:
+  - stable `id` fields
+  - explicit foreign keys (`*_id`)
+  - timestamps (`created_at`, `updated_at`)
+  - normalized entity ownership
+- When future features need new data, update these JSON files first, then consume through the app API data layer.
   
   /context
     /ThemeContext.tsx

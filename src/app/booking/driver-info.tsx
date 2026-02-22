@@ -7,6 +7,7 @@ import { Text } from '@/components/common/text';
 import { Button } from '@/components/common/button';
 import { spacing, borderRadius } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { localJsonApi } from '@/api/local-json-api';
 
 export default function DriverInfoScreen() {
   const { colors } = useTheme();
@@ -18,11 +19,12 @@ export default function DriverInfoScreen() {
     driverRating?: string;
     driverVehicle?: string;
   }>();
+  const apiDriver = localJsonApi.getPrimaryDriver();
 
-  const driverName = params.driverName || 'James Daniels';
-  const driverPhone = params.driverPhone || '080 00000000';
-  const driverRating = params.driverRating || '4.5';
-  const vehicleName = params.driverVehicle || 'BMW 250';
+  const driverName = params.driverName || apiDriver.display_name;
+  const driverPhone = params.driverPhone || apiDriver.phone_number;
+  const driverRating = params.driverRating || apiDriver.rating.toFixed(1);
+  const vehicleName = params.driverVehicle || apiDriver.vehicle.display_name;
 
   const handleCallDriver = async () => {
     const cleanPhone = driverPhone.replace(/[^0-9+]/g, '');
@@ -57,7 +59,7 @@ export default function DriverInfoScreen() {
             <Text variant="body" color="muted">Rating</Text>
           </View>
           <View style={styles.metricItem}>
-            <Text variant="body" weight="medium">289</Text>
+            <Text variant="body" weight="medium">{apiDriver.trips_completed}</Text>
             <Text variant="body" color="muted">Trips</Text>
           </View>
         </View>
@@ -66,7 +68,7 @@ export default function DriverInfoScreen() {
       <View style={[styles.detailsCard, { backgroundColor: colors.surface }]}> 
         <View style={styles.detailRow}>
           <Text variant="body" color="muted">Member Since</Text>
-          <Text variant="body" weight="medium">Dec 13, 2022</Text>
+          <Text variant="body" weight="medium">{apiDriver.member_since}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text variant="body" color="muted">Car Model</Text>
@@ -74,11 +76,11 @@ export default function DriverInfoScreen() {
         </View>
         <View style={styles.detailRow}>
           <Text variant="body" color="muted">Color</Text>
-          <Text variant="body" weight="medium">White</Text>
+          <Text variant="body" weight="medium">{apiDriver.vehicle.color}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text variant="body" color="muted">Plate Number</Text>
-          <Text variant="body" weight="medium">TRX1222240942</Text>
+          <Text variant="body" weight="medium">{apiDriver.vehicle.plate_number}</Text>
         </View>
       </View>
 

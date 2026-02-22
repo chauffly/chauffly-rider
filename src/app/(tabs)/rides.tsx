@@ -11,259 +11,15 @@ import SearchIcon from "@/components/svg/SearchIcon";
 import { borderRadius, spacing } from "@/constants/spacing";
 import { useTheme } from "@/context/theme-context";
 import { Button } from "@/components/common/button";
+import { localJsonApi, RideTabKey } from "@/api/local-json-api";
 
-const TABS = [
-  { key: "past", label: "Past" },
-  { key: "upcoming", label: "Upcoming" },
-  { key: "ongoing", label: "Ongoing" },
-  { key: "canceled", label: "Canceled" },
-] as const;
+const rideTabs = localJsonApi.getRideTabs();
 
-type RideTab = (typeof TABS)[number]["key"];
-type RideCardType = "history" | "live";
-
-type RideStop = {
-  id: string;
-  title: string;
-  subtitle: string;
-  time: string;
-};
-
-type RideItem = {
-  id: string;
-  type: RideCardType;
-  driverName: string;
-  rating?: string;
-  reviews?: string;
-  vehicleName?: string;
-  vehicleMeta?: string;
-  stops: RideStop[];
-  seatInfo?: number;
-  schedule?: string;
-  fare: string;
-  showTrackRoute?: boolean;
-};
-
-const ridesByTab: Record<RideTab, RideItem[]> = {
-  past: [
-    {
-      id: "past-1",
-      type: "history",
-      driverName: "David I.",
-      rating: "4.5",
-      reviews: "1,927 reviews",
-      vehicleName: "BMW M5 Series",
-      vehicleMeta: "NYC-3560 · White",
-      stops: [
-        {
-          id: "s1",
-          title: "Bobst Library",
-          subtitle: "Branch Office North",
-          time: "10:00 AM",
-        },
-        {
-          id: "s2",
-          title: "Union Square",
-          subtitle: "Client Pickup",
-          time: "10:14 AM",
-        },
-        {
-          id: "s3",
-          title: "Larchmont Hotel",
-          subtitle: "Corporate HQ",
-          time: "10:28 AM",
-        },
-      ],
-      seatInfo: 1,
-      schedule: "Today, Dec 11 10:30 AM",
-      fare: "₦8,000",
-    },
-    {
-      id: "past-2",
-      type: "history",
-      driverName: "Sarah M.",
-      rating: "4.8",
-      reviews: "1,102 reviews",
-      vehicleName: "Mercedes E-Class",
-      vehicleMeta: "ABJ-2120 · Black",
-      stops: [
-        {
-          id: "s1",
-          title: "Maitama District",
-          subtitle: "Home",
-          time: "07:40 AM",
-        },
-        {
-          id: "s2",
-          title: "Central Business Area",
-          subtitle: "Drop Parcel",
-          time: "07:54 AM",
-        },
-        {
-          id: "s3",
-          title: "Wuse II",
-          subtitle: "Team Pickup",
-          time: "08:05 AM",
-        },
-        {
-          id: "s4",
-          title: "Nnamdi Azikiwe Intl Airport",
-          subtitle: "Terminal D",
-          time: "08:32 AM",
-        },
-      ],
-      seatInfo: 2,
-      schedule: "Yesterday, Dec 10 07:30 AM",
-      fare: "₦14,500",
-    },
-  ],
-  upcoming: [
-    {
-      id: "upcoming-1",
-      type: "history",
-      driverName: "David I.",
-      rating: "4.5",
-      reviews: "1,927 reviews",
-      vehicleName: "BMW M5 Series",
-      vehicleMeta: "NYC-3560 · White",
-      stops: [
-        {
-          id: "s1",
-          title: "Transcorp Hilton",
-          subtitle: "Main Entrance",
-          time: "04:30 PM",
-        },
-        {
-          id: "s2",
-          title: "Jabi Lake Mall",
-          subtitle: "Quick Stop",
-          time: "04:52 PM",
-        },
-        {
-          id: "s3",
-          title: "Utako Bus Terminal",
-          subtitle: "Pickup Guest",
-          time: "05:08 PM",
-        },
-        {
-          id: "s4",
-          title: "Larchmont Hotel",
-          subtitle: "Corporate HQ",
-          time: "05:30 PM",
-        },
-      ],
-      seatInfo: 1,
-      schedule: "Today, Dec 11 04:30 PM",
-      fare: "₦10,800",
-    },
-    {
-      id: "upcoming-2",
-      type: "history",
-      driverName: "Chris A.",
-      rating: "4.6",
-      reviews: "864 reviews",
-      vehicleName: "Range Rover Velar",
-      vehicleMeta: "LOS-6601 · Silver",
-      stops: [
-        {
-          id: "s1",
-          title: "Lekki Phase 1",
-          subtitle: "Pickup Point",
-          time: "09:10 AM",
-        },
-        {
-          id: "s2",
-          title: "Ikoyi Club",
-          subtitle: "Meeting Stop",
-          time: "09:34 AM",
-        },
-        {
-          id: "s3",
-          title: "VI Marina",
-          subtitle: "Final Dropoff",
-          time: "09:58 AM",
-        },
-      ],
-      seatInfo: 3,
-      schedule: "Tomorrow, Dec 12 09:10 AM",
-      fare: "₦12,200",
-    },
-  ],
-  ongoing: [
-    {
-      id: "ongoing-1",
-      type: "live",
-      driverName: "David I.",
-      stops: [
-        {
-          id: "s1",
-          title: "Bobst Library",
-          subtitle: "Branch Office North",
-          time: "10:00 AM",
-        },
-        {
-          id: "s2",
-          title: "Broadway Junction",
-          subtitle: "Passenger stop",
-          time: "10:06 AM",
-        },
-        {
-          id: "s3",
-          title: "Larchmont Hotel",
-          subtitle: "Corporate HQ",
-          time: "10:14 AM",
-        },
-      ],
-      fare: "₦8,000",
-      showTrackRoute: true,
-    },
-  ],
-  canceled: [
-    {
-      id: "canceled-1",
-      type: "live",
-      driverName: "David I.",
-      stops: [
-        {
-          id: "s1",
-          title: "Bobst Library",
-          subtitle: "Branch Office North",
-          time: "10:00 AM",
-        },
-        {
-          id: "s2",
-          title: "Larchmont Hotel",
-          subtitle: "Corporate HQ",
-          time: "10:08 AM",
-        },
-      ],
-      fare: "₦8,000",
-    },
-    {
-      id: "canceled-2",
-      type: "live",
-      driverName: "Chioma O.",
-      stops: [
-        {
-          id: "s1",
-          title: "Airport Road",
-          subtitle: "Pickup Lobby",
-          time: "06:45 PM",
-        },
-        {
-          id: "s2",
-          title: "Apo Resettlement",
-          subtitle: "Dropoff Point",
-          time: "07:22 PM",
-        },
-      ],
-      fare: "₦6,200",
-    },
-  ],
-};
+type RideItem = ReturnType<typeof localJsonApi.getRidesByTab>[number];
 
 function DriverHeader({ ride }: { ride: RideItem }) {
   const { colors } = useTheme();
+  const uiDefaults = localJsonApi.getUiDefaults();
 
   return (
     <View style={styles.driverRow}>
@@ -295,7 +51,7 @@ function DriverHeader({ ride }: { ride: RideItem }) {
             </View>
           </View>
           <Text variant="bodySmall" color="secondary">
-            Verified account
+            {uiDefaults.rides.verified_account_label}
           </Text>
         </View>
       </View>
@@ -430,6 +186,7 @@ function RouteSection({ ride }: { ride: RideItem }) {
 
 function FooterSection({ ride }: { ride: RideItem }) {
   const { colors } = useTheme();
+  const uiDefaults = localJsonApi.getUiDefaults();
 
   if (ride.type === "live") {
     if (!ride.showTrackRoute) {
@@ -439,7 +196,7 @@ function FooterSection({ ride }: { ride: RideItem }) {
     return (
       <Button
         variant="ghost"
-        title="Track Route"
+        title={uiDefaults.rides.track_route_label}
         onPress={() => {}}
         style={{ borderWidth: 1, borderColor: colors.primary }}
       />
@@ -493,9 +250,13 @@ function RideCard({ ride }: { ride: RideItem }) {
 export default function RidesScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<RideTab>("upcoming");
+  const [activeTab, setActiveTab] = useState<RideTabKey>("upcoming");
+  const uiDefaults = localJsonApi.getUiDefaults();
 
-  const rides = useMemo(() => ridesByTab[activeTab], [activeTab]);
+  const rides = useMemo(
+    () => localJsonApi.getRidesByTab(activeTab),
+    [activeTab],
+  );
 
   return (
     <View
@@ -505,12 +266,12 @@ export default function RidesScreen() {
       ]}
     >
       <Text variant="h2" weight="medium" style={styles.title}>
-        Rides
+        {uiDefaults.rides.screen_title}
       </Text>
 
       <View style={styles.searchInputWrap}>
         <TextInput
-          placeholder="Search"
+          placeholder={uiDefaults.rides.search_placeholder}
           leftIcon={<SearchIcon size={20} color={colors.textPrimary} />}
           autoCapitalize="none"
           autoCorrect={false}
@@ -518,7 +279,7 @@ export default function RidesScreen() {
       </View>
 
       <View style={[styles.segmentWrap, { backgroundColor: colors.surface }]}>
-        {TABS.map((tab) => {
+        {rideTabs.map((tab) => {
           const active = tab.key === activeTab;
           return (
             <Pressable
@@ -625,11 +386,11 @@ const styles = StyleSheet.create({
   ratingRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 4,
   },
   divider: {
     height: 1,
-    marginVertical: 16,
+    marginVertical: spacing.md,
   },
   sectionRow: {
     flexDirection: "row",
@@ -638,53 +399,47 @@ const styles = StyleSheet.create({
   },
   vehicleIconWrap: {
     width: 50,
+    height: 50,
+    borderRadius: 14,
     alignItems: "center",
+    justifyContent: "center",
   },
   locationRow: {
     flexDirection: "row",
     alignItems: "flex-start",
+    gap: spacing.sm,
   },
   pinColumn: {
-    width: 30,
+    width: 24,
     alignItems: "center",
+    paddingTop: 2,
   },
   locationTextWrap: {
     flex: 1,
-    marginLeft: 12,
     gap: 2,
   },
   connectorWrap: {
-    marginTop: -16,
-    height: 40,
-    width: 30,
-    justifyContent: "center",
+    marginLeft: 10,
+    marginVertical: 4,
   },
   connectorDots: {
-    height: "100%",
-    alignItems: "center",
-    gap: 4,
+    gap: 3,
     paddingVertical: 2,
   },
   connectorDot: {
-    width: 2,
+    width: 4,
     height: 4,
-    borderRadius: 1,
+    borderRadius: 99,
   },
   footerTop: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: 4,
   },
   seatRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-  },
-  trackButton: {
-    height: 56,
-    borderWidth: 1.5,
-    borderRadius: borderRadius.full,
-    alignItems: "center",
-    justifyContent: "center",
+    gap: 4,
   },
 });

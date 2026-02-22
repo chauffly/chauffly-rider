@@ -9,6 +9,7 @@ import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { RideOption } from './types';
+import { localJsonApi } from '@/api/local-json-api';
 
 interface RideOptionsContentProps {
   rideOptions: RideOption[];
@@ -17,6 +18,7 @@ interface RideOptionsContentProps {
   onProceed?: () => void;
   onSchedule?: () => void;
   etaMinutes?: number;
+  defaultEtaMinutes?: number;
   isLoading?: boolean;
   hasError?: boolean;
 }
@@ -28,11 +30,13 @@ export function RideOptionsContent({
   onProceed,
   onSchedule,
   etaMinutes,
+  defaultEtaMinutes = 3,
   isLoading,
   hasError,
 }: RideOptionsContentProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const activeBooking = localJsonApi.getActiveBooking();
 
   return (
     <View style={styles.rideOptionsContainer}>
@@ -48,7 +52,7 @@ export function RideOptionsContent({
             <Text variant="caption" color="muted" translationKey="booking.eta_estimate" />
           ) : (
             <Text variant="caption" color="muted">
-              {t('booking.eta_minutes', { minutes: etaMinutes || 3 })}
+              {t('booking.eta_minutes', { minutes: etaMinutes || defaultEtaMinutes })}
             </Text>
           )}
         </View>
@@ -132,7 +136,7 @@ export function RideOptionsContent({
             contentFit="contain"
           />
           <Text variant="bodySmall" weight="medium">
-            **** 9948
+            {activeBooking.payment.masked_pan}
           </Text>
         </View>
       </View>

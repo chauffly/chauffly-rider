@@ -9,6 +9,7 @@ import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { Button } from '@/components/common/button';
+import { localJsonApi } from '@/api/local-json-api';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -37,8 +38,8 @@ export default function TripArrivedScreen() {
     destinations?: string;
     destinationName?: string;
     destinationAddress?: string;
-    sampleTotal?: string;
   }>();
+  const activeBooking = localJsonApi.getActiveBooking();
   const [selectedMood, setSelectedMood] = useState('great');
   let destinations: { name?: string; address?: string }[] = [];
   if (params.destinations) {
@@ -68,26 +69,26 @@ export default function TripArrivedScreen() {
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
         <Text variant="h3" weight="medium" align="center">
-          {params.destinationName || finalDestination?.name || 'Larchmont Hotel'}
+          {params.destinationName || finalDestination?.name || activeBooking.route_defaults.destination_name}
         </Text>
         <Text variant="bodySmall" color="muted" align="center" style={styles.addressText}>
-          {params.destinationAddress || finalDestination?.address || '70 Abidjan street, Maitama, NO 10'}
+          {params.destinationAddress || finalDestination?.address || activeBooking.route_defaults.destination_address}
         </Text>
 
         <View style={[styles.statsCard, { borderColor: colors.border }]}> 
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="clock-outline" size={26} color={colors.textPrimary} />
-            <Text variant="bodySmall" weight="medium">3-4 mins</Text>
+            <Text variant="bodySmall" weight="medium">{activeBooking.trip_metrics.duration_text}</Text>
             <Text variant="caption" color="muted">Duration</Text>
           </View>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="map-marker-distance" size={26} color={colors.textPrimary} />
-            <Text variant="bodySmall" weight="medium">1.1 km</Text>
+            <Text variant="bodySmall" weight="medium">{activeBooking.trip_metrics.distance_text}</Text>
             <Text variant="caption" color="muted">Distance</Text>
           </View>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="speedometer" size={26} color={colors.textPrimary} />
-            <Text variant="bodySmall" weight="medium">22 km/h</Text>
+            <Text variant="bodySmall" weight="medium">{activeBooking.trip_metrics.average_speed_text}</Text>
             <Text variant="caption" color="muted">Avg. Speed</Text>
           </View>
         </View>

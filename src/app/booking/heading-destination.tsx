@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { localJsonApi } from '@/api/local-json-api';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -29,6 +30,12 @@ export default function HeadingDestinationScreen() {
     driverVehicle?: string;
     selectedRideId?: string;
   }>();
+  const uiDefaults = localJsonApi.getUiDefaults();
+  const apiDriver = localJsonApi.getPrimaryDriver();
+  const driverName = params.driverName || apiDriver.display_name;
+  const driverPhone = params.driverPhone || apiDriver.phone_number;
+  const driverRating = params.driverRating || apiDriver.rating.toFixed(1);
+  const driverVehicle = params.driverVehicle || apiDriver.vehicle.display_name;
 
   useEffect(() => {
     // TODO: Replace timer-based progression with backend trip status updates.
@@ -43,8 +50,7 @@ export default function HeadingDestinationScreen() {
   }, [router, params]);
 
   const handleCallDriver = async () => {
-    const driverPhone = (params.driverPhone || '0800000000').replace(/[^0-9+]/g, '');
-    const phoneUrl = `tel:${driverPhone}`;
+    const phoneUrl = `tel:${driverPhone.replace(/[^0-9+]/g, '')}`;
     const supported = await Linking.canOpenURL(phoneUrl);
     if (supported) {
       await Linking.openURL(phoneUrl);
@@ -104,13 +110,13 @@ export default function HeadingDestinationScreen() {
       <View style={[styles.bottomCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}> 
         <View style={[styles.handle, { backgroundColor: colors.border }]} />
         <Text variant="h3" weight="medium" align="center">
-          Heading to destination...
+          {uiDefaults.booking.heading_destination_title}
         </Text>
         <Text variant="bodySmall" color="muted" align="center" style={styles.subtitle}>
-          Will arrive at the destination in 3 min..
+          {uiDefaults.booking.heading_destination_subtitle}
         </Text>
         <Text variant="body" align="center" style={styles.vehicleText}>
-          {params.driverVehicle || 'Mercedes Benz e350 2019, Black'}
+          {driverVehicle}
         </Text>
 
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -122,15 +128,15 @@ export default function HeadingDestinationScreen() {
 
           <View style={styles.driverInfo}>
             <View style={styles.driverNameRow}>
-              <Text variant="body" weight="medium">{params.driverName }</Text> 
+              <Text variant="body" weight="medium">{driverName}</Text> 
                 <MaterialCommunityIcons name="check-decagram" size={18} color={colors.brandBlue} />
  
             </View>
 
             <View style={styles.metaRow}>
               <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
-              <Text variant="bodySmall">{params.driverRating || '4.5'}</Text>
-              <Text variant="bodySmall" color="muted">{params.driverPhone}</Text>
+              <Text variant="bodySmall">{driverRating}</Text>
+              <Text variant="bodySmall" color="muted">{driverPhone}</Text>
             </View>
           </View>
 

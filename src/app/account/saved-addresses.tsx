@@ -19,13 +19,12 @@ import { useTheme } from "@/context/theme-context";
 import { useTranslation } from "@/context/language-context";
 import { borderRadius, spacing } from "@/constants/spacing";
 import { StackHeader } from "@/components/common/stack-header";
+import { localJsonApi } from '@/api/local-json-api';
 
 type SavedAddress = {
   key: string;
-  titleKey?: string;
-  title?: string;
-  addressKey?: string;
-  address?: string;
+  title: string;
+  address: string;
 };
 
 export default function SavedAddressesScreen() {
@@ -52,21 +51,11 @@ export default function SavedAddressesScreen() {
   const hasEditPreviewContent =
     editPreviewName.length > 0 || editPreviewAddress.length > 0;
   const [addresses, setAddresses] = useState<SavedAddress[]>([
-    {
-      key: "home",
-      titleKey: "account.address_home",
-      addressKey: "account.address_sample",
-    },
-    {
-      key: "office",
-      titleKey: "account.address_office",
-      addressKey: "account.address_sample",
-    },
-    {
-      key: "apartment",
-      titleKey: "account.address_apartment",
-      addressKey: "account.address_sample",
-    },
+    ...localJsonApi.getSavedAddresses().map((address) => ({
+      key: address.id,
+      title: address.label,
+      address: address.address_line,
+    })),
   ]);
 
   const closeAddModal = () => {
@@ -94,10 +83,10 @@ export default function SavedAddressesScreen() {
   };
 
   const getAddressTitle = (item: SavedAddress) =>
-    item.titleKey ? t(item.titleKey) : (item.title ?? "");
+    item.title;
 
   const getAddressValue = (item: SavedAddress) =>
-    item.addressKey ? t(item.addressKey) : (item.address ?? "");
+    item.address;
 
   const openAddressMenu = (
     item: SavedAddress,
@@ -141,8 +130,6 @@ export default function SavedAddressesScreen() {
               ...item,
               title: editAddressName.trim(),
               address: editAddressValue.trim(),
-              titleKey: undefined,
-              addressKey: undefined,
             }
           : item,
       ),
@@ -209,17 +196,9 @@ export default function SavedAddressesScreen() {
                   size={20}
                   color={colors.textMuted}
                 />
-                {item.titleKey ? (
-                  <Text
-                    variant="body"
-                    weight="semiBold"
-                    translationKey={item.titleKey}
-                  />
-                ) : (
-                  <Text variant="body" weight="semiBold">
-                    {item.title}
-                  </Text>
-                )}
+                <Text variant="body" weight="semiBold">
+                  {item.title}
+                </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
@@ -237,7 +216,7 @@ export default function SavedAddressesScreen() {
               style={[styles.divider, { backgroundColor: colors.border }]}
             />
             <Text variant="bodySmall" color="muted">
-              {item.addressKey ? t(item.addressKey) : item.address}
+              {item.address}
             </Text>
           </View>
         ))}

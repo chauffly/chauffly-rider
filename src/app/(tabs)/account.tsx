@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Image,
   Modal,
@@ -16,6 +16,8 @@ import { useTranslation } from "@/context/language-context";
 import { type Href, useRouter } from "expo-router";
 import { borderRadius, spacing } from "@/constants/spacing";
 import { Button } from "@/components/common/button";
+import { localJsonApi } from '@/api/local-json-api';
+import { accountRoleService, type AccountRole } from "@/services/account-role";
 
 interface AccountMenuItem {
   key: string;
@@ -31,6 +33,19 @@ export default function AccountScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
+  const [accountRole, setAccountRole] = useState<AccountRole>(
+    localJsonApi.getCurrentUserRole() === "corporate" ? "corporate" : "rider",
+  );
+  const currentUser = localJsonApi.getCurrentUser();
+  const corporate = accountRole === "corporate";
+
+  useEffect(() => {
+    const loadRole = async () => {
+      const role = await accountRoleService.getRole();
+      setAccountRole(role);
+    };
+    loadRole();
+  }, []);
 
   const menuItems: AccountMenuItem[] = [
     {
@@ -47,13 +62,42 @@ export default function AccountScreen() {
       showChevron: true,
       route: "/account/notifications",
     },
-    {
-      key: "ride_preference",
-      icon: "car-sport-outline",
-      labelKey: "account.ride_preference",
-      showChevron: true,
-      route: "/booking/ride-preference",
-    },
+    ...(!corporate
+      ? [
+          {
+            key: "ride_preference",
+            icon: "car-sport-outline" as keyof typeof Ionicons.glyphMap,
+            labelKey: "account.ride_preference",
+            showChevron: true,
+            route: "/booking/ride-preference" as Href,
+          },
+          {
+            key: "join_company",
+            icon: "business-outline" as keyof typeof Ionicons.glyphMap,
+            labelKey: "account.join_company",
+            showChevron: true,
+            route: "/account/join-company" as Href,
+          },
+        ]
+      : []),
+    ...(corporate
+      ? [
+          {
+            key: "document_verification",
+            icon: "document-text-outline" as keyof typeof Ionicons.glyphMap,
+            labelKey: "account.document_verification",
+            showChevron: true,
+            route: "/account/document-verification" as Href,
+          },
+          {
+            key: "travel_limit",
+            icon: "speedometer-outline" as keyof typeof Ionicons.glyphMap,
+            labelKey: "account.travel_limit",
+            showChevron: true,
+            route: "/account/travel-limit" as Href,
+          },
+        ]
+      : []),
     {
       key: "app_appearance",
       icon: "color-palette-outline",
@@ -131,13 +175,10 @@ export default function AccountScreen() {
                 variant="h3"
                 size={"xxl"}
                 weight="medium"
-                translationKey="account.sample_name"
-              />
-              <Text
-                variant="bodySmall"
-                color="muted"
-                translationKey="account.sample_phone"
-              />
+              >
+                {currentUser.profile.full_name}
+              </Text>
+              <Text variant="bodySmall" color="muted">{currentUser.phone_number}</Text>
             </View>
             <Ionicons
               name="chevron-forward"
@@ -168,8 +209,9 @@ export default function AccountScreen() {
               <Text
                 variant="body"
                 weight="semiBold"
-                translationKey="account.sample_balance"
-              />
+              >
+                ₦{currentUser.wallet.available_balance.toLocaleString()}
+              </Text>
               <Text
                 variant="caption"
                 color="muted"

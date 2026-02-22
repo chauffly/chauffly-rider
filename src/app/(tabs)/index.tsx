@@ -11,12 +11,14 @@ import { MapControls } from "@/components/home/map-controls";
 import { RouteSummaryCard } from "@/components/home/route-summary-card";
 import { SetLocationContent } from "@/components/home/set-location-content";
 import { RideOptionsContent } from "@/components/home/ride-options-content";
+import { CorporateDashboardContent } from '@/components/home/corporate-dashboard-content';
 import { Origin, RouteStop, RideOption } from "@/components/home/types";
 import { useTheme } from '@/context/theme-context';
 import { useLocation } from "@/context/location-context";
 import { spacing, borderRadius } from '@/constants/spacing';
-import { mockDriver } from '@/constants/mock-driver';
 import { rideOptions } from '@/constants/ride-options';
+import { localJsonApi } from '@/api/local-json-api';
+import { accountRoleService, type AccountRole } from '@/services/account-role';
 import {
   locationHistoryService,
   SavedLocation,
@@ -55,6 +57,14 @@ export default function HomeScreen() {
   } = useLocation();
 
   const mapRef = useRef<MapView>(null);
+  const [accountRole, setAccountRole] = useState<AccountRole>(
+    localJsonApi.getCurrentUserRole() === 'corporate' ? 'corporate' : 'rider'
+  );
+  const isCorporate = accountRole === 'corporate';
+  const uiDefaults = localJsonApi.getUiDefaults();
+  const pickupPlaceholder = uiDefaults.booking.pickup_placeholder;
+  const activeBooking = localJsonApi.getActiveBooking();
+  const bookingDriver = localJsonApi.getDriverById(activeBooking.driver_id);
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>("home");
@@ -73,6 +83,15 @@ export default function HomeScreen() {
   const [origin, setOrigin] = useState<Origin | null>(null);
   const [destinations, setDestinations] = useState<RouteStop[]>([]);
 
+  useEffect(() => {
+    const loadRole = async () => {
+      const role = await accountRoleService.getRole();
+      setAccountRole(role);
+    };
+
+    loadRole();
+  }, []);
+
   // Handle params from your-route screen
   useEffect(() => {
     if (
@@ -81,7 +100,7 @@ export default function HomeScreen() {
       params.originLng
     ) {
       const newOrigin = {
-        name: params.originName || "Pickup Location",
+        name: params.originName || pickupPlaceholder,
         address: params.originAddress || "",
         coordinates: {
           latitude: parseFloat(params.originLat),
@@ -103,9 +122,12 @@ export default function HomeScreen() {
     }
   }, [
     params.viewMode,
+    params.originName,
+    params.originAddress,
     params.originLat,
     params.originLng,
     params.destinations,
+    pickupPlaceholder,
   ]);
 
   // Debug current location
@@ -275,10 +297,10 @@ export default function HomeScreen() {
         bookingType: "instant",
         estimatedDurationMinutes: (routeDurationMinutes || estimatedDurationMinutes).toString(),
         distanceKm: (routeDistanceKm || totalDistanceKm).toString(),
-        driverName: mockDriver.name,
-        driverPhone: mockDriver.phone,
-        driverRating: mockDriver.rating,
-        driverVehicle: mockDriver.vehicle,
+        driverName: bookingDriver.display_name,
+        driverPhone: bookingDriver.phone_number,
+        driverRating: bookingDriver.rating.toFixed(1),
+        driverVehicle: bookingDriver.vehicle.display_name,
       },
     });
   };
@@ -299,10 +321,10 @@ export default function HomeScreen() {
         bookingType: "scheduled",
         estimatedDurationMinutes: (routeDurationMinutes || estimatedDurationMinutes).toString(),
         distanceKm: (routeDistanceKm || totalDistanceKm).toString(),
-        driverName: mockDriver.name,
-        driverPhone: mockDriver.phone,
-        driverRating: mockDriver.rating,
-        driverVehicle: mockDriver.vehicle,
+        driverName: bookingDriver.display_name,
+        driverPhone: bookingDriver.phone_number,
+        driverRating: bookingDriver.rating.toFixed(1),
+        driverVehicle: bookingDriver.vehicle.display_name,
       },
     });
   };
@@ -354,7 +376,7 @@ export default function HomeScreen() {
         );
         setRouteDistanceKm(metrics.distanceKm);
         setRouteDurationMinutes(metrics.durationMinutes);
-      } catch (error) {
+      } catch {
         setRouteDistanceKm(totalDistanceKm);
         setRouteDurationMinutes(estimatedDurationMinutes);
         setRouteMetricsError('fallback');
@@ -392,10 +414,15 @@ export default function HomeScreen() {
       onProceed={handleProceedInstantRide}
       onSchedule={handleScheduleRide}
       etaMinutes={routeDurationMinutes || estimatedDurationMinutes || undefined}
+      defaultEtaMinutes={uiDefaults.booking.default_eta_minutes}
       isLoading={routeMetricsLoading}
       hasError={!!routeMetricsError}
     />
   );
+
+  if (isCorporate) {
+    return <CorporateDashboardContent />;
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

@@ -15,6 +15,7 @@ import { Text } from '@/components/common/text';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { borderRadius, spacing } from '@/constants/spacing';
+import { accountRoleService } from '@/services/account-role';
 
 type RoleType = 'passenger' | 'driver' | 'corporate';
 
@@ -27,22 +28,16 @@ interface RoleOption {
 
 const roleOptions: RoleOption[] = [
   {
-    id: 'passenger',
-    titleKey: 'profile_setup.passenger_title',
-    descriptionKey: 'profile_setup.passenger_description',
-    image: require('@assets/images/passenger.png'),
+    id: "passenger",
+    titleKey: "profile_setup.passenger_title",
+    descriptionKey: "profile_setup.passenger_description",
+    image: require("@assets/images/passenger.png"),
   },
   {
-    id: 'driver',
-    titleKey: 'profile_setup.driver_title',
-    descriptionKey: 'profile_setup.driver_description',
-    image: require('@assets/images/driver.png'),
-  },
-  {
-    id: 'corporate',
-    titleKey: 'profile_setup.corporate_title',
-    descriptionKey: 'profile_setup.corporate_description',
-    image: require('@assets/images/corporate.png'),
+    id: "corporate",
+    titleKey: "profile_setup.corporate_title",
+    descriptionKey: "profile_setup.corporate_description",
+    image: require("@assets/images/corporate.png"),
   },
 ];
 
@@ -54,11 +49,16 @@ export default function RoleSelectionScreen() {
 
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
 
-  const handleRoleSelect = (role: RoleType) => {
+  const handleRoleSelect = async (role: RoleType) => {
     setSelectedRole(role);
-    // Navigate to personal info screen after selection
+    await accountRoleService.setRole(role === 'corporate' ? 'corporate' : 'rider');
+    const nextPath =
+      role === 'corporate'
+        ? '/(auth)/profile-setup/corporate-organization'
+        : '/(auth)/profile-setup/personal-info';
+
     router.push({
-      pathname: '/(auth)/profile-setup/personal-info',
+      pathname: nextPath,
       params: { role },
     });
   };

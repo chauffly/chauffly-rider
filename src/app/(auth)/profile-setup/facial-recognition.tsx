@@ -2,9 +2,8 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,9 +17,13 @@ import { StackHeader } from '@/components/common/stack-header';
 
 export default function FacialRecognitionScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ role?: string }>();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const isCorporate = params.role === 'corporate';
+  const currentStep = isCorporate ? 5 : 3;
+  const totalSteps = isCorporate ? 5 : 3;
 
   const handleBack = () => {
     router.back();
@@ -55,7 +58,7 @@ export default function FacialRecognitionScreen() {
         titleWeight="semiBold"
         right={
           <Text variant="bodySmall" color="muted">
-            3 {t('common.of')} 3
+            {currentStep} {t('common.of')} {totalSteps}
           </Text>
         }
       />

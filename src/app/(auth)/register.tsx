@@ -22,17 +22,19 @@ import { useTranslation } from '@/context/language-context';
 import { spacing } from '@/constants/spacing';
 import CallOutline from '@/components/svg/CallOutline';
 import Password from '@/components/svg/Password';
+import { localJsonApi } from '@/api/local-json-api';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const authDefaults = localJsonApi.getAuthDefaults();
 
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState(authDefaults.register.phone_number);
+  const [password, setPassword] = useState(authDefaults.register.password);
+  const [confirmPassword, setConfirmPassword] = useState(authDefaults.register.confirm_password);
+  const [agreeToTerms, setAgreeToTerms] = useState(authDefaults.register.agree_to_terms);
 
   const handleCreateAccount = () => {
     // TODO: Implement account creation

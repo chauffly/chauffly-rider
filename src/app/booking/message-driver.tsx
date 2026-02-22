@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '@/components/common/text';
 import { spacing, borderRadius } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { localJsonApi } from '@/api/local-json-api';
 
 type ChatMessage = {
   id: string;
@@ -15,23 +16,19 @@ type ChatMessage = {
   fromDriver: boolean;
 };
 
-const INITIAL_MESSAGES: ChatMessage[] = [
-  { id: 'm1', text: 'Hello, good morning Daniel', time: '09:34PM', fromDriver: true },
-  { id: 'm2', text: 'I\'m James i am on my way to your location, please wait..', time: '09:34PM', fromDriver: true },
-  {
-    id: 'm3',
-    text: 'Hello James, ok i will be waiting for you in front of Bobst Library. you can contact me as soon as you arrive',
-    time: '09:34PM',
-    fromDriver: false,
-  },
-];
-
 export default function MessageDriverScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ driverName?: string }>();
   const [message, setMessage] = useState('');
+  const apiDriver = localJsonApi.getPrimaryDriver();
+  const chatMessages: ChatMessage[] = localJsonApi.getChatMessages().map((record) => ({
+    id: record.id,
+    text: record.text,
+    time: record.time,
+    fromDriver: record.sender_type === 'driver',
+  }));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.md }]}> 
@@ -39,12 +36,12 @@ export default function MessageDriverScreen() {
         <Pressable onPress={() => router.back()} style={styles.headerIcon}>
           <MaterialCommunityIcons name="chevron-left" size={28} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" weight="medium">{params.driverName || 'James Daniels'}</Text>
+        <Text variant="h3" weight="medium">{params.driverName || apiDriver.display_name}</Text>
         <View style={styles.headerIcon} />
       </View>
 
       <View style={styles.messagesContainer}>
-        {INITIAL_MESSAGES.map((chat) => (
+        {chatMessages.map((chat) => (
           <View
             key={chat.id}
             style={[

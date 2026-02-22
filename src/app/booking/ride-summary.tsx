@@ -14,6 +14,7 @@ import { rideOptions } from '@/constants/ride-options';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
+import { localJsonApi } from '@/api/local-json-api';
 
 export default function RideSummaryScreen() {
   const router = useRouter();
@@ -23,6 +24,8 @@ export default function RideSummaryScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const [isShimmering, setIsShimmering] = useState(true);
+  const activeBooking = localJsonApi.getActiveBooking();
+  const fallbackDriver = localJsonApi.getDriverById(activeBooking.driver_id);
    const params = useLocalSearchParams<{
     originName?: string;
     originAddress?: string;
@@ -103,10 +106,10 @@ export default function RideSummaryScreen() {
             <LocationPinGreen size={18} />
             <View style={styles.routeText}>
               <Text variant="bodySmall" font="medium">
-                {params.originName || t('booking.sample_pickup_location')}
+                {params.originName || activeBooking.route_defaults.origin_name}
               </Text>
               <Text variant="caption" color="muted">
-                {params.originAddress || t('booking.sample_pickup_note')}
+                {params.originAddress || activeBooking.route_defaults.origin_address}
               </Text>
             </View>
             <Text variant="caption" color="muted">
@@ -118,10 +121,10 @@ export default function RideSummaryScreen() {
             <LocationPinRed size={18} />
             <View style={styles.routeText}>
               <Text variant="bodySmall" font="medium">
-                {destinations[destinations.length - 1]?.name || t('booking.sample_dropoff_location')}
+                {destinations[destinations.length - 1]?.name || activeBooking.route_defaults.destination_name}
               </Text>
               <Text variant="caption" color="muted">
-                {destinations[destinations.length - 1]?.address || t('booking.sample_dropoff_note')}
+                {destinations[destinations.length - 1]?.address || activeBooking.route_defaults.destination_address}
               </Text>
             </View>
             <Text variant="caption" color="muted">
@@ -141,12 +144,12 @@ export default function RideSummaryScreen() {
               <View style={[styles.driverAvatar, { backgroundColor: colors.border }]} />
               <View style={styles.driverInfo}>
                 <Text variant="bodySmall" font="medium">
-                  {params.driverName}
+                  {params.driverName || fallbackDriver.display_name}
                 </Text>
               <View style={styles.ratingRow}>
                 <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
                 <Text variant="caption" color="muted">
-                  {params.driverRating || t('booking.sample_rating')}
+                  {params.driverRating || fallbackDriver.rating.toFixed(1)}
                 </Text>
                 {params.driverPhone ? (
                   <Text variant="caption" color="muted">
@@ -176,16 +179,16 @@ export default function RideSummaryScreen() {
           <Text variant="bodySmall" font="medium" translationKey="booking.ride_summary_fare_breakdown" />
           <View style={styles.fareRow}>
             <Text variant="caption" color="muted" translationKey="booking.trip_fare" />
-            <Text variant="caption" translationKey="booking.sample_trip_fare" />
+            <Text variant="caption">{activeBooking.fare_breakdown.trip_fare}</Text>
           </View>
           <View style={styles.fareRow}>
             <Text variant="caption" color="muted" translationKey="booking.tax" />
-            <Text variant="caption" translationKey="booking.sample_tax" />
+            <Text variant="caption">{activeBooking.fare_breakdown.tax}</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.fareRow}>
             <Text variant="bodySmall" font="medium" translationKey="booking.total" />
-            <Text variant="bodySmall" font="medium" translationKey="booking.sample_total" />
+            <Text variant="bodySmall" font="medium">{activeBooking.fare_breakdown.total}</Text>
           </View>
         </View>
 

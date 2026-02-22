@@ -10,6 +10,7 @@ import ChevronLeft from '@/components/svg/ChevronLeft';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
+import { localJsonApi } from '@/api/local-json-api';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -37,6 +38,11 @@ export default function DriverAcceptsScreen() {
     driverRating?: string;
     driverVehicle?: string;
   }>();
+  const apiDriver = localJsonApi.getPrimaryDriver();
+  const driverName = params.driverName || apiDriver.display_name;
+  const driverPhone = params.driverPhone || apiDriver.phone_number;
+  const driverRating = params.driverRating || apiDriver.rating.toFixed(1);
+  const driverVehicle = params.driverVehicle || apiDriver.vehicle.display_name;
 
   const [rideArrivalState, setRideArrivalState] = useState<
     "accepted" | "heading" | "arrived"
@@ -89,11 +95,11 @@ export default function DriverAcceptsScreen() {
         : t("booking.arrival_waiting_note");
 
   const handleCallDriver = async () => {
-    const driverPhone = (params.driverPhone || t("booking.sample_driver_phone")).replace(
+    const sanitizedPhone = driverPhone.replace(
       /[^0-9+]/g,
       "",
     );
-    const phoneUrl = `tel:${driverPhone}`;
+    const phoneUrl = `tel:${sanitizedPhone}`;
     const supported = await Linking.canOpenURL(phoneUrl);
     if (supported) {
       await Linking.openURL(phoneUrl);
@@ -169,7 +175,7 @@ export default function DriverAcceptsScreen() {
           {statusSubtitle}
         </Text>
         <Text variant="body" style={styles.vehicleText}>
-          {params.driverVehicle}
+          {driverVehicle}
         </Text>
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
@@ -183,7 +189,7 @@ export default function DriverAcceptsScreen() {
           </View>
           <View style={styles.driverInfo}>
             <Text variant="body" font="medium">
-              {params.driverName || t("booking.sample_driver_name")}
+              {driverName}
             </Text>
             <View style={styles.ratingRow}>
               <MaterialCommunityIcons
@@ -192,10 +198,10 @@ export default function DriverAcceptsScreen() {
                 color={colors.primary}
               />
               <Text variant="bodySmall" color="muted">
-                {params.driverRating || t("booking.sample_rating")}
+                {driverRating}
               </Text>
               <Text variant="bodySmall" color="muted">
-                {params.driverPhone || t("booking.sample_driver_phone")}
+                {driverPhone}
               </Text>
             </View>
           </View>

@@ -81,6 +81,10 @@ function RootLayoutNav() {
         <Stack.Screen name="account/privacy-policy" options={{ headerShown: false }} />
         <Stack.Screen name="account/terms-of-use" options={{ headerShown: false }} />
         <Stack.Screen name="account/visit-website" options={{ headerShown: false }} />
+        <Stack.Screen name="account/join-company" options={{ headerShown: false }} />
+        <Stack.Screen name="account/document-verification" options={{ headerShown: false }} />
+        <Stack.Screen name="account/travel-limit" options={{ headerShown: false }} />
+        <Stack.Screen name="corporate" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"
           options={{ presentation: "modal", title: "Modal" }}

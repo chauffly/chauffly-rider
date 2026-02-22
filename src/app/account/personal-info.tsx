@@ -9,15 +9,17 @@ import { StackHeader } from '@/components/common/stack-header';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
+import { localJsonApi } from '@/api/local-json-api';
 
 export default function PersonalInfoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const [fullName, setFullName] = useState(t('account.sample_name'));
-  const [email, setEmail] = useState(t('account.sample_email'));
-  const [phone, setPhone] = useState(t('account.sample_phone_local'));
+  const currentUser = localJsonApi.getCurrentUser();
+  const [fullName, setFullName] = useState(currentUser.profile.full_name);
+  const [email, setEmail] = useState(currentUser.email);
+  const [phone, setPhone] = useState(currentUser.phone_number);
 
   const avatarSize = spacing.xxxxl * 3;
   const editButtonSize = spacing.xl + spacing.md;
