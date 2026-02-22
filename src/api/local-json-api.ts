@@ -223,6 +223,7 @@ type CorporateData = {
 type ApiRideListItem = {
   id: string;
   type: 'history' | 'live';
+  driverId: string;
   driverName: string;
   rating?: string;
   reviews?: string;
@@ -323,6 +324,7 @@ export const localJsonApi = {
       return {
         id: ride.id,
         type: ride.type,
+        driverId: ride.driver_id,
         driverName: driver.display_name,
         rating: ride.rating,
         reviews: ride.reviews,

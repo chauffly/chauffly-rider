@@ -136,10 +136,27 @@ export default function SelectPickupTimeScreen() {
       <View style={styles.footer}>
         <Button
           translationKey="booking.personalize_ride"
+          variant="outline"
           fullWidth
           onPress={() =>
             router.push({
               pathname: '/booking/personalization',
+              params: {
+                ...params,
+                pickupDate: format(selectedDate, 'yyyy-MM-dd'),
+                pickupTime: format(selectedTime, 'HH:mm'),
+                estimatedDurationMinutes: durationMinutes.toString(),
+                fromSchedule: 'true',
+              },
+            })
+          }
+        />
+        <Button
+          translationKey="booking.schedule_ride"
+          fullWidth
+          onPress={() =>
+            router.push({
+              pathname: '/booking/schedule-detail',
               params: {
                 ...params,
                 pickupDate: format(selectedDate, 'yyyy-MM-dd'),
@@ -335,6 +352,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     marginTop: 'auto',
+    gap: spacing.md,
     paddingBottom: spacing.xl,
   },
 });

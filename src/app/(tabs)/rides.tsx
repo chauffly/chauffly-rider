@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
 import { Text } from "@/components/common/text";
 import { TextInput } from "@/components/common/text-input";
@@ -165,7 +166,7 @@ function RouteSection({ ride }: { ride: RideItem }) {
             {!isLast ? (
               <View style={styles.connectorWrap}>
                 <View style={styles.connectorDots}>
-                  {Array.from({ length: 5 }).map((_, dotIndex) => (
+                  {Array.from({ length: 3 }).map((_, dotIndex) => (
                     <View
                       key={`${stop.id}-dot-${dotIndex}`}
                       style={[
@@ -229,11 +230,47 @@ function FooterSection({ ride }: { ride: RideItem }) {
   );
 }
 
-function RideCard({ ride }: { ride: RideItem }) {
+const TAB_TO_STATUS: Record<RideTabKey, string> = {
+  past: "Completed",
+  upcoming: "Scheduled",
+  ongoing: "Ongoing",
+  canceled: "Cancelled",
+};
+
+function RideCard({ ride, activeTab }: { ride: RideItem; activeTab: RideTabKey }) {
   const { colors } = useTheme();
+  const router = useRouter();
+
+  const handlePress = () => {
+    const rideParams = {
+      driverId: ride.driverId,
+      fare: ride.fare,
+      stops: JSON.stringify(ride.stops),
+      vehicleName: ride.vehicleName || '',
+      schedule: ride.schedule || '',
+    };
+
+    if (activeTab === "upcoming") {
+      router.push({
+        pathname: "/booking/schedule-detail",
+        params: rideParams,
+      });
+    } else {
+      router.push({
+        pathname: "/booking/ride-detail",
+        params: {
+          ...rideParams,
+          rideStatus: TAB_TO_STATUS[activeTab],
+        },
+      });
+    }
+  };
 
   return (
-    <View style={[styles.rideCard, { backgroundColor: colors.surface }]}>
+    <Pressable
+      onPress={handlePress}
+      style={[styles.rideCard, { backgroundColor: colors.surface }]}
+    >
       <DriverHeader ride={ride} />
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
       <VehicleSection ride={ride} />
@@ -243,7 +280,7 @@ function RideCard({ ride }: { ride: RideItem }) {
       <RouteSection ride={ride} />
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
       <FooterSection ride={ride} />
-    </View>
+    </Pressable>
   );
 }
 
@@ -310,7 +347,7 @@ export default function RidesScreen() {
         }}
       >
         {rides.map((ride) => (
-          <RideCard key={ride.id} ride={ride} />
+          <RideCard key={ride.id} ride={ride} activeTab={activeTab} />
         ))}
       </ScrollView>
     </View>
@@ -419,17 +456,18 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   connectorWrap: {
-    marginLeft: 10,
+    marginLeft: 12,
     marginVertical: 4,
+    marginTop: -10,
   },
   connectorDots: {
     gap: 3,
     paddingVertical: 2,
   },
   connectorDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 99,
+    width: 2,
+    height: 8,
+    borderRadius: 2,
   },
   footerTop: {
     flexDirection: "row",

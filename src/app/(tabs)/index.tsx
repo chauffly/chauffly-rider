@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Image } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 
 import { Text } from "@/components/common/text";
 import { LocationPermissionModal } from '@/components/common/location-permission-modal';
@@ -432,7 +432,6 @@ export default function HomeScreen() {
           style={styles.map}
           initialRegion={mapRegion}
           onMapReady={() => setIsMapReady(true)}
-          provider={PROVIDER_GOOGLE}
           mapType="standard"
           showsBuildings
           showsIndoors

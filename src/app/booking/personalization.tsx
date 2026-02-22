@@ -40,7 +40,10 @@ export default function PersonalizationScreen() {
     bookingType?: string;
     pickupDate?: string;
     pickupTime?: string;
+    fromSchedule?: string;
   }>();
+
+  const isFromSchedule = params.fromSchedule === 'true';
 
   return (
     <View
@@ -95,7 +98,7 @@ export default function PersonalizationScreen() {
           style={styles.footerButton}
           onPress={() =>
             router.push({
-              pathname: "/booking/ride-summary",
+              pathname: isFromSchedule ? "/booking/schedule-detail" : "/booking/ride-summary",
               params,
             })
           }
