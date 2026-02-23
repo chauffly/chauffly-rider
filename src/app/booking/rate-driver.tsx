@@ -42,7 +42,7 @@ export default function RateDriverScreen() {
       <Image source={require('../../../assets/images/avatar.png')} style={styles.avatar} />
 
       <Text variant="h2" weight="medium" align="center" style={styles.title}>
-        How was the chauffer?
+        How was the chauffeur?
       </Text>
       <Text variant="bodySmall" color="muted" align="center" style={styles.subtitle}>
         Assist chauffly in improving by evaluating this journey

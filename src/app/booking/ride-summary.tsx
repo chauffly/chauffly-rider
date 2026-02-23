@@ -207,7 +207,7 @@ export default function RideSummaryScreen() {
                 paddingRight: spacing.md,
               },
             ]}
-            onPress={() => router.push('/booking/personalization')}
+            onPress={() => router.push({ pathname: '/booking/personalization', params })}
             accessibilityRole="button"
             accessibilityLabel={t('booking.enhance_ride_title')}
           >

@@ -71,6 +71,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="account/saved-addresses" options={{ headerShown: false }} />
         <Stack.Screen name="account/notifications" options={{ headerShown: false }} />
+        <Stack.Screen name="account/notification-list" options={{ headerShown: false }} />
         <Stack.Screen name="account/appearance" options={{ headerShown: false }} />
         <Stack.Screen name="account/personal-info" options={{ headerShown: false }} />
         <Stack.Screen name="account/security" options={{ headerShown: false }} />

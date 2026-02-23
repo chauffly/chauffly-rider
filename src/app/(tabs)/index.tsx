@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Image } from "react-native";
+import { Pressable, StyleSheet, View, Image } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
+import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/common/text";
 import { LocationPermissionModal } from '@/components/common/location-permission-modal';
 import { HomeContent } from "@/components/home/home-content";
@@ -522,6 +523,25 @@ export default function HomeScreen() {
           )}
         </MapView>
 
+        {viewMode === "home" && (
+          <Pressable
+            style={[
+              styles.notificationButton,
+              {
+                backgroundColor: colors.surface,
+                top: insets.top + spacing.md,
+              },
+            ]}
+            onPress={() => router.push("/account/notification-list")}
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={22}
+              color={colors.textPrimary}
+            />
+          </Pressable>
+        )}
+
         {viewMode === "ride-options" && (
           <RouteSummaryCard
             origin={origin}
@@ -579,6 +599,21 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     flex: 1,
+  },
+  notificationButton: {
+    position: "absolute",
+    right: spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 10,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
