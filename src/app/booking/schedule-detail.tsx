@@ -98,15 +98,26 @@ export default function ScheduleDetailScreen() {
       >
         {/* Scheduled Ride Header */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text variant="h3" weight="bold" align="center">
+          <Text variant="h3" weight="semiBold" align="center">
             Your Scheduled Ride
           </Text>
-          <Text variant="bodySmall" color="muted" align="center" style={styles.dateSubtitle}>
+          <Text
+            variant="bodySmall"
+            color="muted"
+            align="center"
+            style={styles.dateSubtitle}
+          >
             {dateDisplay}
           </Text>
-          <View style={[styles.notifyBanner, { backgroundColor: colors.primary }]}>
-            <MaterialCommunityIcons name="information" size={18} color="#FFFFFF" />
-            <Text variant="bodySmall" style={{ color: '#FFFFFF', flex: 1 }}>
+          <View
+            style={[styles.notifyBanner, { backgroundColor: colors.primary }]}
+          >
+            <MaterialCommunityIcons
+              name="information"
+              size={18}
+              color="#FFFFFF"
+            />
+            <Text variant="bodySmall" style={{ color: "#FFFFFF", flex: 1 }}>
               We will notify you when the driver is found
             </Text>
           </View>
@@ -116,19 +127,41 @@ export default function ScheduleDetailScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.driverRow}>
             <View style={styles.driverLeft}>
-              <View style={[styles.driverAvatar, { backgroundColor: colors.border }]}>
-                <MaterialCommunityIcons name="account" size={28} color={colors.textSecondary} />
+              <View
+                style={[
+                  styles.driverAvatar,
+                  { backgroundColor: colors.border },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="account"
+                  size={28}
+                  color={colors.textSecondary}
+                />
               </View>
               <View>
                 <View style={styles.driverNameRow}>
                   <Text variant="body" weight="semiBold">
                     {driver.display_name}
                   </Text>
-                  <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
+                  <MaterialCommunityIcons
+                    name="star"
+                    size={14}
+                    color={colors.primary}
+                  />
                   <Text variant="bodySmall">{driver.rating.toFixed(1)}</Text>
                   {driver.is_verified && (
-                    <View style={[styles.verifiedBadge, { backgroundColor: '#1DA1F2' }]}>
-                      <MaterialCommunityIcons name="check" size={10} color="#FFFFFF" />
+                    <View
+                      style={[
+                        styles.verifiedBadge,
+                        { backgroundColor: "#1DA1F2" },
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name="check"
+                        size={10}
+                        color="#FFFFFF"
+                      />
                     </View>
                   )}
                 </View>
@@ -138,7 +171,11 @@ export default function ScheduleDetailScreen() {
               </View>
             </View>
             <View style={[styles.chatIcon, { borderColor: colors.border }]}>
-              <MaterialCommunityIcons name="chat-outline" size={20} color={colors.textSecondary} />
+              <MaterialCommunityIcons
+                name="chat-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
             </View>
           </View>
         </View>
@@ -148,7 +185,9 @@ export default function ScheduleDetailScreen() {
           <View style={styles.routeContainer}>
             <View style={styles.routeIconColumn}>
               <LocationPinGreen size={18} />
-              <View style={[styles.routeDash, { borderLeftColor: colors.border }]} />
+              <View
+                style={[styles.routeDash, { borderLeftColor: colors.border }]}
+              />
               <LocationPinRed size={18} />
             </View>
             <View style={styles.routeDetails}>
@@ -161,7 +200,9 @@ export default function ScheduleDetailScreen() {
                     {originAddress}
                   </Text>
                 </View>
-                <Text variant="bodySmall" color="muted">{pickupTimeDisplay}</Text>
+                <Text variant="bodySmall" color="muted">
+                  {pickupTimeDisplay}
+                </Text>
               </View>
               <View style={styles.routeStop}>
                 <View style={styles.routeStopText}>
@@ -172,7 +213,9 @@ export default function ScheduleDetailScreen() {
                     {destAddress}
                   </Text>
                 </View>
-                <Text variant="bodySmall" color="muted">{dropoffTimeDisplay}</Text>
+                <Text variant="bodySmall" color="muted">
+                  {dropoffTimeDisplay}
+                </Text>
               </View>
             </View>
           </View>
@@ -181,45 +224,81 @@ export default function ScheduleDetailScreen() {
         {/* Booking Details */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Status</Text>
-            <Text variant="body" weight="medium">Scheduled</Text>
+            <Text variant="body" color="muted">
+              Status
+            </Text>
+            <Text variant="body" weight="medium">
+              Scheduled
+            </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Payment</Text>
-            <Text variant="body" weight="medium">{fare}</Text>
+            <Text variant="body" color="muted">
+              Payment
+            </Text>
+            <Text variant="body" weight="medium">
+              {fare}
+            </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Date</Text>
-            <Text variant="body" weight="medium">{detailDateDisplay}</Text>
+            <Text variant="body" color="muted">
+              Date
+            </Text>
+            <Text variant="body" weight="medium">
+              {detailDateDisplay}
+            </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Time</Text>
-            <Text variant="body" weight="medium">{pickupTimeDisplay}</Text>
+            <Text variant="body" color="muted">
+              Time
+            </Text>
+            <Text variant="body" weight="medium">
+              {pickupTimeDisplay}
+            </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Transaction</Text>
-            <Text variant="body" weight="medium">{transactionId}</Text>
+            <Text variant="body" color="muted">
+              Transaction
+            </Text>
+            <Text variant="body" weight="medium">
+              {transactionId}
+            </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Booking ID</Text>
-            <Text variant="body" weight="medium">{bookingId}</Text>
+            <Text variant="body" color="muted">
+              Booking ID
+            </Text>
+            <Text variant="body" weight="medium">
+              {bookingId}
+            </Text>
           </View>
         </View>
 
         {/* Fare Breakdown */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Trip Earning (x2)</Text>
-            <Text variant="body" weight="medium">{tripFare}</Text>
+            <Text variant="body" color="muted">
+              Trip Earning (x2)
+            </Text>
+            <Text variant="body" weight="medium">
+              {tripFare}
+            </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">App Deduction (5%)</Text>
-            <Text variant="body" weight="medium">{tax}</Text>
+            <Text variant="body" color="muted">
+              App Deduction (5%)
+            </Text>
+            <Text variant="body" weight="medium">
+              {tax}
+            </Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.detailRow}>
-            <Text variant="body" weight="semiBold">Total</Text>
-            <Text variant="body" weight="semiBold">{total}</Text>
+            <Text variant="body" weight="semiBold">
+              Total
+            </Text>
+            <Text variant="body" weight="semiBold">
+              {total}
+            </Text>
           </View>
         </View>
       </ScrollView>

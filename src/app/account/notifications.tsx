@@ -33,22 +33,10 @@ const notificationItems: NotificationItem[] = [
     key: 'ratingsReviews',
     labelKey: 'account.notification_ratings_reviews',
   },
-  {
-    key: 'personalizedRecommendation',
-    labelKey: 'account.notification_personalized_recommendation',
-  },
   { key: 'appUpdate', labelKey: 'account.notification_app_update' },
-  {
-    key: 'importantAnnouncements',
-    labelKey: 'account.notification_important_announcements',
-  },
   {
     key: 'bookingMistake',
     labelKey: 'account.notification_booking_mistake',
-  },
-  {
-    key: 'poorWeatherCondition',
-    labelKey: 'account.notification_poor_weather_condition',
   },
 ];
 
@@ -65,11 +53,8 @@ export default function NotificationsScreen() {
     accountNotification: false,
     rideStatusUpdates: false,
     ratingsReviews: false,
-    personalizedRecommendation: false,
     appUpdate: false,
-    importantAnnouncements: false,
     bookingMistake: false,
-    poorWeatherCondition: false,
   });
 
   const handleToggle = (key: string, value: boolean) => {

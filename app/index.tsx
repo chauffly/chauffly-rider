@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 64,
-    fontWeight: "bold",
+    fontWeight: "semiBold",
   },
   subtitle: {
     fontSize: 36,

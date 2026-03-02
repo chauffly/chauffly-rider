@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -31,7 +31,7 @@ const slides: OnboardingSlide[] = [
     id: "1",
     titleKey: "onboarding.slide1_title",
     descriptionKey: "onboarding.slide1_description",
-    image: require("../../assets/images/onboarding-1.png"),
+    image: require("../../assets/images/onboarding-1-mercedes.png"),
   },
   {
     id: "2",
@@ -84,10 +84,6 @@ export default function OnboardingScreen() {
       });
     }
   };
-
-  useEffect(() => {
-    router.push("/(tabs)");
-  }, []);
 
   const renderSlide = ({ item }: { item: OnboardingSlide }) => (
     <View style={styles.slide}>

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
+  ActivityIndicator,
   StyleSheet,
   View,
   Pressable,
@@ -70,6 +71,7 @@ export default function YourRouteScreen() {
   const [locationHistory, setLocationHistory] = useState<HistoryItemType[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showActionSheet, setShowActionSheet] = useState(false);
+  const [searchError, setSearchError] = useState(false);
 
   // Handle edit mode - load existing route data
   useEffect(() => {
@@ -143,13 +145,20 @@ export default function YourRouteScreen() {
     async (query: string) => {
       console.log('🔍 Searching for:', query);
       setIsSearching(true);
-      const results = await googlePlacesService.autocomplete(
-        query,
-        currentLocation?.coordinates
-      );
-      console.log('📍 Search results:', results.length, 'places found');
-      setSearchResults(results);
-      setIsSearching(false);
+      try {
+        const results = await googlePlacesService.autocomplete(
+          query,
+          currentLocation?.coordinates
+        );
+        console.log('📍 Search results:', results.length, 'places found');
+        setSearchResults(results);
+        setSearchError(false);
+      } catch {
+        setSearchResults([]);
+        setSearchError(true);
+      } finally {
+        setIsSearching(false);
+      }
     },
     [currentLocation]
   );
@@ -186,12 +195,31 @@ export default function YourRouteScreen() {
   }, [loadLocationHistory]);
 
   useEffect(() => {
-    if (searchQuery.length >= 2) {
-      searchPlaces(searchQuery);
-    } else {
+    if (searchQuery.length < 2) {
       setSearchResults([]);
+      setSearchError(false);
+      return;
     }
+
+    const timeoutId = setTimeout(() => {
+      searchPlaces(searchQuery);
+    }, 350);
+
+    return () => clearTimeout(timeoutId);
   }, [searchQuery, searchPlaces]);
+
+  const historyMatches = useMemo(() => {
+    if (searchQuery.length < 2) {
+      return [];
+    }
+
+    const query = searchQuery.trim().toLowerCase();
+    return locationHistory.filter(
+      (item) =>
+        item.name.toLowerCase().includes(query) ||
+        item.address.toLowerCase().includes(query),
+    );
+  }, [locationHistory, searchQuery]);
 
   const handleClose = () => {
     // Reset all state to initial values
@@ -341,26 +369,55 @@ export default function YourRouteScreen() {
 
   const renderLocationList = () => {
     if (searchQuery.length >= 2) {
+      if (isSearching && searchResults.length === 0) {
+        return (
+          <View style={[styles.emptyState, styles.loadingState]}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text variant="body" color="muted" align="center">
+              Searching locations...
+            </Text>
+          </View>
+        );
+      }
+
       return (
         <FlatList
-          data={searchResults}
-          keyExtractor={(item) => item.placeId}
+          data={searchResults.length > 0 ? searchResults : historyMatches}
+          keyExtractor={(item) =>
+            'placeId' in item ? item.placeId : item.id
+          }
           style={styles.listContainer}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <Divider />}
-          renderItem={({ item }) => (
-            <LocationHistoryItem
-              name={item.mainText}
-              address={item.secondaryText}
-              onPress={() => handleSelectPlace(item)}
-            />
-          )}
+          renderItem={({ item }) =>
+            'placeId' in item ? (
+              <LocationHistoryItem
+                name={item.mainText}
+                address={item.secondaryText}
+                onPress={() => handleSelectPlace(item)}
+              />
+            ) : (
+              <LocationHistoryItem
+                name={item.name}
+                address={item.address}
+                timestamp={item.timestamp}
+                distance={
+                  item.distance
+                    ? locationHistoryService.formatDistance(item.distance)
+                    : undefined
+                }
+                isPinned={item.isPinned}
+                onPress={() => handleSelectHistoryItem(item)}
+                onPinPress={() => handleTogglePin(item.id)}
+              />
+            )
+          }
           ListEmptyComponent={
             !isSearching ? (
               <View style={styles.emptyState}>
                 <Text variant="body" color="muted" align="center">
-                  {t('location.no_results')}
+                  {searchError ? 'Network is unstable. Showing saved locations when available.' : t('location.no_results')}
                 </Text>
               </View>
             ) : null
@@ -642,6 +699,10 @@ const styles = StyleSheet.create({
   emptyState: {
     paddingVertical: spacing.xxxl,
     paddingHorizontal: spacing.lg,
+  },
+  loadingState: {
+    alignItems: "center",
+    gap: spacing.sm,
   },
   actionSheetContent: {
     paddingTop: spacing.md,

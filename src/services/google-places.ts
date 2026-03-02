@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocationCoordinates } from '@/context/location-context';
 
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY';
@@ -37,6 +38,69 @@ function resetSessionToken(): void {
 }
 
 const REQUEST_TIMEOUT = 30000; // 30 seconds
+const AUTOCOMPLETE_CACHE_KEY = '@chauffly/places_autocomplete_cache';
+const AUTOCOMPLETE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const AUTOCOMPLETE_RETRY_COUNT = 2;
+const RETRY_DELAY_MS = 400;
+
+interface CachedPredictionEntry {
+  predictions: PlacePrediction[];
+  savedAt: number;
+}
+
+interface CachedPredictionStore {
+  [query: string]: CachedPredictionEntry;
+}
+
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const cacheQueryKey = (input: string) => input.trim().toLowerCase();
+
+async function readAutocompleteCache(): Promise<CachedPredictionStore> {
+  try {
+    const raw = await AsyncStorage.getItem(AUTOCOMPLETE_CACHE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as CachedPredictionStore;
+  } catch {
+    return {};
+  }
+}
+
+async function writeAutocompleteCache(store: CachedPredictionStore): Promise<void> {
+  try {
+    await AsyncStorage.setItem(AUTOCOMPLETE_CACHE_KEY, JSON.stringify(store));
+  } catch {
+    // Best-effort cache write.
+  }
+}
+
+async function getCachedPredictions(input: string): Promise<PlacePrediction[]> {
+  const cache = await readAutocompleteCache();
+  const key = cacheQueryKey(input);
+  const entry = cache[key];
+  if (!entry) return [];
+
+  if (Date.now() - entry.savedAt > AUTOCOMPLETE_CACHE_TTL_MS) {
+    delete cache[key];
+    await writeAutocompleteCache(cache);
+    return [];
+  }
+
+  return entry.predictions;
+}
+
+async function setCachedPredictions(input: string, predictions: PlacePrediction[]): Promise<void> {
+  const key = cacheQueryKey(input);
+  const cache = await readAutocompleteCache();
+  cache[key] = {
+    predictions,
+    savedAt: Date.now(),
+  };
+  await writeAutocompleteCache(cache);
+}
 
 async function fetchWithTimeout(
   url: string,
@@ -76,63 +140,90 @@ export const googlePlacesService = {
       return [];
     }
 
-    try {
-      const params = new URLSearchParams({
-        input,
-        key: GOOGLE_MAPS_API_KEY,
-        sessiontoken: getSessionToken(),
-        components: 'country:ng',
-      });
+    const params = new URLSearchParams({
+      input,
+      key: GOOGLE_MAPS_API_KEY,
+      sessiontoken: getSessionToken(),
+      components: 'country:ng',
+    });
 
-      if (location) {
-        params.append('location', `${location.latitude},${location.longitude}`);
-        params.append('radius', (radius || 50000).toString());
-      }
-
-      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.toString()}`;
-      console.log('🌐 Calling Google Places Autocomplete API...');
-      console.log('🔑 API Key present:', !!GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY');
-      console.log('📍 Search input:', input);
-
-      const response = await fetchWithTimeout(url, {
-        headers: {
-          'Accept': 'application/json',
-        }
-      });
-
-      console.log('📡 Response status code:', response.status);
-      const data = await response.json();
-
-      console.log('📡 Places API Response Status:', data.status);
-      console.log('📡 Full response:', JSON.stringify(data, null, 2));
-
-      if (data.status === 'OK' && data.predictions) {
-        return data.predictions.map((prediction: any) => ({
-          placeId: prediction.place_id,
-          description: prediction.description,
-          mainText: prediction.structured_formatting?.main_text || prediction.description.split(',')[0],
-          secondaryText: prediction.structured_formatting?.secondary_text || prediction.description.split(',').slice(1).join(',').trim(),
-          types: prediction.types || [],
-        }));
-      }
-
-      if (data.status === 'REQUEST_DENIED') {
-        console.error('❌ Google API - REQUEST_DENIED:', data.error_message);
-      }
-
-      if (data.status === 'ZERO_RESULTS') {
-        console.log('⚠️ No results found for:', input);
-      }
-
-      return [];
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.error('❌ Request timeout - check your internet connection');
-      } else {
-        console.error('❌ Error fetching place autocomplete:', error);
-      }
-      return [];
+    if (location) {
+      params.append('location', `${location.latitude},${location.longitude}`);
+      params.append('radius', (radius || 50000).toString());
     }
+
+    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.toString()}`;
+    console.log('🌐 Calling Google Places Autocomplete API...');
+    console.log('🔑 API Key present:', !!GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY');
+    console.log('📍 Search input:', input);
+
+    for (let attempt = 0; attempt < AUTOCOMPLETE_RETRY_COUNT; attempt += 1) {
+      try {
+        const response = await fetchWithTimeout(url, {
+          headers: {
+            Accept: 'application/json',
+          },
+        });
+
+        console.log('📡 Response status code:', response.status);
+        const data = await response.json();
+
+        console.log('📡 Places API Response Status:', data.status);
+
+        if (data.status === 'OK' && data.predictions) {
+          const predictions: PlacePrediction[] = data.predictions.map((prediction: any) => ({
+            placeId: prediction.place_id,
+            description: prediction.description,
+            mainText:
+              prediction.structured_formatting?.main_text ||
+              prediction.description.split(',')[0],
+            secondaryText:
+              prediction.structured_formatting?.secondary_text ||
+              prediction.description.split(',').slice(1).join(',').trim(),
+            types: prediction.types || [],
+          }));
+          await setCachedPredictions(input, predictions);
+          return predictions;
+        }
+
+        if (data.status === 'REQUEST_DENIED') {
+          console.error('❌ Google API - REQUEST_DENIED:', data.error_message);
+          return [];
+        }
+
+        if (data.status === 'ZERO_RESULTS') {
+          console.log('⚠️ No results found for:', input);
+          return [];
+        }
+
+        if (__DEV__) {
+          console.warn('⚠️ Unexpected Places status:', data.status, data.error_message || '');
+        }
+        return [];
+      } catch (error: any) {
+        const isLastAttempt = attempt === AUTOCOMPLETE_RETRY_COUNT - 1;
+        if (!isLastAttempt) {
+          await wait(RETRY_DELAY_MS * (attempt + 1));
+          continue;
+        }
+
+        if (error.name === 'AbortError') {
+          console.log('ℹ️ Places autocomplete request cancelled or timed out');
+        } else if (error instanceof TypeError) {
+          console.warn('⚠️ Network issue while fetching place autocomplete');
+        } else if (__DEV__) {
+          console.warn('⚠️ Error fetching place autocomplete:', error);
+        } else {
+          console.log('⚠️ Error fetching place autocomplete');
+        }
+      }
+    }
+
+    const cachedPredictions = await getCachedPredictions(input);
+    if (cachedPredictions.length > 0) {
+      console.log(`📦 Using cached autocomplete results for "${input}"`);
+    }
+    return cachedPredictions;
   },
 
   async getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {

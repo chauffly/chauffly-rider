@@ -20,8 +20,6 @@ export default function AccountSecurityScreen() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState({
     biometricId: true,
-    smsAuth: false,
-    emailAuth: false,
     deactivateAccount: false,
   });
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
@@ -59,30 +57,6 @@ export default function AccountSecurityScreen() {
           <Switch
             value={settings.biometricId}
             onValueChange={(value) => setToggle('biometricId', value)}
-            trackOn={colors.primary}
-            trackOff={colors.border}
-            thumbOn={colors.surface}
-            thumbOff={colors.surface}
-          />
-        </View>
-
-        <View style={styles.toggleRow}>
-          <Text variant="body" translationKey="account.sms_authentication" />
-          <Switch
-            value={settings.smsAuth}
-            onValueChange={(value) => setToggle('smsAuth', value)}
-            trackOn={colors.primary}
-            trackOff={colors.border}
-            thumbOn={colors.surface}
-            thumbOff={colors.surface}
-          />
-        </View>
-
-        <View style={styles.toggleRow}>
-          <Text variant="body" translationKey="account.email_authentication" />
-          <Switch
-            value={settings.emailAuth}
-            onValueChange={(value) => setToggle('emailAuth', value)}
             trackOn={colors.primary}
             trackOff={colors.border}
             thumbOn={colors.surface}

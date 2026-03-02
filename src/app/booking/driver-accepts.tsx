@@ -1,4 +1,4 @@
-import { StyleSheet, View, Pressable, Linking } from 'react-native';
+import { StyleSheet, View, Pressable, Linking, Modal, TextInput } from 'react-native';
 import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -47,6 +47,8 @@ export default function DriverAcceptsScreen() {
   const [rideArrivalState, setRideArrivalState] = useState<
     "accepted" | "heading" | "arrived"
   >("accepted");
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pin, setPin] = useState("");
 
   useEffect(() => {
     // TODO: Replace timer-based state simulation with backend/socket ride status events.
@@ -69,16 +71,21 @@ export default function DriverAcceptsScreen() {
       return;
     }
 
-    // TODO: Replace auto-navigation with backend trip-start event.
-    const timer = setTimeout(() => {
-      router.push({
-        pathname: "/booking/heading-destination",
-        params,
-      });
-    }, 2500);
+    setShowPinModal(true);
+  }, [rideArrivalState]);
 
-    return () => clearTimeout(timer);
-  }, [rideArrivalState, router, params]);
+  const handlePinConfirm = () => {
+    if (!pin.trim()) {
+      return;
+    }
+
+    setShowPinModal(false);
+    setPin("");
+    router.push({
+      pathname: "/booking/heading-destination",
+      params,
+    });
+  };
 
   const statusTitle =
     rideArrivalState === "accepted"
@@ -244,6 +251,58 @@ export default function DriverAcceptsScreen() {
           <Button translationKey="booking.view_rides" style={styles.footerButton} onPress={() => router.push('/(tabs)/rides')} />
         </View> */}
       </View>
+
+      <Modal
+        transparent
+        animationType="slide"
+        visible={showPinModal}
+        onRequestClose={() => setShowPinModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[styles.modalCard, { backgroundColor: colors.surface }]}
+          >
+            <Text variant="h3" weight="semiBold" align="center">
+              Enter Pin
+            </Text>
+
+            <Text variant="body" weight="medium" style={styles.pinLabel}>
+              Verify Pin
+            </Text>
+
+            <TextInput
+              style={[
+                styles.pinInput,
+                {
+                  backgroundColor: colors.background,
+                  color: colors.textPrimary,
+                  borderColor: colors.border,
+                },
+              ]}
+              placeholder="Enter PIN"
+              placeholderTextColor={colors.textSecondary}
+              value={pin}
+              onChangeText={setPin}
+              keyboardType="number-pad"
+            />
+
+            <Pressable
+              style={[
+                styles.pinConfirmButton,
+                {
+                  backgroundColor: pin.trim() ? colors.buttonPrimary : colors.border,
+                },
+              ]}
+              onPress={handlePinConfirm}
+              disabled={!pin.trim()}
+            >
+              <Text variant="body" weight="medium" color="inverse">
+                Confirm Passenger
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -342,5 +401,34 @@ const styles = StyleSheet.create({
   },
   footerButton: {
     flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxxl,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.lg,
+  },
+  pinLabel: {
+    marginTop: spacing.sm,
+  },
+  pinInput: {
+    borderWidth: 1,
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg,
+    fontSize: 16,
+  },
+  pinConfirmButton: {
+    marginTop: spacing.md,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.md,
+    alignItems: "center",
   },
 });
