@@ -6,10 +6,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '@/components/common/text';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
 import { Button } from '@/components/common/button';
 
 export default function RatingThankYouScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -24,14 +26,14 @@ export default function RatingThankYouScreen() {
       </View>
 
       <Text variant="h2" weight="medium" align="center" style={styles.title}>
-        Appreciate your reply!
+        {t('booking.thank_you_title')}
       </Text>
       <Text variant="body" color="muted" align="center">
-        Looking forward to our next journey together
+        {t('booking.thank_you_subtitle')}
       </Text>
 
        <Button
-              title="Okay"
+              translationKey="common.done"
               fullWidth
         navigateTo="/(tabs)"  
         style={styles.okButton}

@@ -7,10 +7,12 @@ import { Text } from '@/components/common/text';
 import { Button } from '@/components/common/button';
 import { spacing, borderRadius } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
 import { localJsonApi } from '@/api/local-json-api';
 
 export default function DriverInfoScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -41,7 +43,7 @@ export default function DriverInfoScreen() {
         <Pressable onPress={() => router.back()} style={styles.headerIcon}>
           <MaterialCommunityIcons name="chevron-left" size={28} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" weight="medium">Driver Information</Text>
+        <Text variant="h3" weight="medium">{t('booking.driver_information')}</Text>
         <View style={styles.headerIcon} />
       </View>
 
@@ -56,37 +58,37 @@ export default function DriverInfoScreen() {
               <MaterialCommunityIcons name="star" size={18} color={colors.primary} />
               <Text variant="body" weight="medium">{driverRating}</Text>
             </View>
-            <Text variant="body" color="muted">Rating</Text>
+            <Text variant="body" color="muted">{t('booking.rating_label')}</Text>
           </View>
           <View style={styles.metricItem}>
             <Text variant="body" weight="medium">{apiDriver.trips_completed}</Text>
-            <Text variant="body" color="muted">Trips</Text>
+            <Text variant="body" color="muted">{t('booking.trips_label')}</Text>
           </View>
         </View>
       </View>
 
       <View style={[styles.detailsCard, { backgroundColor: colors.surface }]}> 
         <View style={styles.detailRow}>
-          <Text variant="body" color="muted">Member Since</Text>
+          <Text variant="body" color="muted">{t('booking.member_since')}</Text>
           <Text variant="body" weight="medium">{apiDriver.member_since}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text variant="body" color="muted">Car Model</Text>
+          <Text variant="body" color="muted">{t('booking.car_model')}</Text>
           <Text variant="body" weight="medium">{vehicleName}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text variant="body" color="muted">Color</Text>
+          <Text variant="body" color="muted">{t('booking.color')}</Text>
           <Text variant="body" weight="medium">{apiDriver.vehicle.color}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text variant="body" color="muted">Plate Number</Text>
+          <Text variant="body" color="muted">{t('booking.plate_number')}</Text>
           <Text variant="body" weight="medium">{apiDriver.vehicle.plate_number}</Text>
         </View>
       </View>
 
       <View style={[styles.footerRow, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.sm }]}> 
         <Button
-          title="Call"
+          translationKey="booking.call"
           variant="outline"
           fullWidth
           onPress={handleCallDriver}
@@ -94,7 +96,7 @@ export default function DriverInfoScreen() {
           textStyle={{ color: colors.primary }}
         />
         <Button
-          title="Chat"
+          translationKey="booking.chat"
           fullWidth
           navigateTo="/booking/message-driver"
           navigateParams={params}

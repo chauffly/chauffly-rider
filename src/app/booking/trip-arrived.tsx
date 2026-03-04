@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
 import { Button } from '@/components/common/button';
 import { localJsonApi } from '@/api/local-json-api';
 
@@ -28,6 +29,7 @@ const MOOD_OPTIONS = [
 
 export default function TripArrivedScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     selectedRideId?: string;
@@ -63,7 +65,7 @@ export default function TripArrivedScreen() {
         </View>
 
         <Text variant="h3" weight="medium" align="center" style={styles.sectionGap}>
-          You have arrived!
+          {t('booking.arrived_title')}
         </Text>
 
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -79,23 +81,23 @@ export default function TripArrivedScreen() {
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="clock-outline" size={26} color={colors.textPrimary} />
             <Text variant="bodySmall" weight="medium">{activeBooking.trip_metrics.duration_text}</Text>
-            <Text variant="caption" color="muted">Duration</Text>
+            <Text variant="caption" color="muted">{t('booking.duration_label')}</Text>
           </View>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="map-marker-distance" size={26} color={colors.textPrimary} />
             <Text variant="bodySmall" weight="medium">{activeBooking.trip_metrics.distance_text}</Text>
-            <Text variant="caption" color="muted">Distance</Text>
+            <Text variant="caption" color="muted">{t('booking.distance_label')}</Text>
           </View>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="speedometer" size={26} color={colors.textPrimary} />
             <Text variant="bodySmall" weight="medium">{activeBooking.trip_metrics.average_speed_text}</Text>
-            <Text variant="caption" color="muted">Avg. Speed</Text>
+            <Text variant="caption" color="muted">{t('booking.avg_speed_label')}</Text>
           </View>
         </View>
 
         <View style={[styles.moodCard, { borderColor: colors.border }]}> 
           <Text variant="body" weight="medium" align="center">
-            How did you feel during the entire trip?
+            {t('booking.how_did_trip_feel')}
           </Text>
 
           <View style={styles.moodRow}>
@@ -116,7 +118,7 @@ export default function TripArrivedScreen() {
         </View>
 
         <Button
-          title="Finish"
+          translationKey="booking.finish"
           fullWidth
           navigateTo="/booking/rate-driver"
           navigateParams={params} 

@@ -254,7 +254,7 @@ export default function SelectPickupTimeScreen() {
               onPress={() => setIsTimeOpen(false)}
               style={[styles.timeActionButton, { backgroundColor: colors.accent }]}
             >
-              <Text variant="bodySmall" color="muted">Cancel</Text>
+              <Text variant="bodySmall" color="muted">{t('common.cancel')}</Text>
             </Pressable>
             <Pressable
               onPress={() => {
@@ -263,7 +263,7 @@ export default function SelectPickupTimeScreen() {
               }}
               style={[styles.timeActionButton, { backgroundColor: colors.primary }]}
             >
-              <Text variant="bodySmall" color="inverse">Set time</Text>
+              <Text variant="bodySmall" color="inverse">{t('booking.set_time')}</Text>
             </Pressable>
           </View>
           </View>

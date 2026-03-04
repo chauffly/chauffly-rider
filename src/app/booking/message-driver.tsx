@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '@/components/common/text';
 import { spacing, borderRadius } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
 import { localJsonApi } from '@/api/local-json-api';
 
 type ChatMessage = {
@@ -18,6 +19,7 @@ type ChatMessage = {
 
 export default function MessageDriverScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ driverName?: string }>();
@@ -79,7 +81,7 @@ export default function MessageDriverScreen() {
           <TextInput
             value={message}
             onChangeText={setMessage}
-            placeholder="Type your message"
+            placeholder={t('booking.chat_message_placeholder')}
             placeholderTextColor={colors.textSecondary}
             style={[styles.input, { color: colors.textPrimary }]}
           />

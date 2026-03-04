@@ -7,6 +7,7 @@ import { Text } from '@/components/common/text';
 import { StackHeader } from '@/components/common/stack-header';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
 
 interface Notification {
   id: string;
@@ -97,6 +98,7 @@ export default function NotificationListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.read).length;
 
@@ -112,7 +114,7 @@ export default function NotificationListScreen() {
       ]}
     >
       <StackHeader
-        title="Notifications"
+        title={t('account.notifications_title')}
         onBack={() => router.back()}
       />
 
@@ -122,7 +124,7 @@ export default function NotificationListScreen() {
       >
         {unreadCount > 0 && (
           <Text variant="bodySmall" color="muted" style={styles.sectionLabel}>
-            New
+            {t('account.notifications_new')}
           </Text>
         )}
 
@@ -168,7 +170,7 @@ export default function NotificationListScreen() {
 
         {MOCK_NOTIFICATIONS.some((n) => n.read) && (
           <Text variant="bodySmall" color="muted" style={styles.sectionLabel}>
-            Earlier
+            {t('account.notifications_earlier')}
           </Text>
         )}
 

@@ -42,10 +42,10 @@ export default function RateDriverScreen() {
       <Image source={require('../../../assets/images/avatar.png')} style={styles.avatar} />
 
       <Text variant="h2" weight="medium" align="center" style={styles.title}>
-        How was the chauffeur?
+        {t('booking.how_was_driver')}
       </Text>
       <Text variant="bodySmall" color="muted" align="center" style={styles.subtitle}>
-        Assist chauffly in improving by evaluating this journey
+        {t('booking.rate_driver_subtitle')}
       </Text>
 
       <View style={styles.starsRow}>
@@ -66,33 +66,33 @@ export default function RateDriverScreen() {
 
       <View style={[styles.infoCard, { borderColor: colors.border }]}> 
         <View style={styles.row}>
-          <Text variant="bodySmall" color="muted">Ride</Text>
+          <Text variant="bodySmall" color="muted">{t('booking.ride_label')}</Text>
           <Text variant="bodySmall" weight="medium">{selectedRideTitle}</Text>
         </View>
         <View style={styles.row}>
-          <Text variant="bodySmall" color="muted">Payment</Text>
-          <Text variant="bodySmall" weight="medium">Cash</Text>
+          <Text variant="bodySmall" color="muted">{t('booking.payment_label')}</Text>
+          <Text variant="bodySmall" weight="medium">{t('rides.labels.cash')}</Text>
         </View>
       </View>
 
       <View style={[styles.fareCard, { borderColor: colors.border }]}> 
         <View style={styles.row}>
-          <Text variant="bodySmall" color="muted">Trip Fare (x2)</Text>
+          <Text variant="bodySmall" color="muted">{t('booking.trip_earning_x2')}</Text>
           <Text variant="bodySmall" color="muted">{tripFare}</Text>
         </View>
         <View style={styles.row}>
-          <Text variant="bodySmall" color="muted">Tax (5%)</Text>
+          <Text variant="bodySmall" color="muted">{t('booking.tax')}</Text>
           <Text variant="bodySmall" color="muted">{tax}</Text>
         </View>
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <View style={styles.row}>
-          <Text variant="body" weight='medium'>Total</Text>
+          <Text variant="body" weight='medium'>{t('booking.total')}</Text>
           <Text variant="h3" weight='medium'>{total}</Text>
         </View>
       </View>
 
       <Button
-        title="Assign ranking"
+        translationKey="booking.assign_ranking"
         fullWidth
         navigateTo="/booking/rating-thank-you"
         navigateParams={params}

@@ -263,11 +263,11 @@ export default function DriverAcceptsScreen() {
             style={[styles.modalCard, { backgroundColor: colors.surface }]}
           >
             <Text variant="h3" weight="semiBold" align="center">
-              Enter Pin
+              {t('booking.enter_pin_title')}
             </Text>
 
             <Text variant="body" weight="medium" style={styles.pinLabel}>
-              Verify Pin
+              {t('booking.verify_pin_label')}
             </Text>
 
             <TextInput
@@ -279,7 +279,7 @@ export default function DriverAcceptsScreen() {
                   borderColor: colors.border,
                 },
               ]}
-              placeholder="Enter PIN"
+              placeholder={t('booking.enter_pin_placeholder')}
               placeholderTextColor={colors.textSecondary}
               value={pin}
               onChangeText={setPin}
@@ -297,7 +297,7 @@ export default function DriverAcceptsScreen() {
               disabled={!pin.trim()}
             >
               <Text variant="body" weight="medium" color="inverse">
-                Confirm Passenger
+                {t('booking.confirm_passenger')}
               </Text>
             </Pressable>
           </View>

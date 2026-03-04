@@ -10,6 +10,7 @@ import LocationPinGreen from '@/components/svg/LocationPinGreen';
 import LocationPinRed from '@/components/svg/LocationPinRed';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
 import { localJsonApi } from '@/api/local-json-api';
 
 type RideStatus = 'Completed' | 'Cancelled' | 'Ongoing';
@@ -18,6 +19,7 @@ export default function RideDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   const params = useLocalSearchParams<{
     rideStatus?: string;
@@ -64,7 +66,7 @@ export default function RideDetailScreen() {
         },
       ]}
     >
-      <StackHeader title="Details" align="center" onBack={() => router.back()} />
+      <StackHeader translationKey="booking.details_title" align="center" onBack={() => router.back()} />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -160,29 +162,29 @@ export default function RideDetailScreen() {
         {/* Booking Details */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Status</Text>
+            <Text variant="body" color="muted">{t('booking.status_label')}</Text>
             <Text variant="body" weight="medium" style={{ color: statusColor }}>
               {rideStatus}
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Payment</Text>
+            <Text variant="body" color="muted">{t('booking.payment_label')}</Text>
             <Text variant="body" weight="medium">{fare}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Date</Text>
+            <Text variant="body" color="muted">{t('booking.date_label')}</Text>
             <Text variant="body" weight="medium">{detailDate}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Time</Text>
+            <Text variant="body" color="muted">{t('booking.time_label')}</Text>
             <Text variant="body" weight="medium">{firstStopTime}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Transaction</Text>
+            <Text variant="body" color="muted">{t('booking.transaction_label')}</Text>
             <Text variant="body" weight="medium">{transactionId}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Booking ID</Text>
+            <Text variant="body" color="muted">{t('booking.booking_id_label')}</Text>
             <Text variant="body" weight="medium">{bookingId}</Text>
           </View>
         </View>
@@ -190,16 +192,16 @@ export default function RideDetailScreen() {
         {/* Fare Breakdown */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">Trip Earning (x2)</Text>
+            <Text variant="body" color="muted">{t('booking.trip_earning_x2')}</Text>
             <Text variant="body" weight="medium">{tripFare}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text variant="body" color="muted">App Deduction (5%)</Text>
+            <Text variant="body" color="muted">{t('booking.app_deduction_5')}</Text>
             <Text variant="body" weight="medium">{tax}</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.detailRow}>
-            <Text variant="body" weight="semiBold">Total</Text>
+            <Text variant="body" weight="semiBold">{t('booking.total')}</Text>
             <Text variant="body" weight="semiBold">{total}</Text>
           </View>
         </View>
@@ -207,7 +209,7 @@ export default function RideDetailScreen() {
 
       <View style={styles.footer}>
         <Button
-          title="Share Receipt"
+          translationKey="booking.share_receipt"
           variant="outline"
           fullWidth
           onPress={() => {}}

@@ -11,12 +11,14 @@ import LocationPinGreen from '@/components/svg/LocationPinGreen';
 import LocationPinRed from '@/components/svg/LocationPinRed';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
 import { localJsonApi } from '@/api/local-json-api';
 
 export default function ScheduleDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const activeBooking = localJsonApi.getActiveBooking();
   const fallbackDriver = localJsonApi.getDriverById(activeBooking.driver_id);
 
@@ -87,7 +89,7 @@ export default function ScheduleDetailScreen() {
       ]}
     >
       <StackHeader
-        title="Details"
+        translationKey="booking.details_title"
         align="center"
         onBack={() => router.back()}
       />
@@ -99,7 +101,7 @@ export default function ScheduleDetailScreen() {
         {/* Scheduled Ride Header */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text variant="h3" weight="semiBold" align="center">
-            Your Scheduled Ride
+            {t('booking.scheduled_ride_title')}
           </Text>
           <Text
             variant="bodySmall"
@@ -118,7 +120,7 @@ export default function ScheduleDetailScreen() {
               color="#FFFFFF"
             />
             <Text variant="bodySmall" style={{ color: "#FFFFFF", flex: 1 }}>
-              We will notify you when the driver is found
+              {t('booking.notify_when_driver_found')}
             </Text>
           </View>
         </View>
@@ -225,15 +227,15 @@ export default function ScheduleDetailScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
-              Status
+              {t('booking.status_label')}
             </Text>
             <Text variant="body" weight="medium">
-              Scheduled
+              {t('booking.scheduled_status')}
             </Text>
           </View>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
-              Payment
+              {t('booking.payment_label')}
             </Text>
             <Text variant="body" weight="medium">
               {fare}
@@ -241,7 +243,7 @@ export default function ScheduleDetailScreen() {
           </View>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
-              Date
+              {t('booking.date_label')}
             </Text>
             <Text variant="body" weight="medium">
               {detailDateDisplay}
@@ -249,7 +251,7 @@ export default function ScheduleDetailScreen() {
           </View>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
-              Time
+              {t('booking.time_label')}
             </Text>
             <Text variant="body" weight="medium">
               {pickupTimeDisplay}
@@ -257,7 +259,7 @@ export default function ScheduleDetailScreen() {
           </View>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
-              Transaction
+              {t('booking.transaction_label')}
             </Text>
             <Text variant="body" weight="medium">
               {transactionId}
@@ -265,7 +267,7 @@ export default function ScheduleDetailScreen() {
           </View>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
-              Booking ID
+              {t('booking.booking_id_label')}
             </Text>
             <Text variant="body" weight="medium">
               {bookingId}
@@ -277,7 +279,7 @@ export default function ScheduleDetailScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
-              Trip Earning (x2)
+              {t('booking.trip_earning_x2')}
             </Text>
             <Text variant="body" weight="medium">
               {tripFare}
@@ -285,7 +287,7 @@ export default function ScheduleDetailScreen() {
           </View>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
-              App Deduction (5%)
+              {t('booking.app_deduction_5')}
             </Text>
             <Text variant="body" weight="medium">
               {tax}
@@ -305,7 +307,7 @@ export default function ScheduleDetailScreen() {
 
       <View style={styles.footer}>
         <Button
-          title="Cancel Ride"
+          translationKey="booking.cancel_ride"
           variant="outline"
           fullWidth
           onPress={() => router.back()}
