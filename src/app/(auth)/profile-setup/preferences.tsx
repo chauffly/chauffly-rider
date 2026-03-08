@@ -56,11 +56,7 @@ export default function PreferencesScreen() {
   };
 
   const handleContinue = () => {
-    // Navigate to facial recognition screen
-    router.push({
-      pathname: '/(auth)/profile-setup/facial-recognition',
-      params: { role: params.role },
-    });
+    router.replace('/(tabs)');
   };
 
   return (

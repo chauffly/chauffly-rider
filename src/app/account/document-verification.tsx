@@ -7,7 +7,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '@/components/common/button';
 import { StackHeader } from '@/components/common/stack-header';
 import { Text } from '@/components/common/text';
-import FaceOutline from '@/components/svg/FaceOutline';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
@@ -174,7 +173,7 @@ export default function DocumentVerificationScreen() {
           <>
             <View style={[styles.verificationCard, { backgroundColor: colors.surface }]}>
               <View style={styles.verificationIconWrap}>
-                <FaceOutline size={64} color={colors.textPrimary} />
+                <MaterialCommunityIcons name="shield-check-outline" size={64} color={colors.textPrimary} />
               </View>
 
               <Text variant="h3" weight="medium" size="xl">

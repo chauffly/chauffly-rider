@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/common/button';
 import { StackHeader } from '@/components/common/stack-header';
 import { Text } from '@/components/common/text';
-import FaceOutline from '@/components/svg/FaceOutline';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
@@ -19,10 +19,7 @@ export default function CorporateKycVerificationScreen() {
   const { t } = useTranslation();
 
   const handleSetUpNow = () => {
-    router.push({
-      pathname: '/(auth)/profile-setup/facial-recognition',
-      params: { role: params.role ?? 'corporate' },
-    });
+    router.replace('/(tabs)');
   };
 
   return (
@@ -47,7 +44,7 @@ export default function CorporateKycVerificationScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.iconWrap}>
-          <FaceOutline size={116} color={colors.textPrimary} />
+          <MaterialCommunityIcons name="shield-check-outline" size={116} color={colors.textPrimary} />
         </View>
 
         <Text variant="h3" weight="medium" size={"xl"} style={styles.title}>
@@ -67,7 +64,7 @@ export default function CorporateKycVerificationScreen() {
           </Text>
         </View>
 
-        <Button translationKey="common.set_up_now" fullWidth onPress={handleSetUpNow} style={styles.button} />
+        <Button translationKey="common.continue" fullWidth onPress={handleSetUpNow} style={styles.button} />
       </ScrollView>
     </View>
   );

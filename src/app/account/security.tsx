@@ -19,7 +19,6 @@ export default function AccountSecurityScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const [settings, setSettings] = useState({
-    biometricId: true,
     deactivateAccount: false,
   });
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
@@ -52,18 +51,6 @@ export default function AccountSecurityScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.toggleRow}>
-          <Text variant="body" translationKey="account.biometric_id" />
-          <Switch
-            value={settings.biometricId}
-            onValueChange={(value) => setToggle('biometricId', value)}
-            trackOn={colors.primary}
-            trackOff={colors.border}
-            thumbOn={colors.surface}
-            thumbOff={colors.surface}
-          />
-        </View>
-
         <View style={styles.sectionWithDescription}>
           <View style={styles.toggleRow}>
             <Text variant="body" translationKey="account.deactivate_account" />
