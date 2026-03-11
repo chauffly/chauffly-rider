@@ -4,6 +4,7 @@ Shared client source:
 
 - `/Users/thecodingchef/Documents/projects/chauffly/rider/src/api-client`
 - Main guide: `./API_CLIENT_GUIDE.md`
+- Rider endpoint coverage: `./RIDER_ENDPOINT_COVERAGE.md`
 
 Rider migration order:
 

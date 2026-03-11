@@ -32,6 +32,7 @@ export default function SelectPickupTimeScreen() {
     originLng?: string;
     destinations?: string;
     selectedRideId?: string;
+    selectedRideTier?: string;
     bookingType?: string;
     pickupDate?: string;
     pickupTime?: string;
@@ -156,12 +157,13 @@ export default function SelectPickupTimeScreen() {
           fullWidth
           onPress={() =>
             router.push({
-              pathname: '/booking/schedule-detail',
+              pathname: '/booking/ride-summary',
               params: {
                 ...params,
                 pickupDate: format(selectedDate, 'yyyy-MM-dd'),
                 pickupTime: format(selectedTime, 'HH:mm'),
                 estimatedDurationMinutes: durationMinutes.toString(),
+                bookingType: 'scheduled'
               },
             })
           }

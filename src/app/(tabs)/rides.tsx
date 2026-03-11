@@ -1,317 +1,110 @@
-import { useMemo, useState } from "react";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useMemo, useState } from 'react';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { format } from 'date-fns';
 
-import { Text } from "@/components/common/text";
-import { TextInput } from "@/components/common/text-input";
-import LocationPinGreen from "@/components/svg/LocationPinGreen";
-import LocationPinRed from "@/components/svg/LocationPinRed";
-import SearchIcon from "@/components/svg/SearchIcon";
-import { borderRadius, spacing } from "@/constants/spacing";
-import { useTheme } from "@/context/theme-context";
-import { Button } from "@/components/common/button";
-import { localJsonApi, RideTabKey } from "@/api/local-json-api";
+import { useBookings } from '@/api-client';
+import { Text } from '@/components/common/text';
+import { TextInput } from '@/components/common/text-input';
+import SearchIcon from '@/components/svg/SearchIcon';
+import { borderRadius, spacing } from '@/constants/spacing';
+import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
+import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { formatNairaAmount } from '@/utils/currency';
 
-const rideTabs = localJsonApi.getRideTabs();
+type RideTabKey = 'past' | 'upcoming' | 'ongoing' | 'canceled';
 
-type RideItem = ReturnType<typeof localJsonApi.getRidesByTab>[number];
+const rideTabs: Array<{ key: RideTabKey; translationKey: string }> = [
+  { key: 'upcoming', translationKey: 'rides.tabs.upcoming' },
+  { key: 'ongoing', translationKey: 'rides.tabs.ongoing' },
+  { key: 'past', translationKey: 'rides.tabs.past' },
+  { key: 'canceled', translationKey: 'rides.tabs.canceled' }
+];
 
-function DriverHeader({ ride }: { ride: RideItem }) {
-  const { colors } = useTheme();
-  const uiDefaults = localJsonApi.getUiDefaults();
-
-  return (
-    <View style={styles.driverRow}>
-      <View style={styles.driverIdentityRow}>
-        <View style={[styles.avatarWrap, { backgroundColor: colors.border }]}>
-          <MaterialCommunityIcons
-            name="account"
-            size={28}
-            color={colors.textSecondary}
-          />
-        </View>
-
-        <View style={styles.driverMeta}>
-          <View style={styles.driverNameRow}>
-            <Text variant="body" weight="medium">
-              {ride.driverName}
-            </Text>
-            <View
-              style={[
-                styles.verifiedIconWrap,
-                { backgroundColor: colors.brandBlue },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="check"
-                size={12}
-                color={colors.white}
-              />
-            </View>
-          </View>
-          <Text variant="bodySmall" color="secondary">
-            {uiDefaults.rides.verified_account_label}
-          </Text>
-        </View>
-      </View>
-
-      {ride.type === "history" ? (
-        <View style={styles.rightStat}>
-          <View style={styles.ratingRow}>
-            <MaterialCommunityIcons
-              name="star"
-              size={18}
-              color={colors.primary}
-            />
-            <Text variant="bodySmall" weight="medium">
-              {ride.rating}
-            </Text>
-          </View>
-          <Text variant="caption" color="secondary">
-            {ride.reviews}
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.rightStat}>
-          <Text variant="body" weight="medium">
-            {ride.fare}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
-function VehicleSection({ ride }: { ride: RideItem }) {
-  const { colors } = useTheme();
-
-  if (ride.type !== "history") {
-    return null;
+const mapTabToApi = (tab: RideTabKey): 'past' | 'upcoming' | 'ongoing' | 'cancelled' => {
+  if (tab === 'canceled') {
+    return 'cancelled';
   }
-
-  return (
-    <View style={styles.sectionRow}>
-      <View style={styles.vehicleIconWrap}>
-        <MaterialCommunityIcons
-          name="car-sports"
-          size={34}
-          color={colors.textSecondary}
-        />
-      </View>
-      <View>
-        <Text variant="bodySmall" weight="medium">
-          {ride.vehicleName}
-        </Text>
-        <Text variant="caption" color="secondary">
-          {ride.vehicleMeta}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function StopIcon({
-  stopIndex,
-  totalStops,
-}: {
-  stopIndex: number;
-  totalStops: number;
-}) {
-  const { colors } = useTheme();
-
-  if (stopIndex === 0) {
-    return <LocationPinGreen size={24} color={colors.success} />;
-  }
-
-  if (stopIndex === totalStops - 1) {
-    return <LocationPinRed size={24} color={colors.error} />;
-  }
-
-  return (
-    <MaterialCommunityIcons
-      name="map-marker"
-      size={22}
-      color={colors.primary}
-    />
-  );
-}
-
-function RouteSection({ ride }: { ride: RideItem }) {
-  const { colors } = useTheme();
-
-  return (
-    <View>
-      {ride.stops.map((stop, index) => {
-        const isLast = index === ride.stops.length - 1;
-
-        return (
-          <View key={stop.id}>
-            <View style={styles.locationRow}>
-              <View style={styles.pinColumn}>
-                <StopIcon stopIndex={index} totalStops={ride.stops.length} />
-              </View>
-              <View style={styles.locationTextWrap}>
-                <Text variant="body" weight="medium">
-                  {stop.title}
-                </Text>
-                <Text variant="bodySmall" color="secondary">
-                  {stop.subtitle}
-                </Text>
-              </View>
-              <Text variant="bodySmall">{stop.time}</Text>
-            </View>
-
-            {!isLast ? (
-              <View style={styles.connectorWrap}>
-                <View style={styles.connectorDots}>
-                  {Array.from({ length: 3 }).map((_, dotIndex) => (
-                    <View
-                      key={`${stop.id}-dot-${dotIndex}`}
-                      style={[
-                        styles.connectorDot,
-                        { backgroundColor: colors.border },
-                      ]}
-                    />
-                  ))}
-                </View>
-              </View>
-            ) : null}
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-function FooterSection({ ride }: { ride: RideItem }) {
-  const { colors } = useTheme();
-  const uiDefaults = localJsonApi.getUiDefaults();
-
-  if (ride.type === "live") {
-    if (!ride.showTrackRoute) {
-      return null;
-    }
-
-    return (
-      <Button
-        variant="ghost"
-        title={uiDefaults.rides.track_route_label}
-        onPress={() => {}}
-        style={{ borderWidth: 1, borderColor: colors.primary }}
-      />
-    );
-  }
-
-  return (
-    <View>
-      <View style={styles.footerTop}>
-        <View style={styles.seatRow}>
-          <MaterialCommunityIcons
-            name="seat-passenger"
-            size={16}
-            color={colors.textPrimary}
-          />
-          <Text variant="bodySmall" weight="medium" color="primary">
-            {ride.seatInfo} seat(s)
-          </Text>
-        </View>
-        <View style={styles.rightStat}>
-          <Text variant="body" size={"xxl"} weight="medium" color="primary">
-            {ride.fare}
-          </Text>
-        </View>
-      </View>
-      <Text variant="caption" color="secondary">
-        {ride.schedule}
-      </Text>
-    </View>
-  );
-}
-
-const TAB_TO_STATUS: Record<RideTabKey, string> = {
-  past: "Completed",
-  upcoming: "Scheduled",
-  ongoing: "Ongoing",
-  canceled: "Cancelled",
+  return tab;
 };
 
-function RideCard({ ride, activeTab }: { ride: RideItem; activeTab: RideTabKey }) {
-  const { colors } = useTheme();
-  const router = useRouter();
-
-  const handlePress = () => {
-    const rideParams = {
-      driverId: ride.driverId,
-      fare: ride.fare,
-      stops: JSON.stringify(ride.stops),
-      vehicleName: ride.vehicleName || '',
-      schedule: ride.schedule || '',
-    };
-
-    if (activeTab === "upcoming") {
-      router.push({
-        pathname: "/booking/schedule-detail",
-        params: rideParams,
-      });
-    } else {
-      router.push({
-        pathname: "/booking/ride-detail",
-        params: {
-          ...rideParams,
-          rideStatus: TAB_TO_STATUS[activeTab],
-        },
-      });
-    }
-  };
-
-  return (
-    <Pressable
-      onPress={handlePress}
-      style={[styles.rideCard, { backgroundColor: colors.surface }]}
-    >
-      <DriverHeader ride={ride} />
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-      <VehicleSection ride={ride} />
-      {ride.type === "history" ? (
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-      ) : null}
-      <RouteSection ride={ride} />
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-      <FooterSection ride={ride} />
-    </Pressable>
-  );
-}
+const statusLabel = (status: string): string => {
+  switch (status) {
+    case 'pending':
+      return 'Pending';
+    case 'searching':
+      return 'Searching';
+    case 'driver_assigned':
+      return 'Driver assigned';
+    case 'driver_heading':
+      return 'Driver heading';
+    case 'driver_arrived':
+      return 'Driver arrived';
+    case 'in_progress':
+      return 'In progress';
+    case 'completed':
+      return 'Completed';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'no_drivers':
+      return 'No drivers';
+    default:
+      return status || '--';
+  }
+};
 
 export default function RidesScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<RideTabKey>("upcoming");
-  const uiDefaults = localJsonApi.getUiDefaults();
+  const router = useRouter();
 
-  const rides = useMemo(
-    () => localJsonApi.getRidesByTab(activeTab),
-    [activeTab],
-  );
+  const [activeTab, setActiveTab] = useState<RideTabKey>('upcoming');
+  const [search, setSearch] = useState('');
+
+  const { data: bookingsData } = useBookings({
+    tab: mapTabToApi(activeTab)
+  });
+  const bookingItems = asArray<Record<string, unknown>>(asRecord(bookingsData).items);
+
+  const filteredBookings = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) {
+      return bookingItems;
+    }
+
+    return bookingItems.filter((item) => {
+      const rideOption = asRecord(item.rideOption);
+      const driver = asRecord(item.driver);
+      const driverName = `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim().toLowerCase();
+      const pickup = asString(item.pickupAddress).toLowerCase();
+      const rideName = asString(rideOption.name).toLowerCase();
+      return pickup.includes(query) || driverName.includes(query) || rideName.includes(query);
+    });
+  }, [bookingItems, search]);
 
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor: colors.background, paddingTop: insets.top + 24 },
+        { backgroundColor: colors.background, paddingTop: insets.top + 24 }
       ]}
     >
       <Text variant="h2" weight="medium" style={styles.title}>
-        {uiDefaults.rides.screen_title}
+        {t('rides.title')}
       </Text>
 
       <View style={styles.searchInputWrap}>
         <TextInput
-          placeholder={uiDefaults.rides.search_placeholder}
+          placeholder={t('rides.search_placeholder')}
           leftIcon={<SearchIcon size={20} color={colors.textPrimary} />}
           autoCapitalize="none"
           autoCorrect={false}
+          value={search}
+          onChangeText={setSearch}
         />
       </View>
 
@@ -323,16 +116,16 @@ export default function RidesScreen() {
               key={tab.key}
               style={[
                 styles.segmentButton,
-                active && { backgroundColor: colors.textPrimary },
+                active && { backgroundColor: colors.textPrimary }
               ]}
               onPress={() => setActiveTab(tab.key)}
             >
               <Text
                 variant="bodySmall"
-                weight={active ? "medium" : "regular"}
-                color={active ? "inverse" : "secondary"}
+                weight={active ? 'medium' : 'regular'}
+                color={active ? 'inverse' : 'secondary'}
               >
-                {tab.label}
+                {t(tab.translationKey)}
               </Text>
             </Pressable>
           );
@@ -343,12 +136,99 @@ export default function RidesScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingBottom: insets.bottom + spacing.xxxxl,
-          gap: spacing.lg,
+          gap: spacing.lg
         }}
       >
-        {rides.map((ride) => (
-          <RideCard key={ride.id} ride={ride} activeTab={activeTab} />
-        ))}
+        {filteredBookings.length === 0 ? (
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
+            <MaterialCommunityIcons
+              name="car-off"
+              size={36}
+              color={colors.textSecondary}
+            />
+            <Text variant="body" color="secondary">
+              {t('rides.empty_state')}
+            </Text>
+          </View>
+        ) : (
+          filteredBookings.map((item) => {
+            const rideOption = asRecord(item.rideOption);
+            const driver = asRecord(item.driver);
+            const bookingId = asString(item.id);
+            const pickupAddress = asString(item.pickupAddress, '--');
+            const pickupName = asString(item.pickupName, pickupAddress);
+            const driverName =
+              `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Awaiting driver';
+            const createdAt = asString(item.createdAt);
+            const createdAtLabel = createdAt ? format(new Date(createdAt), 'EEE, MMM d • h:mm a') : '--';
+            const fareTotal = formatNairaAmount(item.fareTotal);
+            const status = asString(item.status, '--');
+            const statusText = statusLabel(status);
+
+            return (
+              <Pressable
+                key={bookingId}
+                onPress={() =>
+                  router.push({
+                    pathname: activeTab === 'upcoming' ? '/booking/schedule-detail' : '/booking/ride-detail',
+                    params: {
+                      bookingId,
+                      rideStatus: statusText
+                    }
+                  })
+                }
+                style={[styles.rideCard, { backgroundColor: colors.surface }]}
+              >
+                <View style={styles.cardTopRow}>
+                  <View style={styles.driverIdentityRow}>
+                    <View style={[styles.avatarWrap, { backgroundColor: colors.border }]}>
+                      <MaterialCommunityIcons
+                        name="account"
+                        size={28}
+                        color={colors.textSecondary}
+                      />
+                    </View>
+                    <View style={styles.driverMeta}>
+                      <Text variant="body" weight="medium">
+                        {driverName}
+                      </Text>
+                      <Text variant="caption" color="secondary">
+                        {asString(rideOption.name, 'Ride')}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.rightStat}>
+                    <Text variant="body" weight="medium">
+                      {fareTotal}
+                    </Text>
+                    <Text variant="caption" color="secondary">
+                      {statusText}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                <View style={styles.locationRow}>
+                  <View style={styles.pinColumn}>
+                    <MaterialCommunityIcons name="map-marker" size={22} color={colors.primary} />
+                  </View>
+                  <View style={styles.locationTextWrap}>
+                    <Text variant="bodySmall" weight="medium">
+                      {pickupName}
+                    </Text>
+                    <Text variant="caption" color="secondary" numberOfLines={1}>
+                      {pickupAddress}
+                    </Text>
+                  </View>
+                  <Text variant="caption" color="secondary">
+                    {createdAtLabel}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })
+        )}
       </ScrollView>
     </View>
   );
@@ -357,127 +237,80 @@ export default function RidesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 16
   },
   title: {
-    marginBottom: 26,
+    marginBottom: 26
   },
   searchInputWrap: {
-    marginBottom: 8,
+    marginBottom: 8
   },
-
   segmentWrap: {
     borderRadius: borderRadius.full,
     padding: 4,
-    flexDirection: "row",
-    marginBottom: spacing.lg,
+    flexDirection: 'row',
+    marginBottom: spacing.lg
   },
   segmentButton: {
     flex: 1,
     borderRadius: borderRadius.full,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   rideCard: {
     borderRadius: 26,
-    padding: 16,
+    padding: 16
   },
-  driverRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
   },
   driverIdentityRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.md,
+    flex: 1
   },
   avatarWrap: {
     width: 50,
     height: 50,
     borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   driverMeta: {
     gap: 2,
-  },
-  driverNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  verifiedIconWrap: {
-    width: 14,
-    height: 14,
-    borderRadius: 99,
-    alignItems: "center",
-    justifyContent: "center",
+    flex: 1
   },
   rightStat: {
-    alignItems: "flex-end",
-    gap: 2,
-  },
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+    alignItems: 'flex-end',
+    gap: 2
   },
   divider: {
     height: 1,
-    marginVertical: spacing.md,
-  },
-  sectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  vehicleIconWrap: {
-    width: 50,
-    height: 50,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
+    marginVertical: spacing.md
   },
   locationRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm
   },
   pinColumn: {
     width: 24,
-    alignItems: "center",
-    paddingTop: 2,
+    alignItems: 'center',
+    paddingTop: 2
   },
   locationTextWrap: {
     flex: 1,
-    gap: 2,
+    gap: 2
   },
-  connectorWrap: {
-    marginLeft: 12,
-    marginVertical: 4,
-    marginTop: -10,
-  },
-  connectorDots: {
-    gap: 3,
-    paddingVertical: 2,
-  },
-  connectorDot: {
-    width: 2,
-    height: 8,
-    borderRadius: 2,
-  },
-  footerTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  seatRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
+  emptyCard: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.sm
+  }
 });

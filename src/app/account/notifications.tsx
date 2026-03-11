@@ -1,67 +1,85 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
+import {
+  useMarkAllNotificationsRead,
+  useNotificationPreferences,
+  useUpdateNotificationPreferences
+} from '@/api-client';
 import { Text } from '@/components/common/text';
 import { StackHeader } from '@/components/common/stack-header';
 import { Switch } from '@/components/common/switch';
+import { Button } from '@/components/common/button';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
+import { asBoolean, asRecord } from '@/utils/api-helpers';
 
-type NotificationItem = {
-  key: string;
-  labelKey: string;
+type NotificationSettings = {
+  push_enabled: boolean;
+  sms_enabled: boolean;
+  email_enabled: boolean;
+  ride_updates: boolean;
+  promotions: boolean;
+  payment_alerts: boolean;
 };
 
-const notificationItems: NotificationItem[] = [
-  { key: 'generalUpdate', labelKey: 'account.notification_general_update' },
-  {
-    key: 'safetySecurity',
-    labelKey: 'account.notification_safety_security_alerts',
-  },
-  {
-    key: 'accountNotification',
-    labelKey: 'account.notification_account',
-  },
-  {
-    key: 'rideStatusUpdates',
-    labelKey: 'account.notification_ride_status_updates',
-  },
-  {
-    key: 'ratingsReviews',
-    labelKey: 'account.notification_ratings_reviews',
-  },
-  { key: 'appUpdate', labelKey: 'account.notification_app_update' },
-  {
-    key: 'bookingMistake',
-    labelKey: 'account.notification_booking_mistake',
-  },
-];
+const defaultSettings: NotificationSettings = {
+  push_enabled: true,
+  sms_enabled: true,
+  email_enabled: true,
+  ride_updates: true,
+  promotions: false,
+  payment_alerts: true
+};
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const [notificationToggles, setNotificationToggles] = useState<
-    Record<string, boolean>
-  >({
-    generalUpdate: true,
-    safetySecurity: true,
-    accountNotification: false,
-    rideStatusUpdates: false,
-    ratingsReviews: false,
-    appUpdate: false,
-    bookingMistake: false,
-  });
 
-  const handleToggle = (key: string, value: boolean) => {
-    setNotificationToggles((prev) => ({
+  const { data: preferencesData } = useNotificationPreferences();
+  const updatePreferences = useUpdateNotificationPreferences();
+  const markAllRead = useMarkAllNotificationsRead();
+
+  const [settings, setSettings] = useState<NotificationSettings>(defaultSettings);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const record = asRecord(preferencesData);
+    if (Object.keys(record).length === 0) {
+      return;
+    }
+    setSettings({
+      push_enabled: asBoolean(record.pushEnabled ?? record.push_enabled, true),
+      sms_enabled: asBoolean(record.smsEnabled ?? record.sms_enabled, true),
+      email_enabled: asBoolean(record.emailEnabled ?? record.email_enabled, true),
+      ride_updates: asBoolean(record.rideUpdates ?? record.ride_updates, true),
+      promotions: asBoolean(record.promotions, false),
+      payment_alerts: asBoolean(record.paymentAlerts ?? record.payment_alerts, true)
+    });
+  }, [preferencesData]);
+
+  const handleToggle = (key: keyof NotificationSettings, value: boolean) => {
+    setSettings((prev) => ({
       ...prev,
-      [key]: value,
+      [key]: value
     }));
+  };
+
+  const handleSave = async () => {
+    if (saving) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await updatePreferences.mutateAsync(settings);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -71,34 +89,100 @@ export default function NotificationsScreen() {
         {
           backgroundColor: colors.background,
           paddingTop: insets.top + spacing.lg,
-          paddingBottom: insets.bottom + spacing.md,
-        },
+          paddingBottom: insets.bottom + spacing.md
+        }
       ]}
     >
-      <StackHeader
-        translationKey="account.notifications_title"
-        align="center"
-        onBack={() => router.back()}
-      />
+      <StackHeader translationKey="account.notifications_title" align="center" onBack={() => router.back()} />
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {notificationItems.map((item) => (
-          <View key={item.key} style={styles.row}>
-            <Text variant="body" translationKey={item.labelKey} />
-            <Switch
-              value={notificationToggles[item.key]}
-              onValueChange={(value) => handleToggle(item.key, value)}
-              trackOn={colors.primary}
-              trackOff={colors.border}
-              thumbOn={colors.surface}
-              thumbOff={colors.surface}
-            />
-          </View>
-        ))}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.row}>
+          <Text variant="body" translationKey="account.notification_general_update" />
+          <Switch
+            value={settings.push_enabled}
+            onValueChange={(value) => handleToggle('push_enabled', value)}
+            trackOn={colors.primary}
+            trackOff={colors.border}
+            thumbOn={colors.surface}
+            thumbOff={colors.surface}
+          />
+        </View>
+
+        <View style={styles.row}>
+          <Text variant="body" translationKey="account.notification_account" />
+          <Switch
+            value={settings.email_enabled}
+            onValueChange={(value) => handleToggle('email_enabled', value)}
+            trackOn={colors.primary}
+            trackOff={colors.border}
+            thumbOn={colors.surface}
+            thumbOff={colors.surface}
+          />
+        </View>
+
+        <View style={styles.row}>
+          <Text variant="body" translationKey="account.notification_safety_security_alerts" />
+          <Switch
+            value={settings.sms_enabled}
+            onValueChange={(value) => handleToggle('sms_enabled', value)}
+            trackOn={colors.primary}
+            trackOff={colors.border}
+            thumbOn={colors.surface}
+            thumbOff={colors.surface}
+          />
+        </View>
+
+        <View style={styles.row}>
+          <Text variant="body" translationKey="account.notification_ride_status_updates" />
+          <Switch
+            value={settings.ride_updates}
+            onValueChange={(value) => handleToggle('ride_updates', value)}
+            trackOn={colors.primary}
+            trackOff={colors.border}
+            thumbOn={colors.surface}
+            thumbOff={colors.surface}
+          />
+        </View>
+
+        <View style={styles.row}>
+          <Text variant="body" translationKey="account.notification_ratings_reviews" />
+          <Switch
+            value={settings.payment_alerts}
+            onValueChange={(value) => handleToggle('payment_alerts', value)}
+            trackOn={colors.primary}
+            trackOff={colors.border}
+            thumbOn={colors.surface}
+            thumbOff={colors.surface}
+          />
+        </View>
+
+        <View style={styles.row}>
+          <Text variant="body" translationKey="account.notification_app_update" />
+          <Switch
+            value={settings.promotions}
+            onValueChange={(value) => handleToggle('promotions', value)}
+            trackOn={colors.primary}
+            trackOff={colors.border}
+            thumbOn={colors.surface}
+            thumbOff={colors.surface}
+          />
+        </View>
       </ScrollView>
+
+      <View style={styles.footer}>
+        <Button
+          title={saving ? t('common.loading') : t('common.save')}
+          fullWidth
+          onPress={handleSave}
+          disabled={saving}
+        />
+        <Button
+          title={t('account.notifications_mark_all_read')}
+          fullWidth
+          variant="outline"
+          onPress={() => markAllRead.mutate()}
+        />
+      </View>
     </View>
   );
 }
@@ -106,16 +190,20 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   content: {
     paddingTop: spacing.lg,
-    gap: spacing.xxl + spacing.sm,
+    gap: spacing.xxl + spacing.sm
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.lg,
+    gap: spacing.lg
   },
+  footer: {
+    marginTop: spacing.xl,
+    gap: spacing.md
+  }
 });

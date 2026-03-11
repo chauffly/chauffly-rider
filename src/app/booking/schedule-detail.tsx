@@ -3,7 +3,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { format } from 'date-fns';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useState } from 'react';
 
+import { useBookingById, useBookingCancel } from '@/api-client';
 import { Text } from '@/components/common/text';
 import { Button } from '@/components/common/button';
 import { StackHeader } from '@/components/common/stack-header';
@@ -12,70 +14,74 @@ import LocationPinRed from '@/components/svg/LocationPinRed';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
-import { localJsonApi } from '@/api/local-json-api';
+import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { formatNairaAmount } from '@/utils/currency';
 
 export default function ScheduleDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const activeBooking = localJsonApi.getActiveBooking();
-  const fallbackDriver = localJsonApi.getDriverById(activeBooking.driver_id);
+  const [cancelError, setCancelError] = useState('');
 
   const params = useLocalSearchParams<{
-    originName?: string;
-    originAddress?: string;
-    destinations?: string;
+    bookingId?: string;
     pickupDate?: string;
     pickupTime?: string;
-    estimatedDurationMinutes?: string;
-    driverId?: string;
-    fare?: string;
-    stops?: string;
-    schedule?: string;
   }>();
+  const bookingId = params.bookingId ?? '';
 
-  const driver = params.driverId
-    ? localJsonApi.getDriverById(params.driverId)
-    : fallbackDriver;
-  const rideStops = params.stops ? JSON.parse(params.stops) : null;
-  const destinations = params.destinations ? JSON.parse(params.destinations) : [];
-  const pickupDate = params.pickupDate;
-  const pickupTime = params.pickupTime;
-  const pickupDateTime = pickupDate && pickupTime
-    ? new Date(`${pickupDate}T${pickupTime}:00`)
-    : new Date();
-  const durationMinutes = params.estimatedDurationMinutes
-    ? Number(params.estimatedDurationMinutes)
-    : 45;
+  const { data: bookingDetailData } = useBookingById(bookingId, {
+    enabled: Boolean(bookingId)
+  });
+  const cancelBooking = useBookingCancel();
 
-  const pickupTimeDisplay = rideStops
-    ? rideStops[0]?.time || '10:00 AM'
-    : format(pickupDateTime, 'h:mm a');
-  const dropoffDateTime = new Date(pickupDateTime.getTime() + durationMinutes * 60000);
-  const dropoffTimeDisplay = rideStops
-    ? rideStops[rideStops.length - 1]?.time || '10:08 AM'
-    : format(dropoffDateTime, 'h:mm a');
-  const dateDisplay = params.schedule || format(pickupDateTime, 'EEE, MMM d - h:mm a');
-  const detailDateDisplay = pickupDate
-    ? format(pickupDateTime, 'd, MMM, yyyy')
-    : '14, Dec, 2025';
+  const detailRecord = asRecord(bookingDetailData);
+  const booking = asRecord(detailRecord.booking);
+  const fare = asRecord(detailRecord.fare);
+  const driver = asRecord(detailRecord.driver);
+  const vehicle = asRecord(driver.vehicle);
+  const stops = asArray<Record<string, unknown>>(detailRecord.stops);
 
-  const bookingId = 'BKG22942';
-  const transactionId = 'TRX1222240942';
-  const fare = params.fare || activeBooking.fare_breakdown.total;
-  const tripFare = fare;
-  const tax = activeBooking.fare_breakdown.tax;
-  const total = fare;
+  const pickupAtRaw = asString(booking.scheduledAt || booking.createdAt);
+  const pickupAt = pickupAtRaw ? new Date(pickupAtRaw) : null;
+  const dateDisplay = pickupAt ? format(pickupAt, 'EEE, MMM d - h:mm a') : '--';
+  const pickupTime = pickupAt ? format(pickupAt, 'h:mm a') : '--';
+  const detailDate = pickupAt ? format(pickupAt, 'd, MMM, yyyy') : '--';
 
-  const originName = rideStops ? rideStops[0]?.title : (params.originName || activeBooking.route_defaults.origin_name);
-  const originAddress = rideStops ? rideStops[0]?.subtitle : (params.originAddress || activeBooking.route_defaults.origin_address);
-  const destName = rideStops
-    ? rideStops[rideStops.length - 1]?.title
-    : (destinations[destinations.length - 1]?.name || activeBooking.route_defaults.destination_name);
-  const destAddress = rideStops
-    ? rideStops[rideStops.length - 1]?.subtitle
-    : (destinations[destinations.length - 1]?.address || activeBooking.route_defaults.destination_address);
+  const lastStop = stops.length > 0 ? asRecord(stops[stops.length - 1]) : {};
+  const pickupName = asString(booking.pickupName, asString(booking.pickupAddress, '--'));
+  const pickupAddress = asString(booking.pickupAddress, '--');
+  const destinationName = asString(lastStop.name, asString(lastStop.address, '--'));
+  const destinationAddress = asString(lastStop.address, '--');
+
+  const dropoffTimeRaw = asString(lastStop.arrivedAt);
+  const dropoffTime = dropoffTimeRaw ? format(new Date(dropoffTimeRaw), 'h:mm a') : '--';
+
+  const driverName = `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Awaiting driver';
+  const driverRating = asString(driver.rating, '--');
+  const vehicleName = `${asString(vehicle.make)} ${asString(vehicle.model)}`.trim() || '--';
+
+  const totalFare = formatNairaAmount(fare.total);
+  const tripFare = formatNairaAmount(fare.tripFare);
+  const tax = formatNairaAmount(fare.tax);
+
+  const handleCancelRide = async () => {
+    if (!bookingId || cancelBooking.isPending) {
+      return;
+    }
+
+    setCancelError('');
+    try {
+      await cancelBooking.mutateAsync({
+        bookingId,
+        reason: 'Cancelled by rider'
+      });
+      router.replace('/(tabs)/rides');
+    } catch (error) {
+      setCancelError(error instanceof Error ? error.message : 'Unable to cancel ride right now.');
+    }
+  };
 
   return (
     <View
@@ -84,146 +90,95 @@ export default function ScheduleDetailScreen() {
         {
           backgroundColor: colors.background,
           paddingTop: insets.top + spacing.lg,
-          paddingBottom: insets.bottom + spacing.lg,
-        },
+          paddingBottom: insets.bottom + spacing.lg
+        }
       ]}
     >
-      <StackHeader
-        translationKey="booking.details_title"
-        align="center"
-        onBack={() => router.back()}
-      />
+      <StackHeader translationKey="booking.details_title" align="center" onBack={() => router.back()} />
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Scheduled Ride Header */}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text variant="h3" weight="semiBold" align="center">
             {t('booking.scheduled_ride_title')}
           </Text>
-          <Text
-            variant="bodySmall"
-            color="muted"
-            align="center"
-            style={styles.dateSubtitle}
-          >
+          <Text variant="bodySmall" color="muted" align="center" style={styles.dateSubtitle}>
             {dateDisplay}
           </Text>
-          <View
-            style={[styles.notifyBanner, { backgroundColor: colors.primary }]}
-          >
-            <MaterialCommunityIcons
-              name="information"
-              size={18}
-              color="#FFFFFF"
-            />
-            <Text variant="bodySmall" style={{ color: "#FFFFFF", flex: 1 }}>
+          <View style={[styles.notifyBanner, { backgroundColor: colors.primary }]}>
+            <MaterialCommunityIcons name="information" size={18} color="#FFFFFF" />
+            <Text variant="bodySmall" style={{ color: '#FFFFFF', flex: 1 }}>
               {t('booking.notify_when_driver_found')}
             </Text>
           </View>
         </View>
 
-        {/* Driver Info */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.driverRow}>
             <View style={styles.driverLeft}>
-              <View
-                style={[
-                  styles.driverAvatar,
-                  { backgroundColor: colors.border },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="account"
-                  size={28}
-                  color={colors.textSecondary}
-                />
+              <View style={[styles.driverAvatar, { backgroundColor: colors.border }]}>
+                <MaterialCommunityIcons name="account" size={28} color={colors.textSecondary} />
               </View>
               <View>
                 <View style={styles.driverNameRow}>
                   <Text variant="body" weight="semiBold">
-                    {driver.display_name}
+                    {driverName}
                   </Text>
-                  <MaterialCommunityIcons
-                    name="star"
-                    size={14}
-                    color={colors.primary}
-                  />
-                  <Text variant="bodySmall">{driver.rating.toFixed(1)}</Text>
-                  {driver.is_verified && (
-                    <View
-                      style={[
-                        styles.verifiedBadge,
-                        { backgroundColor: "#1DA1F2" },
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name="check"
-                        size={10}
-                        color="#FFFFFF"
-                      />
-                    </View>
-                  )}
+                  {driverRating !== '--' ? (
+                    <>
+                      <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
+                      <Text variant="bodySmall">{driverRating}</Text>
+                    </>
+                  ) : null}
                 </View>
                 <Text variant="caption" color="muted">
-                  {driver.vehicle.display_name}
+                  {vehicleName}
                 </Text>
               </View>
             </View>
             <View style={[styles.chatIcon, { borderColor: colors.border }]}>
-              <MaterialCommunityIcons
-                name="chat-outline"
-                size={20}
-                color={colors.textSecondary}
-              />
+              <MaterialCommunityIcons name="chat-outline" size={20} color={colors.textSecondary} />
             </View>
           </View>
         </View>
 
-        {/* Route */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.routeContainer}>
             <View style={styles.routeIconColumn}>
               <LocationPinGreen size={18} />
-              <View
-                style={[styles.routeDash, { borderLeftColor: colors.border }]}
-              />
+              <View style={[styles.routeDash, { borderLeftColor: colors.border }]} />
               <LocationPinRed size={18} />
             </View>
             <View style={styles.routeDetails}>
               <View style={styles.routeStop}>
                 <View style={styles.routeStopText}>
                   <Text variant="body" weight="medium">
-                    {originName}
+                    {pickupName}
                   </Text>
                   <Text variant="caption" color="muted">
-                    {originAddress}
+                    {pickupAddress}
                   </Text>
                 </View>
                 <Text variant="bodySmall" color="muted">
-                  {pickupTimeDisplay}
+                  {pickupTime}
                 </Text>
               </View>
               <View style={styles.routeStop}>
                 <View style={styles.routeStopText}>
                   <Text variant="body" weight="medium">
-                    {destName}
+                    {destinationName}
                   </Text>
                   <Text variant="caption" color="muted">
-                    {destAddress}
+                    {destinationAddress}
                   </Text>
                 </View>
                 <Text variant="bodySmall" color="muted">
-                  {dropoffTimeDisplay}
+                  {dropoffTime}
                 </Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Booking Details */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
@@ -238,7 +193,7 @@ export default function ScheduleDetailScreen() {
               {t('booking.payment_label')}
             </Text>
             <Text variant="body" weight="medium">
-              {fare}
+              {totalFare}
             </Text>
           </View>
           <View style={styles.detailRow}>
@@ -246,7 +201,7 @@ export default function ScheduleDetailScreen() {
               {t('booking.date_label')}
             </Text>
             <Text variant="body" weight="medium">
-              {detailDateDisplay}
+              {detailDate}
             </Text>
           </View>
           <View style={styles.detailRow}>
@@ -254,15 +209,7 @@ export default function ScheduleDetailScreen() {
               {t('booking.time_label')}
             </Text>
             <Text variant="body" weight="medium">
-              {pickupTimeDisplay}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text variant="body" color="muted">
-              {t('booking.transaction_label')}
-            </Text>
-            <Text variant="body" weight="medium">
-              {transactionId}
+              {pickupTime}
             </Text>
           </View>
           <View style={styles.detailRow}>
@@ -270,12 +217,11 @@ export default function ScheduleDetailScreen() {
               {t('booking.booking_id_label')}
             </Text>
             <Text variant="body" weight="medium">
-              {bookingId}
+              {asString(booking.id, bookingId || '--')}
             </Text>
           </View>
         </View>
 
-        {/* Fare Breakdown */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.detailRow}>
             <Text variant="body" color="muted">
@@ -296,23 +242,28 @@ export default function ScheduleDetailScreen() {
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.detailRow}>
             <Text variant="body" weight="semiBold">
-              Total
+              {t('booking.total')}
             </Text>
             <Text variant="body" weight="semiBold">
-              {total}
+              {totalFare}
             </Text>
           </View>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
+        {cancelError ? (
+          <Text variant="bodySmall" color="error" style={styles.cancelError}>
+            {cancelError}
+          </Text>
+        ) : null}
         <Button
           translationKey="booking.cancel_ride"
           variant="outline"
           fullWidth
-          onPress={() => router.back()}
-          textStyle={{ color: colors.error }}
-          style={{ borderColor: colors.error }}
+          onPress={handleCancelRide}
+          disabled={!bookingId || cancelBooking.isPending}
+          title={cancelBooking.isPending ? t('common.loading') : undefined}
         />
       </View>
     </View>
@@ -322,103 +273,98 @@ export default function ScheduleDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   content: {
     gap: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.lg
   },
   card: {
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: spacing.lg
   },
   dateSubtitle: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
+    marginTop: spacing.xs
   },
   notifyBanner: {
+    marginTop: spacing.md,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    gap: spacing.xs
   },
   driverRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
   driverLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.md
   },
   driverAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   driverNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-  },
-  verifiedBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.xs
   },
   chatIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   routeContainer: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.md
   },
   routeIconColumn: {
     alignItems: 'center',
-    paddingTop: spacing.xs,
+    paddingTop: spacing.xs
   },
   routeDash: {
     flex: 1,
     borderLeftWidth: 1.5,
     borderStyle: 'dashed',
-    marginVertical: spacing.xs,
+    marginVertical: spacing.xs
   },
   routeDetails: {
     flex: 1,
-    gap: spacing.xl,
+    gap: spacing.xl
   },
   routeStop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: spacing.sm,
+    gap: spacing.sm
   },
   routeStopText: {
-    flex: 1,
+    flex: 1
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
+    gap: spacing.md
   },
   divider: {
-    height: 1,
-    marginVertical: spacing.sm,
+    height: 1
   },
   footer: {
-    paddingTop: spacing.md,
+    marginTop: spacing.lg
   },
+  cancelError: {
+    marginBottom: spacing.sm
+  }
 });

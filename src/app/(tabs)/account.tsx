@@ -1,23 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+  View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { type Href, useRouter } from 'expo-router';
 
-import { Text } from "@/components/common/text";
-import { useTheme } from "@/context/theme-context";
-import { useTranslation } from "@/context/language-context";
-import { type Href, useRouter } from "expo-router";
-import { borderRadius, spacing } from "@/constants/spacing";
-import { Button } from "@/components/common/button";
-import { localJsonApi } from '@/api/local-json-api';
-import { accountRoleService, type AccountRole } from "@/services/account-role";
+import { useApiClient, useCurrentUser, useWalletBalance } from '@/api-client';
+import { Button } from '@/components/common/button';
+import { Text } from '@/components/common/text';
+import { borderRadius, spacing } from '@/constants/spacing';
+import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
+import { clearRiderSession } from '@/runtime/rider-runtime';
+import { accountRoleService, type AccountRole } from '@/services/account-role';
+import { asNumber, asRecord, asString, fullName } from '@/utils/api-helpers';
 
 interface AccountMenuItem {
   key: string;
@@ -27,110 +29,188 @@ interface AccountMenuItem {
   route?: Href;
 }
 
+const resolveAvailableBalance = (
+  userRecord: Record<string, unknown>,
+  walletRecord: Record<string, unknown>
+): number => {
+  const walletSnapshot = asRecord(userRecord.wallet);
+  const rawKobo =
+    asNumber(walletRecord.available_balance_kobo, Number.NaN) ||
+    asNumber(walletRecord.availableBalanceKobo, Number.NaN);
+
+  if (Number.isFinite(rawKobo)) {
+    return rawKobo / 100;
+  }
+
+  const fallbackRaw =
+    walletSnapshot.availableBalance ??
+    walletSnapshot.available_balance ??
+    walletRecord.available_balance ??
+    walletRecord.availableBalance;
+
+  if (typeof fallbackRaw === 'number' && Number.isFinite(fallbackRaw)) {
+    return fallbackRaw;
+  }
+
+  if (typeof fallbackRaw === 'string') {
+    const parsed = Number.parseFloat(fallbackRaw);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
+};
+
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const api = useApiClient();
+
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
-  const [accountRole, setAccountRole] = useState<AccountRole>(
-    localJsonApi.getCurrentUserRole() === "corporate" ? "corporate" : "rider",
+  const [accountRole, setAccountRole] = useState<AccountRole>('rider');
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const { data: currentUserData } = useCurrentUser();
+  const { data: walletData } = useWalletBalance();
+
+  const userRecord = asRecord(currentUserData);
+  const walletRecord = asRecord(walletData);
+
+  const isCorporate = accountRole === 'corporate';
+  const userDisplayName = fullName(userRecord) || 'Rider';
+  const userPhone = asString(userRecord.phoneNumber ?? userRecord.phone_number, '--');
+  const avatarUrl = asString(userRecord.avatarUrl ?? userRecord.avatar_url);
+
+  const availableBalance = useMemo(
+    () => resolveAvailableBalance(userRecord, walletRecord),
+    [userRecord, walletRecord]
   );
-  const currentUser = localJsonApi.getCurrentUser();
-  const corporate = accountRole === "corporate";
 
   useEffect(() => {
     const loadRole = async () => {
-      const role = await accountRoleService.getRole();
-      setAccountRole(role);
+      const storedRole = await accountRoleService.getRole();
+      setAccountRole(storedRole);
     };
-    loadRole();
+
+    void loadRole();
   }, []);
+
+  useEffect(() => {
+    const role = asString(userRecord.role, '');
+    if (!role) {
+      return;
+    }
+
+    const nextRole: AccountRole = role === 'corporate_admin' ? 'corporate' : 'rider';
+    setAccountRole(nextRole);
+    void accountRoleService.setRole(nextRole);
+  }, [userRecord]);
+
+  const handleConfirmLogout = async () => {
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+    try {
+      await api.authApi.logout();
+    } catch {
+      // Intentionally ignore server logout failures; local session is still cleared.
+    } finally {
+      await clearRiderSession();
+      setIsLogoutModalVisible(false);
+      setLoggingOut(false);
+      router.replace('/(auth)/login');
+    }
+  };
 
   const menuItems: AccountMenuItem[] = [
     {
-      key: "saved_addresses",
-      icon: "location-outline",
-      labelKey: "account.saved_addresses",
+      key: 'saved_addresses',
+      icon: 'location-outline',
+      labelKey: 'account.saved_addresses',
       showChevron: true,
-      route: "/account/saved-addresses",
+      route: '/account/saved-addresses'
     },
     {
-      key: "notifications",
-      icon: "notifications-outline",
-      labelKey: "account.notifications",
+      key: 'notifications',
+      icon: 'notifications-outline',
+      labelKey: 'account.notifications',
       showChevron: true,
-      route: "/account/notifications",
+      route: '/account/notifications'
     },
-    ...(!corporate
+    ...(!isCorporate
       ? [
           {
-            key: "ride_preference",
-            icon: "car-sport-outline" as keyof typeof Ionicons.glyphMap,
-            labelKey: "account.ride_preference",
+            key: 'ride_preference',
+            icon: 'car-sport-outline' as keyof typeof Ionicons.glyphMap,
+            labelKey: 'account.ride_preference',
             showChevron: true,
-            route: "/booking/ride-preference" as Href,
+            route: '/booking/ride-preference' as Href
           },
           {
-            key: "join_company",
-            icon: "business-outline" as keyof typeof Ionicons.glyphMap,
-            labelKey: "account.join_company",
+            key: 'join_company',
+            icon: 'business-outline' as keyof typeof Ionicons.glyphMap,
+            labelKey: 'account.join_company',
             showChevron: true,
-            route: "/account/join-company" as Href,
-          },
+            route: '/account/join-company' as Href
+          }
         ]
       : []),
-    ...(corporate
+    ...(isCorporate
       ? [
           {
-            key: "document_verification",
-            icon: "document-text-outline" as keyof typeof Ionicons.glyphMap,
-            labelKey: "account.document_verification",
+            key: 'document_verification',
+            icon: 'document-text-outline' as keyof typeof Ionicons.glyphMap,
+            labelKey: 'account.document_verification',
             showChevron: true,
-            route: "/account/document-verification" as Href,
+            route: '/account/document-verification' as Href
           },
           {
-            key: "travel_limit",
-            icon: "speedometer-outline" as keyof typeof Ionicons.glyphMap,
-            labelKey: "account.travel_limit",
+            key: 'travel_limit',
+            icon: 'speedometer-outline' as keyof typeof Ionicons.glyphMap,
+            labelKey: 'account.travel_limit',
             showChevron: true,
-            route: "/account/travel-limit" as Href,
-          },
+            route: '/account/travel-limit' as Href
+          }
         ]
       : []),
     {
-      key: "app_appearance",
-      icon: "color-palette-outline",
-      labelKey: "account.app_appearance",
+      key: 'app_appearance',
+      icon: 'color-palette-outline',
+      labelKey: 'account.app_appearance',
       showChevron: false,
-      route: "/account/appearance",
+      route: '/account/appearance'
     },
     {
-      key: "help_support",
-      icon: "help-circle-outline",
-      labelKey: "account.help_support",
+      key: 'help_support',
+      icon: 'help-circle-outline',
+      labelKey: 'account.help_support',
       showChevron: true,
-      route: "/account/help-support",
+      route: '/account/help-support'
     },
     {
-      key: "account_security",
-      icon: "shield-checkmark-outline",
-      labelKey: "account.account_security",
+      key: 'account_security',
+      icon: 'shield-checkmark-outline',
+      labelKey: 'account.account_security',
       showChevron: true,
-      route: "/account/security",
+      route: '/account/security'
     },
     {
-      key: "rate_us",
-      icon: "star-outline",
-      labelKey: "account.rate_us",
-      showChevron: false,
+      key: 'rate_us',
+      icon: 'star-outline',
+      labelKey: 'account.rate_us',
+      showChevron: false
     },
     {
-      key: "log_out",
-      icon: "log-out-outline",
-      labelKey: "account.log_out",
-      showChevron: false,
-    },
+      key: 'log_out',
+      icon: 'log-out-outline',
+      labelKey: 'account.log_out',
+      showChevron: false
+    }
   ];
 
   const avatarSize = spacing.xxxxl + spacing.lg;
@@ -143,48 +223,43 @@ export default function AccountScreen() {
         styles.container,
         {
           backgroundColor: colors.background,
-          paddingTop: insets.top + spacing.lg,
-        },
+          paddingTop: insets.top + spacing.lg
+        }
       ]}
     >
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Pressable
           style={[styles.profileCard, { backgroundColor: colors.surface }]}
           accessibilityRole="button"
-          accessibilityLabel={t("account.profile")}
-          accessibilityHint={t("account.open_personal_info_hint")}
-          onPress={() => router.push("/account/personal-info")}
+          accessibilityLabel={t('account.profile')}
+          accessibilityHint={t('account.open_personal_info_hint')}
+          onPress={() => router.push('/account/personal-info')}
         >
           <View style={styles.profileHeader}>
             <Image
-              source={require("@assets/images/avatar.png")}
+              source={
+                avatarUrl
+                  ? { uri: avatarUrl }
+                  : require('../../../assets/images/avatar.png')
+              }
               style={[
                 styles.avatar,
                 {
                   width: avatarSize,
                   height: avatarSize,
-                  borderRadius: avatarSize / 2,
-                },
+                  borderRadius: avatarSize / 2
+                }
               ]}
             />
             <View style={styles.profileInfo}>
-              <Text
-                variant="h3"
-                size={"xxl"}
-                weight="medium"
-              >
-                {currentUser.profile.full_name}
+              <Text variant="h3" size="xxl" weight="medium">
+                {userDisplayName}
               </Text>
-              <Text variant="bodySmall" color="muted">{currentUser.phone_number}</Text>
+              <Text variant="bodySmall" color="muted">
+                {userPhone}
+              </Text>
             </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={colors.textMuted}
-            />
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.balanceRow}>
@@ -195,42 +270,31 @@ export default function AccountScreen() {
                   backgroundColor: colors.accent,
                   width: walletSize,
                   height: walletSize,
-                  borderRadius: walletSize / 2,
-                },
+                  borderRadius: walletSize / 2
+                }
               ]}
             >
-              <Ionicons
-                name="wallet-outline"
-                size={22}
-                color={colors.primary}
-              />
+              <Ionicons name="wallet-outline" size={22} color={colors.primary} />
             </View>
             <View style={styles.balanceInfo}>
-              <Text
-                variant="body"
-                weight="semiBold"
-              >
-                ₦{currentUser.wallet.available_balance.toLocaleString()}
+              <Text variant="body" weight="semiBold">
+                ₦{Math.round(availableBalance).toLocaleString()}
               </Text>
-              <Text
-                variant="caption"
-                color="muted"
-                translationKey="account.available_balance"
-              />
+              <Text variant="caption" color="muted" translationKey="account.available_balance" />
             </View>
             <Pressable
               style={[
                 styles.topUpButton,
                 {
-                  backgroundColor: colors.buttonPrimary,
-                },
+                  backgroundColor: colors.buttonPrimary
+                }
               ]}
               onPress={(event) => {
                 event.stopPropagation();
-                router.push("/account/top-up");
+                router.push('/account/top-up');
               }}
               accessibilityRole="button"
-              accessibilityLabel={t("account.top_up")}
+              accessibilityLabel={t('account.top_up')}
             >
               <Ionicons name="add" size={20} color={colors.buttonPrimaryText} />
               <Text
@@ -251,7 +315,7 @@ export default function AccountScreen() {
               accessibilityRole="button"
               accessibilityLabel={t(item.labelKey)}
               onPress={() => {
-                if (item.key === "log_out") {
+                if (item.key === 'log_out') {
                   setIsLogoutModalVisible(true);
                   return;
                 }
@@ -268,25 +332,17 @@ export default function AccountScreen() {
                       backgroundColor: colors.accent,
                       width: menuIconSize,
                       height: menuIconSize,
-                      borderRadius: menuIconSize / 2,
-                    },
+                      borderRadius: menuIconSize / 2
+                    }
                   ]}
                 >
-                  <Ionicons
-                    name={item.icon}
-                    size={20}
-                    color={colors.textMuted}
-                  />
+                  <Ionicons name={item.icon} size={20} color={colors.textMuted} />
                 </View>
                 <Text variant="body" translationKey={item.labelKey} />
               </View>
-              {item.showChevron && (
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={colors.textMuted}
-                />
-              )}
+              {item.showChevron ? (
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              ) : null}
             </Pressable>
           ))}
         </View>
@@ -302,7 +358,7 @@ export default function AccountScreen() {
           style={styles.modalOverlay}
           onPress={() => setIsLogoutModalVisible(false)}
           accessibilityRole="button"
-          accessibilityLabel={t("common.cancel")}
+          accessibilityLabel={t('common.cancel')}
         >
           <Pressable
             style={[styles.modalCard, { backgroundColor: colors.surface }]}
@@ -330,12 +386,10 @@ export default function AccountScreen() {
               />
               <Button
                 translationKey="account.logout_yes_action"
-                onPress={() => {
-                  setIsLogoutModalVisible(false);
-                  router.replace("/(auth)/login");
-                }}
+                onPress={handleConfirmLogout}
                 style={[styles.modalButton, { backgroundColor: colors.error }]}
                 textStyle={{ color: colors.textInverse }}
+                disabled={loggingOut}
               />
             </View>
           </Pressable>
@@ -348,91 +402,91 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   content: {
     paddingBottom: spacing.xxxl,
-    gap: spacing.lg,
+    gap: spacing.lg
   },
   profileCard: {
     borderRadius: borderRadius.xxl,
-    padding: spacing.lg,
+    padding: spacing.lg
   },
   profileHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md
   },
   avatar: {},
   profileInfo: {
-    flex: 1,
+    flex: 1
   },
   divider: {
     height: 0.5,
-    marginVertical: spacing.lg,
+    marginVertical: spacing.lg
   },
   balanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md
   },
   walletIcon: {
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   balanceInfo: {
-    flex: 1,
+    flex: 1
   },
   topUpButton: {
     borderRadius: borderRadius.full,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs
   },
   menuList: {
-    gap: spacing.md,
+    gap: spacing.md
   },
   menuItem: {
     borderRadius: borderRadius.full,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
   },
   menuLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md
   },
   menuIcon: {
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.xxxl,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xxxl
   },
   modalCard: {
-    width: "100%",
+    width: '100%',
     borderRadius: borderRadius.xxl,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxl,
-    gap: spacing.lg,
+    gap: spacing.lg
   },
   modalActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md
   },
   modalButton: {
-    flex: 1,
-  },
+    flex: 1
+  }
 });

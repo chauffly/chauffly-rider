@@ -1,20 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { useBookingById, useBookingUpdates, useDriverLocation as useLiveDriverLocation } from '@/api-client';
 import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
-import { localJsonApi } from '@/api/local-json-api';
+import { socketClient } from '@/runtime/rider-runtime';
+import { asRecord, asString } from '@/utils/api-helpers';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
   longitude: 7.4951,
   latitudeDelta: 0.25,
-  longitudeDelta: 0.25,
+  longitudeDelta: 0.25
 };
 
 export default function HeadingDestinationScreen() {
@@ -22,32 +24,65 @@ export default function HeadingDestinationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
-    originName?: string;
-    destinations?: string;
-    driverName?: string;
-    driverPhone?: string;
-    driverRating?: string;
-    driverVehicle?: string;
-    selectedRideId?: string;
+    bookingId?: string;
   }>();
-  const uiDefaults = localJsonApi.getUiDefaults();
-  const apiDriver = localJsonApi.getPrimaryDriver();
-  const driverName = params.driverName || apiDriver.display_name;
-  const driverPhone = params.driverPhone || apiDriver.phone_number;
-  const driverRating = params.driverRating || apiDriver.rating.toFixed(1);
-  const driverVehicle = params.driverVehicle || apiDriver.vehicle.display_name;
+  const bookingId = params.bookingId ?? '';
+
+  const { data: bookingData } = useBookingById(bookingId, {
+    enabled: Boolean(bookingId),
+    refetchInterval: 5000
+  });
+  const driverLocation = useLiveDriverLocation(socketClient);
+
+  useBookingUpdates(socketClient, {
+    onStatusChanged: (payload) => {
+      if (payload.bookingId !== bookingId) {
+        return;
+      }
+
+      if (payload.status === 'completed') {
+        router.replace({
+          pathname: '/booking/trip-arrived',
+          params: {
+            bookingId
+          }
+        });
+      }
+    },
+    onTripCompleted: () => {
+      router.replace({
+        pathname: '/booking/trip-arrived',
+        params: {
+          bookingId
+        }
+      });
+    },
+    onRideCancelled: () => {
+      router.replace('/(tabs)');
+    }
+  });
+
+  const detail = asRecord(bookingData);
+  const booking = asRecord(detail.booking);
+  const driver = asRecord(detail.driver);
+  const vehicle = asRecord(driver.vehicle);
+
+  const driverName = `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Driver';
+  const driverPhone = asString(driver.phoneNumber, '--');
+  const driverRating = asString(driver.rating, '--');
+  const driverVehicle = `${asString(vehicle.make)} ${asString(vehicle.model)}`.trim() || '--';
 
   useEffect(() => {
-    // TODO: Replace timer-based progression with backend trip status updates.
-    const timer = setTimeout(() => {
-      router.push({
+    const status = asString(booking.status);
+    if (status === 'completed') {
+      router.replace({
         pathname: '/booking/trip-arrived',
-        params,
+        params: {
+          bookingId
+        }
       });
-    }, 5000);
-
-    return () => clearTimeout(timer);
-  }, [router, params]);
+    }
+  }, [booking, bookingId, router]);
 
   const handleCallDriver = async () => {
     const phoneUrl = `tel:${driverPhone.replace(/[^0-9+]/g, '')}`;
@@ -60,30 +95,47 @@ export default function HeadingDestinationScreen() {
   const openDriverChat = () => {
     router.push({
       pathname: '/booking/message-driver',
-      params,
+      params: {
+        bookingId,
+        driverName
+      }
     });
   };
 
   const openDriverInfo = () => {
     router.push({
       pathname: '/booking/driver-info',
-      params,
+      params: {
+        bookingId,
+        driverName,
+        driverPhone,
+        driverRating,
+        driverVehicle
+      }
     });
   };
+
+  const markerCoordinates = useMemo(
+    () => ({
+      latitude: driverLocation.lat ?? 9.22,
+      longitude: driverLocation.lng ?? 7.45
+    }),
+    [driverLocation.lat, driverLocation.lng]
+  );
 
   return (
     <View style={styles.container}>
       <MapView style={styles.map} initialRegion={DEFAULT_REGION}>
-        <Marker coordinate={{ latitude: 9.22, longitude: 7.45 }}>
+        <Marker coordinate={markerCoordinates}>
           <MaterialCommunityIcons name="car" size={24} color={colors.textPrimary} />
         </Marker>
 
         <Polyline
           coordinates={[
-            { latitude: 9.22, longitude: 7.45 },
+            markerCoordinates,
             { latitude: 9.18, longitude: 7.47 },
             { latitude: 9.17, longitude: 7.53 },
-            { latitude: 9.12, longitude: 7.52 },
+            { latitude: 9.12, longitude: 7.52 }
           ]}
           strokeColor={colors.primary}
           strokeWidth={6}
@@ -97,23 +149,17 @@ export default function HeadingDestinationScreen() {
         <MaterialCommunityIcons name="chevron-left" size={24} color={colors.textPrimary} />
       </Pressable>
 
-      <View
-        style={[
-          styles.floatingButton,
-          styles.rightButton,
-          { bottom: 420, backgroundColor: colors.surface },
-        ]}
-      >
+      <View style={[styles.floatingButton, styles.rightButton, { bottom: 420, backgroundColor: colors.surface }]}>
         <MaterialCommunityIcons name="crosshairs-gps" size={24} color={colors.textPrimary} />
       </View>
 
-      <View style={[styles.bottomCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}> 
+      <View style={[styles.bottomCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}>
         <View style={[styles.handle, { backgroundColor: colors.border }]} />
         <Text variant="h3" weight="medium" align="center">
-          {uiDefaults.booking.heading_destination_title}
+          Heading to destination
         </Text>
         <Text variant="bodySmall" color="muted" align="center" style={styles.subtitle}>
-          {uiDefaults.booking.heading_destination_subtitle}
+          Your chauffeur is currently driving your route
         </Text>
         <Text variant="body" align="center" style={styles.vehicleText}>
           {driverVehicle}
@@ -128,48 +174,43 @@ export default function HeadingDestinationScreen() {
 
           <View style={styles.driverInfo}>
             <View style={styles.driverNameRow}>
-              <Text variant="body" weight="medium">{driverName}</Text> 
-                <MaterialCommunityIcons name="check-decagram" size={18} color={colors.brandBlue} />
- 
+              <Text variant="body" weight="medium">
+                {driverName}
+              </Text>
+              <MaterialCommunityIcons name="check-decagram" size={18} color={colors.brandBlue} />
             </View>
 
             <View style={styles.metaRow}>
               <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
               <Text variant="bodySmall">{driverRating}</Text>
-              <Text variant="bodySmall" color="muted">{driverPhone}</Text>
+              <Text variant="bodySmall" color="muted">
+                {driverPhone}
+              </Text>
             </View>
           </View>
 
-           <View style={styles.actionIcons}>
-                     <Pressable
-                       style={[styles.iconButton, { backgroundColor: colors.accent }]}
-                       accessibilityRole="button"
-                       onPress={(event) => {
-                         event.stopPropagation();
-                         openDriverChat();
-                       }}
-                     >
-                       <MaterialCommunityIcons
-                         name="message-text-outline"
-                         size={20}
-                         color={colors.primary}
-                       />
-                     </Pressable>
-                     <Pressable
-                       style={[styles.iconButton, { backgroundColor: colors.accent }]}
-                       accessibilityRole="button"
-                       onPress={async (event) => {
-                         event.stopPropagation();
-                         await handleCallDriver();
-                       }}
-                     >
-                       <MaterialCommunityIcons
-                         name="phone-outline"
-                         size={20}
-                         color={colors.primary}
-                       />
-                     </Pressable>
-                   </View>
+          <View style={styles.actionIcons}>
+            <Pressable
+              style={[styles.iconButton, { backgroundColor: colors.accent }]}
+              accessibilityRole="button"
+              onPress={(event) => {
+                event.stopPropagation();
+                openDriverChat();
+              }}
+            >
+              <MaterialCommunityIcons name="message-text-outline" size={20} color={colors.primary} />
+            </Pressable>
+            <Pressable
+              style={[styles.iconButton, { backgroundColor: colors.accent }]}
+              accessibilityRole="button"
+              onPress={async (event) => {
+                event.stopPropagation();
+                await handleCallDriver();
+              }}
+            >
+              <MaterialCommunityIcons name="phone-outline" size={20} color={colors.primary} />
+            </Pressable>
+          </View>
         </Pressable>
       </View>
     </View>
@@ -178,10 +219,10 @@ export default function HeadingDestinationScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFillObject
   },
   floatingButton: {
     position: 'absolute',
@@ -194,13 +235,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 4
   },
   leftButton: {
-    left: spacing.lg,
+    left: spacing.lg
   },
   rightButton: {
-    right: spacing.lg,
+    right: spacing.lg
   },
   bottomCard: {
     position: 'absolute',
@@ -210,67 +251,60 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 34,
     borderTopRightRadius: 34,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.md
   },
   handle: {
     width: 74,
     height: 5,
     borderRadius: 3,
     alignSelf: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.lg
   },
   subtitle: {
-    marginTop: spacing.sm,
+    marginTop: spacing.sm
   },
   vehicleText: {
-    marginTop: spacing.sm,
+    marginTop: spacing.sm
   },
   divider: {
     height: 1,
-    marginVertical: spacing.lg,
+    marginVertical: spacing.lg
   },
   driverRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.md
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 28,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   driverInfo: {
     flex: 1,
-    gap: spacing.xs,
+    gap: spacing.xs
   },
   driverNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-  },
-  verified: {
-    width: 16,
-    height: 16,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs
   },
   actionIcons: {
-    flexDirection: "row",
-    gap: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm
   },
   iconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    alignItems: 'center',
+    justifyContent: 'center'
+  }
 });

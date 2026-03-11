@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { addMinutes, format } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useCreateBooking, useEstimateFare } from '@/api-client';
 import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
 import { StackHeader } from '@/components/common/stack-header';
@@ -14,7 +15,25 @@ import { rideOptions } from '@/constants/ride-options';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
-import { localJsonApi } from '@/api/local-json-api';
+import { asRecord, asString } from '@/utils/api-helpers';
+import { formatNairaAmount } from '@/utils/currency';
+
+const generateIdempotencyKey = (): string => {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+type DestinationInput = {
+  id?: string;
+  name?: string;
+  address: string;
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
+};
 
 export default function RideSummaryScreen() {
   const router = useRouter();
@@ -24,40 +43,52 @@ export default function RideSummaryScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const [isShimmering, setIsShimmering] = useState(true);
-  const activeBooking = localJsonApi.getActiveBooking();
-  const fallbackDriver = localJsonApi.getDriverById(activeBooking.driver_id);
-   const params = useLocalSearchParams<{
+  const [bookingError, setBookingError] = useState('');
+  const estimateFare = useEstimateFare();
+  const createBooking = useCreateBooking();
+  const params = useLocalSearchParams<{
     originName?: string;
     originAddress?: string;
+    originLat?: string;
+    originLng?: string;
     destinations?: string;
     selectedRideId?: string;
+    selectedRideTier?: string;
     pickupDate?: string;
     pickupTime?: string;
     bookingType?: string;
     estimatedDurationMinutes?: string;
     distanceKm?: string;
-    driverName?: string;
-    driverPhone?: string;
-    driverRating?: string;
-    driverVehicle?: string;
   }>();
 
-  const destinations = params.destinations ? JSON.parse(params.destinations) : [];
-  const selectedRide = rideOptions.find((option) => option.id === params.selectedRideId) ?? rideOptions[0];
-  const durationMinutes = params.estimatedDurationMinutes
-    ? Number(params.estimatedDurationMinutes)
-    : 45;
+  const destinations: DestinationInput[] = useMemo(() => {
+    if (!params.destinations) {
+      return [];
+    }
+    try {
+      return JSON.parse(params.destinations) as DestinationInput[];
+    } catch {
+      return [];
+    }
+  }, [params.destinations]);
+
+  const selectedRideOptionId = asString(params.selectedRideId, '');
+  const selectedRide = rideOptions.find((option) => option.id === params.selectedRideTier)
+    ?? rideOptions.find((option) => option.id === selectedRideOptionId)
+    ?? rideOptions[0];
+  const rideOptionIdForApi = selectedRideOptionId || selectedRide.id;
+  const durationMinutes = params.estimatedDurationMinutes ? Number(params.estimatedDurationMinutes) : 45;
   const distanceKm = params.distanceKm ? Number(params.distanceKm) : null;
   const pickupDate = params.pickupDate;
   const pickupTime = params.pickupTime;
-  const pickupDateTime = pickupDate && pickupTime
-    ? new Date(`${pickupDate}T${pickupTime}:00`)
-    : new Date();
-  const pickupTimeDisplay = pickupDate && pickupTime
-    ? format(pickupDateTime, 'h:mm a')
-    : t('booking.now');
+  const pickupDateTime =
+    pickupDate && pickupTime ? new Date(`${pickupDate}T${pickupTime}:00`) : new Date();
+  const pickupTimeDisplay = pickupDate && pickupTime ? format(pickupDateTime, 'h:mm a') : t('booking.now');
   const dropoffTimeDisplay = format(addMinutes(pickupDateTime, durationMinutes), 'h:mm a');
-  const showDriver = !!params.driverName;
+  const bookingType = params.bookingType === 'scheduled' ? 'scheduled' : 'instant';
+
+  const pickupLat = Number(params.originLat ?? 0);
+  const pickupLng = Number(params.originLng ?? 0);
 
   useEffect(() => {
     const shimmerLoop = Animated.loop(
@@ -65,7 +96,7 @@ export default function RideSummaryScreen() {
         toValue: 1,
         duration: 1200,
         easing: Easing.inOut(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       { iterations: 2 }
     );
@@ -77,14 +108,106 @@ export default function RideSummaryScreen() {
     return () => shimmerLoop.stop();
   }, [shimmerAnim]);
 
- 
+  useEffect(() => {
+    if (!pickupLat || !pickupLng || destinations.length === 0) {
+      return;
+    }
+
+    const runEstimate = async () => {
+      try {
+        await estimateFare.mutateAsync({
+          pickup: { lat: pickupLat, lng: pickupLng },
+          stops: destinations.map((stop) => ({
+            lat: stop.coordinates.latitude,
+            lng: stop.coordinates.longitude
+          })),
+          ride_option_id: rideOptionIdForApi
+        });
+      } catch {
+        // Keep UI fallback pricing if estimate fails.
+      }
+    };
+
+    void runEstimate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupLat, pickupLng, destinations.length, rideOptionIdForApi]);
+
+  const estimateRecord = asRecord(estimateFare.data);
+  const fareBreakdown = asRecord(estimateRecord.fare_breakdown);
+
+  const tripFare = formatNairaAmount(fareBreakdown.trip_fare || estimateRecord.estimated_fare || 0);
+  const tax = formatNairaAmount(fareBreakdown.tax || 0);
+  const total = formatNairaAmount(fareBreakdown.total || estimateRecord.estimated_fare || 0);
+
+  const handleCreateBooking = async () => {
+    if (!params.originAddress || !pickupLat || !pickupLng || destinations.length === 0) {
+      setBookingError('Missing route details. Please set pickup and destination again.');
+      return;
+    }
+
+    setBookingError('');
+    try {
+      const scheduledAt =
+        bookingType === 'scheduled'
+          ? format(pickupDateTime, "yyyy-MM-dd'T'HH:mm:ssxxx")
+          : undefined;
+
+      const bookingResponse = await createBooking.mutateAsync({
+        input: {
+          pickup: {
+            name: params.originName || params.originAddress,
+            address: params.originAddress,
+            coordinates: {
+              lat: pickupLat,
+              lng: pickupLng
+            }
+          },
+          stops: destinations.map((stop) => ({
+            name: stop.name,
+            address: stop.address,
+            coordinates: {
+              lat: stop.coordinates.latitude,
+              lng: stop.coordinates.longitude
+            }
+          })),
+          ride_option_id: rideOptionIdForApi,
+          booking_type: bookingType,
+          scheduled_at: scheduledAt
+        },
+        idempotencyKey: generateIdempotencyKey()
+      });
+
+      const result = asRecord(bookingResponse);
+      const booking = asRecord(result.booking);
+      const bookingEntity = asRecord(booking.booking);
+      const driver = asRecord(booking.driver);
+      const vehicle = asRecord(driver.vehicle);
+      const bookingId = asString(bookingEntity.id) || asString(result.bookingId);
+
+      router.push({
+        pathname: '/booking/driver-accepts',
+        params: {
+          bookingId,
+          selectedRideId: rideOptionIdForApi,
+          selectedRideTier: selectedRide.id,
+          originName: params.originName,
+          originAddress: params.originAddress,
+          destinations: JSON.stringify(destinations),
+          driverName: `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim(),
+          driverPhone: asString(driver.phoneNumber),
+          driverRating: asString(driver.rating),
+          driverVehicle: `${asString(vehicle.make)} ${asString(vehicle.model)}`.trim()
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to create booking.';
+      setBookingError(message);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.md }]}>
-      <StackHeader
-        translationKey="booking.ride_summary"
-        onBack={() => router.back()}
-      />
+      <StackHeader translationKey="booking.ride_summary" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -96,7 +219,7 @@ export default function RideSummaryScreen() {
               <Text variant="caption" color="muted" translationKey="booking.eta_range_short" />
             </View>
             <Text variant="body" font="medium">
-              {t(selectedRide.priceKey)}
+              {total}
             </Text>
           </View>
 
@@ -106,10 +229,10 @@ export default function RideSummaryScreen() {
             <LocationPinGreen size={18} />
             <View style={styles.routeText}>
               <Text variant="bodySmall" font="medium">
-                {params.originName || activeBooking.route_defaults.origin_name}
+                {params.originName || 'Pickup location'}
               </Text>
               <Text variant="caption" color="muted">
-                {params.originAddress || activeBooking.route_defaults.origin_address}
+                {params.originAddress || '--'}
               </Text>
             </View>
             <Text variant="caption" color="muted">
@@ -121,10 +244,10 @@ export default function RideSummaryScreen() {
             <LocationPinRed size={18} />
             <View style={styles.routeText}>
               <Text variant="bodySmall" font="medium">
-                {destinations[destinations.length - 1]?.name || activeBooking.route_defaults.destination_name}
+                {destinations[destinations.length - 1]?.name || 'Destination'}
               </Text>
               <Text variant="caption" color="muted">
-                {destinations[destinations.length - 1]?.address || activeBooking.route_defaults.destination_address}
+                {destinations[destinations.length - 1]?.address || '--'}
               </Text>
             </View>
             <Text variant="caption" color="muted">
@@ -138,57 +261,22 @@ export default function RideSummaryScreen() {
           ) : null}
         </View>
 
-        {showDriver ? (
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <View style={styles.driverRow}>
-              <View style={[styles.driverAvatar, { backgroundColor: colors.border }]} />
-              <View style={styles.driverInfo}>
-                <Text variant="bodySmall" font="medium">
-                  {params.driverName || fallbackDriver.display_name}
-                </Text>
-              <View style={styles.ratingRow}>
-                <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
-                <Text variant="caption" color="muted">
-                  {params.driverRating || fallbackDriver.rating.toFixed(1)}
-                </Text>
-                {params.driverPhone ? (
-                  <Text variant="caption" color="muted">
-                    {params.driverPhone}
-                  </Text>
-                ) : null}
-              </View>
-              {params.driverVehicle ? (
-                <Text variant="caption" color="muted">
-                  {params.driverVehicle}
-                </Text>
-              ) : null}
-            </View>
-              <View style={[styles.driverBadge, { backgroundColor: colors.accent }]}>
-                <MaterialCommunityIcons name="check-decagram" size={18} color={colors.primary} />
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <Text variant="bodySmall" font="medium" translationKey="booking.driver_assigned_later" />
-            <Text variant="caption" color="muted" translationKey="booking.driver_assigned_later_note" />
-          </View>
-        )}
-
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text variant="bodySmall" font="medium" translationKey="booking.ride_summary_fare_breakdown" />
           <View style={styles.fareRow}>
             <Text variant="caption" color="muted" translationKey="booking.trip_fare" />
-            <Text variant="caption">{activeBooking.fare_breakdown.trip_fare}</Text>
+            <Text variant="caption">{tripFare}</Text>
           </View>
           <View style={styles.fareRow}>
             <Text variant="caption" color="muted" translationKey="booking.tax" />
-            <Text variant="caption">{activeBooking.fare_breakdown.tax}</Text>
+            <Text variant="caption">{tax}</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.fareRow}>
             <Text variant="bodySmall" font="medium" translationKey="booking.total" />
-            <Text variant="bodySmall" font="medium">{activeBooking.fare_breakdown.total}</Text>
+            <Text variant="bodySmall" font="medium">
+              {total}
+            </Text>
           </View>
         </View>
 
@@ -201,17 +289,17 @@ export default function RideSummaryScreen() {
                 borderColor: colors.primary,
                 borderWidth: 2,
                 overflow: 'hidden',
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingRight: spacing.md,
-              },
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingRight: spacing.md
+              }
             ]}
             onPress={() => router.push({ pathname: '/booking/personalization', params })}
             accessibilityRole="button"
             accessibilityLabel={t('booking.enhance_ride_title')}
           >
-            {isShimmering && (
+            {isShimmering ? (
               <Animated.View
                 style={[
                   styles.shimmerOverlay,
@@ -221,38 +309,39 @@ export default function RideSummaryScreen() {
                       {
                         translateX: shimmerAnim.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [-screenWidth, screenWidth],
-                        }),
+                          outputRange: [-screenWidth, screenWidth]
+                        })
                       },
-                      { rotate: '-20deg' },
-                    ],
-                  },
+                      { rotate: '-20deg' }
+                    ]
+                  }
                 ]}
                 pointerEvents="none"
               />
-            )}
+            ) : null}
             <View>
-
-            <Text variant="bodySmall" font="medium" translationKey="booking.enhance_ride_title" />
-            <Text variant="caption" color="muted">
-              {t('booking.enhance_ride_subtitle')}
-            </Text>
+              <Text variant="bodySmall" font="medium" translationKey="booking.enhance_ride_title" />
+              <Text variant="caption" color="muted">
+                {t('booking.enhance_ride_subtitle')}
+              </Text>
             </View>
-            <MaterialCommunityIcons name='chevron-double-right' size={24}  color={colors.primary} />
+            <MaterialCommunityIcons name="chevron-double-right" size={24} color={colors.primary} />
           </Pressable>
         </View>
+        {bookingError ? (
+          <Text variant="bodySmall" color="error">
+            {bookingError}
+          </Text>
+        ) : null}
       </ScrollView>
 
       <View style={styles.footer}>
         <Button
           translationKey="booking.book_ride"
           fullWidth
-          onPress={() =>
-            router.push({
-              pathname: '/booking/driver-accepts',
-              params,
-            })
-          }
+          onPress={handleCreateBooking}
+          disabled={createBooking.isPending}
+          title={createBooking.isPending ? t('common.loading') : undefined}
         />
       </View>
     </View>
@@ -261,92 +350,55 @@ export default function RideSummaryScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
+    flex: 1
   },
   content: {
-    gap: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.md
   },
   card: {
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-  },
-  premiumCardWrapper: {
-    position: 'relative',
-  },
-  shimmerOverlay: {
-    position: 'absolute',
-    top: -20,
-    bottom: -20,
-    width: 140,
-    opacity: 0.25,
-  },
-  premiumRing: {
-    position: 'absolute',
-    top: -6,
-    bottom: -6,
-    left: -6,
-    right: -6,
-    borderRadius: borderRadius.lg + 8,
-    borderWidth: 1.5,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.lg
   },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
   vehicleInfo: {
-    gap: spacing.xs,
+    gap: spacing.xs
   },
   divider: {
     height: 1,
-    marginVertical: spacing.md,
+    marginVertical: spacing.md
   },
   routeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.sm
   },
   routeText: {
-    flex: 1,
-  },
-  driverRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  driverAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  driverInfo: {
-    flex: 1,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  driverBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1
   },
   fareRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
+    justifyContent: 'space-between'
+  },
+  premiumCardWrapper: {
+    marginTop: spacing.sm
+  },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: -40,
+    bottom: -40,
+    width: 80,
+    opacity: 0.35
   },
   footer: {
-    paddingBottom: spacing.lg,
-  },
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg
+  }
 });

@@ -1,30 +1,65 @@
-import { useState } from "react";
+import { useMemo, useState } from 'react';
 import {
   GestureResponderEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+  View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
-import { Text } from "@/components/common/text";
-import { TextInput } from "@/components/common/text-input";
-import { Button } from "@/components/common/button";
-import { BottomSheet } from "@/components/common/bottom-sheet";
-import { useTheme } from "@/context/theme-context";
-import { useTranslation } from "@/context/language-context";
-import { borderRadius, spacing } from "@/constants/spacing";
-import { StackHeader } from "@/components/common/stack-header";
-import { localJsonApi } from '@/api/local-json-api';
+import {
+  useCreateSavedAddress,
+  useDeleteSavedAddress,
+  useSavedAddresses,
+  useToggleSavedAddressPin,
+  useUpdateSavedAddress
+} from '@/api-client';
+import { Text } from '@/components/common/text';
+import { TextInput } from '@/components/common/text-input';
+import { Button } from '@/components/common/button';
+import { BottomSheet } from '@/components/common/bottom-sheet';
+import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
+import { borderRadius, spacing } from '@/constants/spacing';
+import { StackHeader } from '@/components/common/stack-header';
+import { asArray, asBoolean, asRecord, asString } from '@/utils/api-helpers';
 
-type SavedAddress = {
-  key: string;
+type AddressLabel = 'home' | 'office' | 'apartment' | 'other';
+
+interface SavedAddressVm {
+  id: string;
   title: string;
   address: string;
+  label: AddressLabel;
+  customLabel: string;
+  lat: string;
+  lng: string;
+  isPinned: boolean;
+}
+
+const toAddressList = (value: unknown): SavedAddressVm[] => {
+  const rootRecord = asRecord(value);
+  const maybeItems = asArray<Record<string, unknown>>(rootRecord.items);
+  const source = maybeItems.length > 0 ? maybeItems : asArray<Record<string, unknown>>(value);
+  return source.map((address) => {
+    const coordinates = asRecord(address.coordinates);
+    const label = asString(address.label, 'other') as AddressLabel;
+    const customLabel = asString(address.customLabel ?? address.custom_label);
+    return {
+      id: asString(address.id),
+      title: customLabel || label,
+      address: asString(address.addressLine ?? address.address_line, '--'),
+      label,
+      customLabel,
+      lat: String(coordinates.lat ?? ''),
+      lng: String(coordinates.lng ?? ''),
+      isPinned: asBoolean(address.isPinned ?? address.is_pinned)
+    };
+  });
 };
 
 export default function SavedAddressesScreen() {
@@ -33,69 +68,69 @@ export default function SavedAddressesScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const { colors } = useTheme();
   const { t } = useTranslation();
+
+  const { data: addressesData } = useSavedAddresses();
+  const createAddress = useCreateSavedAddress();
+  const updateAddress = useUpdateSavedAddress();
+  const deleteAddress = useDeleteSavedAddress();
+  const togglePin = useToggleSavedAddressPin();
+
+  const addresses = useMemo(() => toAddressList(addressesData), [addressesData]);
+
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const [menuTarget, setMenuTarget] = useState<SavedAddress | null>(null);
+  const [menuTarget, setMenuTarget] = useState<SavedAddressVm | null>(null);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
-  const [addressName, setAddressName] = useState("");
-  const [addressValue, setAddressValue] = useState("");
-  const [editAddressName, setEditAddressName] = useState("");
-  const [editAddressValue, setEditAddressValue] = useState("");
-  const previewName = addressName.trim();
-  const previewAddress = addressValue.trim();
-  const hasPreviewContent = previewName.length > 0 || previewAddress.length > 0;
-  const editPreviewName = editAddressName.trim();
-  const editPreviewAddress = editAddressValue.trim();
-  const hasEditPreviewContent =
-    editPreviewName.length > 0 || editPreviewAddress.length > 0;
-  const [addresses, setAddresses] = useState<SavedAddress[]>([
-    ...localJsonApi.getSavedAddresses().map((address) => ({
-      key: address.id,
-      title: address.label,
-      address: address.address_line,
-    })),
-  ]);
+  const [addressName, setAddressName] = useState('');
+  const [addressValue, setAddressValue] = useState('');
+  const [latValue, setLatValue] = useState('');
+  const [lngValue, setLngValue] = useState('');
+  const [editAddressName, setEditAddressName] = useState('');
+  const [editAddressValue, setEditAddressValue] = useState('');
+  const [editLatValue, setEditLatValue] = useState('');
+  const [editLngValue, setEditLngValue] = useState('');
 
   const closeAddModal = () => {
     setIsAddModalVisible(false);
-    setAddressName("");
-    setAddressValue("");
+    setAddressName('');
+    setAddressValue('');
+    setLatValue('');
+    setLngValue('');
   };
 
-  const handleSaveAddress = () => {
+  const parseCoordinate = (value: string): number | null => {
+    const parsed = Number.parseFloat(value.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const handleSaveAddress = async () => {
     if (!addressName.trim() || !addressValue.trim()) {
       return;
     }
 
-    setAddresses((prev) => [
-      {
-        key: `custom-${Date.now()}`,
-        title: addressName.trim(),
-        address: addressValue.trim(),
-      },
-      ...prev,
-    ]);
-    setAddressName("");
-    setAddressValue("");
-    setIsAddModalVisible(false);
+    const lat = parseCoordinate(latValue);
+    const lng = parseCoordinate(lngValue);
+    if (lat === null || lng === null) {
+      return;
+    }
+
+    await createAddress.mutateAsync({
+      label: 'other',
+      custom_label: addressName.trim(),
+      address_line: addressValue.trim(),
+      coordinates: { lat, lng },
+      is_pinned: false
+    });
+    closeAddModal();
   };
 
-  const getAddressTitle = (item: SavedAddress) =>
-    item.title;
-
-  const getAddressValue = (item: SavedAddress) =>
-    item.address;
-
-  const openAddressMenu = (
-    item: SavedAddress,
-    event: GestureResponderEvent,
-  ) => {
+  const openAddressMenu = (item: SavedAddressVm, event: GestureResponderEvent) => {
     setMenuTarget(item);
     setMenuPosition({
       x: event.nativeEvent.pageX,
-      y: event.nativeEvent.pageY,
+      y: event.nativeEvent.pageY
     });
     setIsMenuVisible(true);
   };
@@ -106,34 +141,42 @@ export default function SavedAddressesScreen() {
 
   const openEditModal = () => {
     if (!menuTarget) return;
-    setEditAddressName(getAddressTitle(menuTarget));
-    setEditAddressValue(getAddressValue(menuTarget));
+    setEditAddressName(menuTarget.customLabel || menuTarget.title);
+    setEditAddressValue(menuTarget.address);
+    setEditLatValue(menuTarget.lat);
+    setEditLngValue(menuTarget.lng);
     setIsMenuVisible(false);
     setIsEditModalVisible(true);
   };
 
   const closeEditModal = () => {
     setIsEditModalVisible(false);
-    setEditAddressName("");
-    setEditAddressValue("");
+    setEditAddressName('');
+    setEditAddressValue('');
+    setEditLatValue('');
+    setEditLngValue('');
   };
 
-  const handleSaveEditedAddress = () => {
+  const handleSaveEditedAddress = async () => {
     if (!menuTarget || !editAddressName.trim() || !editAddressValue.trim()) {
       return;
     }
 
-    setAddresses((prev) =>
-      prev.map((item) =>
-        item.key === menuTarget.key
-          ? {
-              ...item,
-              title: editAddressName.trim(),
-              address: editAddressValue.trim(),
-            }
-          : item,
-      ),
-    );
+    const lat = parseCoordinate(editLatValue);
+    const lng = parseCoordinate(editLngValue);
+    if (lat === null || lng === null) {
+      return;
+    }
+
+    await updateAddress.mutateAsync({
+      id: menuTarget.id,
+      input: {
+        label: 'other',
+        custom_label: editAddressName.trim(),
+        address_line: editAddressValue.trim(),
+        coordinates: { lat, lng }
+      }
+    });
     closeEditModal();
     setMenuTarget(null);
   };
@@ -148,20 +191,21 @@ export default function SavedAddressesScreen() {
     setIsDeleteModalVisible(false);
   };
 
-  const handleDeleteAddress = () => {
+  const handleDeleteAddress = async () => {
     if (!menuTarget) return;
-    setAddresses((prev) => prev.filter((item) => item.key !== menuTarget.key));
+    await deleteAddress.mutateAsync({ id: menuTarget.id });
     setIsDeleteModalVisible(false);
     setMenuTarget(null);
+  };
+
+  const toggleAddressPin = async (addressId: string) => {
+    await togglePin.mutateAsync({ id: addressId });
   };
 
   const POPOVER_WIDTH = 170;
   const popoverLeft = Math.max(
     spacing.lg,
-    Math.min(
-      menuPosition.x - POPOVER_WIDTH + spacing.xl,
-      screenWidth - POPOVER_WIDTH - spacing.lg,
-    ),
+    Math.min(menuPosition.x - POPOVER_WIDTH + spacing.xl, screenWidth - POPOVER_WIDTH - spacing.lg)
   );
 
   return (
@@ -170,51 +214,40 @@ export default function SavedAddressesScreen() {
         styles.container,
         {
           backgroundColor: colors.background,
-          paddingTop: insets.top + spacing.lg,
-        },
+          paddingTop: insets.top + spacing.lg
+        }
       ]}
     >
-      <StackHeader
-        translationKey="account.saved_addresses_title"
-        onBack={() => router.back()}
-        align="center"
-      />
+      <StackHeader translationKey="account.saved_addresses_title" onBack={() => router.back()} align="center" />
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {addresses.map((item) => (
-          <View
-            key={item.key}
-            style={[styles.card, { backgroundColor: colors.surface }]}
-          >
+          <View key={item.id} style={[styles.card, { backgroundColor: colors.surface }]}>
             <View style={styles.cardHeader}>
               <View style={styles.cardTitle}>
-                <Ionicons
-                  name="location-outline"
-                  size={20}
-                  color={colors.textMuted}
-                />
+                <Ionicons name={item.isPinned ? 'bookmark' : 'location-outline'} size={20} color={colors.textMuted} />
                 <Text variant="body" weight="semiBold">
                   {item.title}
                 </Text>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("account.address_options")}
-                onPress={(event) => openAddressMenu(item, event)}
-              >
-                <Ionicons
-                  name="ellipsis-vertical"
-                  size={18}
-                  color={colors.textMuted}
-                />
-              </Pressable>
+              <View style={styles.cardActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('account.pin_address')}
+                  onPress={() => toggleAddressPin(item.id)}
+                >
+                  <Ionicons name={item.isPinned ? 'bookmark' : 'bookmark-outline'} size={18} color={colors.primary} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('account.address_options')}
+                  onPress={(event) => openAddressMenu(item, event)}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color={colors.textMuted} />
+                </Pressable>
+              </View>
             </View>
-            <View
-              style={[styles.divider, { backgroundColor: colors.border }]}
-            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <Text variant="bodySmall" color="muted">
               {item.address}
             </Text>
@@ -222,22 +255,13 @@ export default function SavedAddressesScreen() {
         ))}
       </ScrollView>
 
-      <View
-        style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}
-      >
-        <Button
-          translationKey="account.add_address"
-          fullWidth
-          onPress={() => setIsAddModalVisible(true)}
-        />
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <Button translationKey="account.add_address" fullWidth onPress={() => setIsAddModalVisible(true)} />
       </View>
 
       {isMenuVisible && (
         <View style={styles.popoverOverlay}>
-          <Pressable
-            style={styles.popoverBackdrop}
-            onPress={closeAddressMenu}
-          />
+          <Pressable style={styles.popoverBackdrop} onPress={closeAddressMenu} />
           <View
             style={[
               styles.popover,
@@ -245,276 +269,116 @@ export default function SavedAddressesScreen() {
                 top: menuPosition.y + spacing.xs,
                 left: popoverLeft,
                 backgroundColor: colors.surface,
-                shadowColor: colors.textPrimary,
-              },
+                shadowColor: colors.textPrimary
+              }
             ]}
           >
             <Pressable
               style={styles.popoverItem}
               onPress={openEditModal}
               accessibilityRole="button"
-              accessibilityLabel={t("account.edit_action")}
+              accessibilityLabel={t('account.edit_action')}
             >
-              <Ionicons
-                name="create-outline"
-                size={20}
-                color={colors.textMuted}
-              />
-              <Text
-                variant="body"
-                color="muted"
-                translationKey="account.edit_action"
-              />
+              <Ionicons name="create-outline" size={20} color={colors.textMuted} />
+              <Text variant="body" color="muted" translationKey="account.edit_action" />
             </Pressable>
-            <View
-              style={[
-                styles.popoverDivider,
-                { backgroundColor: colors.border },
-              ]}
-            />
+            <View style={[styles.popoverDivider, { backgroundColor: colors.border }]} />
             <Pressable
               style={styles.popoverItem}
               onPress={openDeleteModal}
               accessibilityRole="button"
-              accessibilityLabel={t("account.delete_action")}
+              accessibilityLabel={t('account.delete_action')}
             >
               <Ionicons name="trash-outline" size={20} color={colors.error} />
-              <Text
-                variant="body"
-                color="error"
-                translationKey="account.delete_action"
-              />
+              <Text variant="body" color="error" translationKey="account.delete_action" />
             </Pressable>
           </View>
         </View>
       )}
 
-      <BottomSheet
-        visible={isAddModalVisible}
-        onClose={closeAddModal}
-        maxHeight={640}
-      >
+      <BottomSheet visible={isAddModalVisible} onClose={closeAddModal} maxHeight={640}>
         <View
           style={[
             styles.modalSheet,
             {
               backgroundColor: colors.background,
-              paddingBottom: insets.bottom + spacing.lg,
-            },
+              paddingBottom: insets.bottom + spacing.lg
+            }
           ]}
         >
-          <Text
-            variant="h2"
-            weight="medium"
-            align="center"
-            translationKey="account.add_address_title"
-          />
-
-          <View
-            style={[
-              styles.previewCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.previewHeader}>
-              <Ionicons
-                name={hasPreviewContent ? "location-sharp" : "location-outline"}
-                size={20}
-                color={hasPreviewContent ? colors.error : colors.textMuted}
-              />
-              <Text
-                variant="body"
-                weight="semiBold"
-                color={previewName ? undefined : "muted"}
-              >
-                {previewName || t("account.preview_name_empty")}
-              </Text>
-            </View>
-            <Text variant="bodySmall" color="muted">
-              {previewAddress || t("account.preview_address_empty")}
-            </Text>
-          </View>
+          <Text variant="h2" weight="medium" align="center" translationKey="account.add_address_title" />
 
           <TextInput
             labelTranslationKey="account.name_label"
             placeholderTranslationKey="account.name_placeholder"
             value={addressName}
             onChangeText={setAddressName}
+            leftIcon={<Ionicons name="bookmark-outline" size={20} color={colors.primary} />}
           />
-
           <TextInput
             labelTranslationKey="account.address_label"
             placeholderTranslationKey="account.address_placeholder"
             value={addressValue}
             onChangeText={setAddressValue}
+            leftIcon={<Ionicons name="location-outline" size={20} color={colors.primary} />}
+            multiline
+            numberOfLines={2}
           />
+          <TextInput label="Latitude" value={latValue} onChangeText={setLatValue} keyboardType="decimal-pad" />
+          <TextInput label="Longitude" value={lngValue} onChangeText={setLngValue} keyboardType="decimal-pad" />
 
-          <View style={styles.modalActions}>
-            <Button
-              variant="outline"
-              translationKey="common.cancel"
-              onPress={closeAddModal}
-              style={styles.actionButton}
-            />
-            <Button
-              translationKey="common.save"
-              onPress={handleSaveAddress}
-              disabled={!addressName.trim() || !addressValue.trim()}
-              style={styles.actionButton}
-            />
-          </View>
+          <Button title={t('common.save')} fullWidth onPress={handleSaveAddress} />
         </View>
       </BottomSheet>
 
-      <BottomSheet
-        visible={isEditModalVisible}
-        onClose={closeEditModal}
-        maxHeight={640}
-      >
+      <BottomSheet visible={isEditModalVisible} onClose={closeEditModal} maxHeight={640}>
         <View
           style={[
             styles.modalSheet,
             {
               backgroundColor: colors.background,
-              paddingBottom: insets.bottom + spacing.lg,
-            },
+              paddingBottom: insets.bottom + spacing.lg
+            }
           ]}
         >
-          <Text
-            variant="h3"
-            weight="medium"
-            align="center"
-            translationKey="account.edit_address_title"
-          />
-
-          <View
-            style={[
-              styles.previewCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.previewHeader}>
-              <Ionicons
-                name={
-                  hasEditPreviewContent ? "location-sharp" : "location-outline"
-                }
-                size={20}
-                color={hasEditPreviewContent ? colors.error : colors.textMuted}
-              />
-              <Text
-                variant="body"
-                weight="semiBold"
-                color={editPreviewName ? undefined : "muted"}
-              >
-                {editPreviewName || t("account.preview_name_empty")}
-              </Text>
-            </View>
-            <Text variant="bodySmall" color="muted">
-              {editPreviewAddress || t("account.preview_address_empty")}
-            </Text>
-          </View>
+          <Text variant="h2" weight="medium" align="center" translationKey="account.edit_address_title" />
 
           <TextInput
             labelTranslationKey="account.name_label"
             placeholderTranslationKey="account.name_placeholder"
             value={editAddressName}
             onChangeText={setEditAddressName}
+            leftIcon={<Ionicons name="bookmark-outline" size={20} color={colors.primary} />}
           />
-
           <TextInput
             labelTranslationKey="account.address_label"
             placeholderTranslationKey="account.address_placeholder"
             value={editAddressValue}
             onChangeText={setEditAddressValue}
+            leftIcon={<Ionicons name="location-outline" size={20} color={colors.primary} />}
+            multiline
+            numberOfLines={2}
           />
+          <TextInput label="Latitude" value={editLatValue} onChangeText={setEditLatValue} keyboardType="decimal-pad" />
+          <TextInput label="Longitude" value={editLngValue} onChangeText={setEditLngValue} keyboardType="decimal-pad" />
 
-          <View style={styles.modalActions}>
-            <Button
-              variant="outline"
-              translationKey="common.cancel"
-              onPress={closeEditModal}
-              style={styles.actionButton}
-            />
-            <Button
-              translationKey="common.save"
-              onPress={handleSaveEditedAddress}
-              disabled={!editAddressName.trim() || !editAddressValue.trim()}
-              style={styles.actionButton}
-            />
-          </View>
+          <Button title={t('common.save')} fullWidth onPress={handleSaveEditedAddress} />
         </View>
       </BottomSheet>
 
-      <BottomSheet
-        visible={isDeleteModalVisible}
-        onClose={closeDeleteModal}
-        maxHeight={520}
-      >
+      <BottomSheet visible={isDeleteModalVisible} onClose={closeDeleteModal} maxHeight={360}>
         <View
           style={[
             styles.modalSheet,
             {
               backgroundColor: colors.background,
-              paddingBottom: insets.bottom + spacing.lg,
-            },
+              paddingBottom: insets.bottom + spacing.lg
+            }
           ]}
         >
-          <Text
-            variant="h3"
-            weight="medium"
-            align="center"
-            color="error"
-            translationKey="account.delete_address_title"
-          />
-          <View
-            style={[
-              styles.divider,
-              { backgroundColor: colors.border, marginVertical: spacing.md },
-            ]}
-          />
-          <Text
-            variant="body"
-            align="center"
-            translationKey="account.delete_address_question"
-            style={styles.deleteQuestion}
-          />
-
-          {menuTarget && (
-            <View
-              style={[
-                styles.previewCard,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <View style={styles.previewHeader}>
-                <Ionicons
-                  name="location-sharp"
-                  size={20}
-                  color={colors.error}
-                />
-                <Text variant="body" weight="semiBold">
-                  {getAddressTitle(menuTarget)}
-                </Text>
-              </View>
-              <Text variant="bodySmall" color="muted">
-                {getAddressValue(menuTarget)}
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.modalActions}>
-            <Button
-              variant="outline"
-              translationKey="account.delete_no_cancel"
-              onPress={closeDeleteModal}
-              style={styles.actionButton}
-            />
-            <Button
-              translationKey="account.delete_yes"
-              onPress={handleDeleteAddress}
-              style={styles.actionButton}
-            />
-          </View>
+          <Text variant="h2" weight="medium" align="center" translationKey="account.delete_address_title" />
+          <Text variant="bodySmall" color="muted" align="center" translationKey="account.delete_address_message" />
+          <Button title={t('common.delete')} fullWidth onPress={handleDeleteAddress} />
         </View>
       </BottomSheet>
     </View>
@@ -524,86 +388,68 @@ export default function SavedAddressesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   content: {
-    gap: spacing.lg,
-    paddingBottom: spacing.xxxl,
+    gap: spacing.md,
+    paddingBottom: spacing.xxxxl
   },
   card: {
-    borderRadius: borderRadius.xxl,
-    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md
   },
   cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
   },
   cardTitle: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
+    flex: 1
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm
   },
   divider: {
-    height: 0.5,
-    marginVertical: spacing.lg,
+    height: 1,
+    marginVertical: spacing.sm
   },
   footer: {
-    paddingTop: spacing.sm,
+    marginTop: 'auto'
   },
   popoverOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 20,
+    ...StyleSheet.absoluteFillObject
   },
   popoverBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFillObject
   },
   popover: {
-    position: "absolute",
+    position: 'absolute',
     width: 170,
-    borderRadius: borderRadius.xl,
-    paddingVertical: spacing.sm,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
+    borderRadius: borderRadius.md,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 6,
+    paddingVertical: spacing.xs
   },
   popoverItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
   },
   popoverDivider: {
-    height: 1,
-    marginHorizontal: spacing.md,
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: spacing.sm
   },
   modalSheet: {
-    paddingTop: spacing.lg,
-    gap: spacing.md,
-  },
-  previewCard: {
-    borderWidth: 1,
-    borderRadius: borderRadius.xxl,
-    padding: spacing.lg,
-    marginTop: spacing.sm,
-  },
-  previewHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  actionButton: {
-    flex: 1,
-  },
-  deleteQuestion: {
-    marginBottom: spacing.md,
-  },
+    gap: spacing.md
+  }
 });

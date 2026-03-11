@@ -42,7 +42,9 @@ export const queryKeys = {
   corporate: {
     organization: ['corporate', 'organization'] as const,
     employees: ['corporate', 'employees'] as const,
+    joinRequests: ['corporate', 'join-requests'] as const,
     summary: (period: string) => ['corporate', 'summary', period] as const,
+    usage: (cursor?: string) => ['corporate', 'usage', cursor ?? 'first'] as const,
     invoices: ['corporate', 'invoices'] as const,
     policies: ['corporate', 'travel-policies'] as const
   },

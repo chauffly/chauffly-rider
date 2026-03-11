@@ -1,56 +1,102 @@
 import { useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
+  StyleSheet,
+  View
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/common/text';
-import { TextInput } from '@/components/common/text-input';
+import { ApiClientError, useApiClient } from '@/api-client';
 import { Button } from '@/components/common/button';
 import { Checkbox } from '@/components/common/checkbox';
 import { SocialButton } from '@/components/common/social-button';
-import { useTheme } from '@/context/theme-context';
-import { useTranslation } from '@/context/language-context';
-import { spacing } from '@/constants/spacing';
+import { Text } from '@/components/common/text';
+import { TextInput } from '@/components/common/text-input';
 import CallOutline from '@/components/svg/CallOutline';
 import Password from '@/components/svg/Password';
-import { localJsonApi } from '@/api/local-json-api';
+import { spacing } from '@/constants/spacing';
+import { useTranslation } from '@/context/language-context';
+import { useTheme } from '@/context/theme-context';
+import { authFlowStorage } from '@/services/auth-flow-storage';
+
+const NIGERIAN_PHONE_REGEX = /^\+234\d{10}$/;
+const PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof ApiClientError) {
+    return error.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+
+  return fallback;
+};
 
 export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const authDefaults = localJsonApi.getAuthDefaults();
+  const api = useApiClient();
 
-  const [phoneNumber, setPhoneNumber] = useState(authDefaults.register.phone_number);
-  const [password, setPassword] = useState(authDefaults.register.password);
-  const [confirmPassword, setConfirmPassword] = useState(authDefaults.register.confirm_password);
-  const [agreeToTerms, setAgreeToTerms] = useState(authDefaults.register.agree_to_terms);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleCreateAccount = () => {
-    // TODO: Implement account creation
-    router.push('/(auth)/profile-setup/role-selection');
-  };
+  const handleCreateAccount = async () => {
+    if (!NIGERIAN_PHONE_REGEX.test(phoneNumber.trim())) {
+      setErrorMessage('Use Nigerian format: +234XXXXXXXXXX');
+      return;
+    }
 
-  const handleLogin = () => {
-    router.push('/(auth)/login');
-  };
+    if (!PASSWORD_REGEX.test(password)) {
+      setErrorMessage('Password must be 8+ chars with uppercase, lowercase, number, and symbol.');
+      return;
+    }
 
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google login
-  };
+    if (password !== confirmPassword) {
+      setErrorMessage('Passwords do not match.');
+      return;
+    }
 
-  const handleAppleLogin = () => {
-    // TODO: Implement Apple login
+    if (!agreeToTerms) {
+      setErrorMessage('You must agree to the terms to continue.');
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      await api.authApi.register({
+        phone_number: phoneNumber.trim(),
+        password,
+        role: 'rider'
+      });
+
+      await authFlowStorage.set({
+        mode: 'register',
+        phoneNumber: phoneNumber.trim()
+      });
+
+      router.push('/(auth)/verify-otp');
+    } catch (error) {
+      setErrorMessage(extractErrorMessage(error, 'Failed to create account. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -62,7 +108,7 @@ export default function RegisterScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xxl },
+          { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xxl }
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -73,7 +119,7 @@ export default function RegisterScreen() {
             style={styles.logo}
             contentFit="contain"
           />
-          <Text variant="h1" align="center" font='medium' style={styles.title}>
+          <Text variant="h1" align="center" font="medium" style={styles.title}>
             {t('auth.create_account')}
           </Text>
           <Text variant="body" color="muted" align="center">
@@ -84,7 +130,7 @@ export default function RegisterScreen() {
         <View style={styles.form}>
           <TextInput
             labelTranslationKey="auth.phone_number"
-            placeholderTranslationKey="auth.phone_placeholder"
+            placeholder={'+2348123456789'}
             leftIcon={<CallOutline />}
             keyboardType="phone-pad"
             value={phoneNumber}
@@ -112,6 +158,7 @@ export default function RegisterScreen() {
           <Pressable
             onPress={() => setAgreeToTerms(!agreeToTerms)}
             style={styles.termsContainer}
+            disabled={submitting}
           >
             <Checkbox checked={agreeToTerms} onPress={() => setAgreeToTerms(!agreeToTerms)} />
             <Text variant="caption" color="muted" style={styles.termsText}>
@@ -119,13 +166,20 @@ export default function RegisterScreen() {
             </Text>
           </Pressable>
 
+          {errorMessage ? (
+            <Text variant="bodySmall" color="error" style={styles.errorText}>
+              {errorMessage}
+            </Text>
+          ) : null}
+
           <Button
             translationKey="auth.create_account_button"
             variant="primary"
             fullWidth
             onPress={handleCreateAccount}
-            disabled={!agreeToTerms}
+            disabled={submitting || !agreeToTerms}
             style={styles.createButton}
+            title={submitting ? 'Please wait...' : undefined}
           />
         </View>
 
@@ -138,15 +192,15 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.socialButtons}>
-          <SocialButton provider="google" onPress={handleGoogleLogin} />
-          <SocialButton provider="apple" onPress={handleAppleLogin} />
+          <SocialButton provider="google" onPress={() => {}} />
+          <SocialButton provider="apple" onPress={() => {}} />
         </View>
 
         <View style={styles.footer}>
           <Text variant="bodySmall" color="muted">
             {t('auth.have_account')}{' '}
           </Text>
-          <Pressable onPress={handleLogin}>
+          <Pressable onPress={() => router.push('/(auth)/login')} disabled={submitting}>
             <Text variant="bodySmall" weight="semiBold" style={{ textDecorationLine: 'underline' }}>
               {t('auth.log_in')}
             </Text>
@@ -159,59 +213,62 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   header: {
     alignItems: 'center',
-    marginBottom: spacing.xxxl,
+    marginBottom: spacing.xxxl
   },
   logo: {
     width: 80,
     height: 80,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xl
   },
   title: {
-    marginBottom: spacing.sm,
+    marginBottom: spacing.sm
   },
   form: {
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xxl
   },
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xl
   },
   termsText: {
     flex: 1,
-    marginLeft: spacing.md,
+    marginLeft: spacing.md
   },
   createButton: {
-    marginTop: spacing.md,
+    marginTop: spacing.md
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xxl
   },
   dividerLine: {
     flex: 1,
-    height: 1,
+    height: 1
   },
   dividerText: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.lg
   },
   socialButtons: {
     flexDirection: 'row',
     gap: spacing.lg,
-    marginBottom: spacing.xxxl,
+    marginBottom: spacing.xxxl
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center'
   },
+  errorText: {
+    marginBottom: spacing.sm
+  }
 });

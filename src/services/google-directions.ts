@@ -1,6 +1,7 @@
 import { LocationCoordinates } from '@/context/location-context';
+import { env } from '@/config/env';
 
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY';
+const GOOGLE_MAPS_API_KEY = env.googleMapsApiKey;
 const REQUEST_TIMEOUT = 20000;
 
 interface RouteMetrics {
@@ -45,7 +46,7 @@ export const googleDirectionsService = {
       return { distanceKm: 0, durationMinutes: 0 };
     }
 
-    if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY === 'YOUR_API_KEY') {
+    if (!GOOGLE_MAPS_API_KEY) {
       return { distanceKm: 0, durationMinutes: 0 };
     }
 

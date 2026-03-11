@@ -8,7 +8,6 @@ import PencilIcon from '@/components/svg/PencilIcon';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { Origin, RouteStop } from './types';
-import { localJsonApi } from '@/api/local-json-api';
 
 interface SetLocationContentProps {
   origin: Origin | null;
@@ -24,7 +23,6 @@ export function SetLocationContent({
   onNext,
 }: SetLocationContentProps) {
   const { colors } = useTheme();
-  const uiDefaults = localJsonApi.getUiDefaults();
 
   return (
     <View style={styles.setLocationContainer}>
@@ -44,12 +42,12 @@ export function SetLocationContent({
             )}
           </View>
           <View style={styles.locationInfo}>
-            <Text variant="body" font="medium" numberOfLines={1}>
-              {origin?.name || uiDefaults.booking.set_location_pickup_label}
-            </Text>
-            <Text variant="caption" color="muted" numberOfLines={1}>
-              {origin?.address || uiDefaults.booking.set_location_pickup_subtitle}
-            </Text>
+              <Text variant="body" font="medium" numberOfLines={1}>
+                {origin?.name || 'Pickup location'}
+              </Text>
+              <Text variant="caption" color="muted" numberOfLines={1}>
+                {origin?.address || 'Select pickup'}
+              </Text>
           </View>
         </View>
 

@@ -1,46 +1,107 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  View
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ApiClientError, useApiClient } from '@/api-client';
+import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
-import { Button } from '@/components/common/button';
-import { useTheme } from '@/context/theme-context';
-import { useTranslation } from '@/context/language-context';
-import { spacing } from '@/constants/spacing';
 import Password from '@/components/svg/Password';
+import { spacing } from '@/constants/spacing';
+import { useTranslation } from '@/context/language-context';
+import { useTheme } from '@/context/theme-context';
+import { authFlowStorage } from '@/services/auth-flow-storage';
+
+const PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof ApiClientError) {
+    return error.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+
+  return fallback;
+};
 
 export default function CreateNewPasswordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const api = useApiClient();
+  const params = useLocalSearchParams<{ phone_number?: string; otp?: string }>();
 
+  const [phoneNumber, setPhoneNumber] = useState(params.phone_number ?? '');
+  const [otp, setOtp] = useState(params.otp ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSavePassword = () => {
-    if (!newPassword || newPassword.length < 6) {
-      setPasswordError(t('auth.password_too_short'));
+  useEffect(() => {
+    if (phoneNumber && otp) {
       return;
     }
+
+    let mounted = true;
+    const loadFlow = async () => {
+      const flow = await authFlowStorage.get();
+      if (!mounted || !flow) return;
+      setPhoneNumber((current) => current || flow.phoneNumber);
+    };
+    void loadFlow();
+
+    return () => {
+      mounted = false;
+    };
+  }, [phoneNumber, otp]);
+
+  const handleSavePassword = async () => {
+    if (!phoneNumber || !otp) {
+      setErrorMessage('Missing password reset context. Request a new OTP.');
+      return;
+    }
+
+    if (!PASSWORD_REGEX.test(newPassword)) {
+      setErrorMessage('Password must be 8+ chars with uppercase, lowercase, number, and symbol.');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
-      setPasswordError(t('auth.passwords_dont_match'));
+      setErrorMessage(t('auth.passwords_dont_match'));
       return;
     }
-    setPasswordError('');
-    // TODO: Implement password save logic
-    router.replace('/(auth)/login');
+
+    setSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      await api.authApi.resetPassword({
+        phone_number: phoneNumber,
+        otp,
+        new_password: newPassword
+      });
+
+      await authFlowStorage.clear();
+      router.replace('/(auth)/login');
+    } catch (error) {
+      setErrorMessage(extractErrorMessage(error, 'Unable to reset password. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -52,7 +113,7 @@ export default function CreateNewPasswordScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xxl },
+          { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xxl }
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -73,6 +134,15 @@ export default function CreateNewPasswordScreen() {
 
         <View style={styles.form}>
           <TextInput
+            labelTranslationKey="auth.verify_code"
+            placeholderTranslationKey="auth.enter_code_placeholder"
+            value={otp}
+            onChangeText={setOtp}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+
+          <TextInput
             labelTranslationKey="auth.new_password"
             placeholderTranslationKey="auth.create_password_placeholder"
             leftIcon={<Password />}
@@ -80,9 +150,9 @@ export default function CreateNewPasswordScreen() {
             value={newPassword}
             onChangeText={(text) => {
               setNewPassword(text);
-              if (passwordError) setPasswordError('');
+              if (errorMessage) setErrorMessage('');
             }}
-            error={passwordError}
+            error={errorMessage}
           />
 
           <TextInput
@@ -93,7 +163,7 @@ export default function CreateNewPasswordScreen() {
             value={confirmPassword}
             onChangeText={(text) => {
               setConfirmPassword(text);
-              if (passwordError) setPasswordError('');
+              if (errorMessage) setErrorMessage('');
             }}
           />
 
@@ -103,6 +173,8 @@ export default function CreateNewPasswordScreen() {
             fullWidth
             onPress={handleSavePassword}
             style={styles.submitButton}
+            disabled={submitting}
+            title={submitting ? 'Please wait...' : undefined}
           />
         </View>
       </ScrollView>
@@ -112,27 +184,27 @@ export default function CreateNewPasswordScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   header: {
     alignItems: 'center',
-    marginBottom: spacing.xxxl,
+    marginBottom: spacing.xxxl
   },
   logo: {
     width: 100,
-    height: 100,
+    height: 100
   },
   title: {
-    marginBottom: spacing.sm,
+    marginBottom: spacing.sm
   },
   form: {
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xxl
   },
   submitButton: {
-    marginTop: spacing.xl,
-  },
+    marginTop: spacing.xl
+  }
 });

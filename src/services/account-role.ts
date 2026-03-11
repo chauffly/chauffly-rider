@@ -1,7 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { localJsonApi } from '@/api/local-json-api';
-
 const ACCOUNT_ROLE_KEY = 'account_role';
 
 type AccountRole = 'rider' | 'corporate';
@@ -15,7 +13,7 @@ export const accountRoleService = {
     if (stored) {
       return normalizeRole(stored);
     }
-    return normalizeRole(localJsonApi.getCurrentUserRole());
+    return 'rider';
   },
 
   async setRole(role: AccountRole): Promise<void> {

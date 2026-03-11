@@ -12,6 +12,7 @@ import {
 
 export interface SocketClientOptions {
   socketBaseUrl: string;
+  socketPath?: string;
   getAccessToken: () => Promise<string | null> | string | null;
   autoConnect?: boolean;
   reconnection?: boolean;
@@ -33,6 +34,9 @@ const nowIso = (): string => new Date().toISOString();
 export class ChaufflySocketClient {
   private readonly options: SocketClientOptions;
   private readonly listeners = new Set<ConnectionStateListener>();
+  private readonly ridesListeners = new Map<keyof RidesServerToClientEvents, Set<(...args: any[]) => void>>();
+  private readonly chatListeners = new Map<keyof ChatServerToClientEvents, Set<(...args: any[]) => void>>();
+  private readonly adminListeners = new Map<keyof AdminServerToClientEvents, Set<(...args: any[]) => void>>();
 
   private ridesSocket: RidesSocket | null = null;
   private chatSocket: ChatSocket | null = null;
@@ -151,24 +155,48 @@ export class ChaufflySocketClient {
     event: keyof RidesServerToClientEvents,
     handler: (...args: any[]) => void
   ): () => void {
+    const handlers = this.ridesListeners.get(event) ?? new Set<(...args: any[]) => void>();
+    handlers.add(handler);
+    this.ridesListeners.set(event, handlers);
     this.ridesSocket?.on(event, handler as never);
-    return () => this.ridesSocket?.off(event, handler as never);
+
+    return () => {
+      const currentHandlers = this.ridesListeners.get(event);
+      currentHandlers?.delete(handler);
+      this.ridesSocket?.off(event, handler as never);
+    };
   }
 
   public onChatEvent(
     event: keyof ChatServerToClientEvents,
     handler: (...args: any[]) => void
   ): () => void {
+    const handlers = this.chatListeners.get(event) ?? new Set<(...args: any[]) => void>();
+    handlers.add(handler);
+    this.chatListeners.set(event, handlers);
     this.chatSocket?.on(event, handler as never);
-    return () => this.chatSocket?.off(event, handler as never);
+
+    return () => {
+      const currentHandlers = this.chatListeners.get(event);
+      currentHandlers?.delete(handler);
+      this.chatSocket?.off(event, handler as never);
+    };
   }
 
   public onAdminEvent(
     event: keyof AdminServerToClientEvents,
     handler: (...args: any[]) => void
   ): () => void {
+    const handlers = this.adminListeners.get(event) ?? new Set<(...args: any[]) => void>();
+    handlers.add(handler);
+    this.adminListeners.set(event, handlers);
     this.adminSocket?.on(event, handler as never);
-    return () => this.adminSocket?.off(event, handler as never);
+
+    return () => {
+      const currentHandlers = this.adminListeners.get(event);
+      currentHandlers?.delete(handler);
+      this.adminSocket?.off(event, handler as never);
+    };
   }
 
   private async connectNamespace(namespace: SocketNamespace): Promise<Socket> {
@@ -181,6 +209,7 @@ export class ChaufflySocketClient {
       reconnectionDelay: this.options.reconnectionDelay ?? 1000,
       reconnectionDelayMax: this.options.reconnectionDelayMax ?? 10_000,
       transports: this.options.transports ?? ['websocket'],
+      path: this.options.socketPath,
       auth: token
         ? {
             token
@@ -235,7 +264,35 @@ export class ChaufflySocketClient {
       });
     });
 
+    this.bindPersistedListeners(namespace, socket);
+
     return socket;
+  }
+
+  private bindPersistedListeners(namespace: SocketNamespace, socket: Socket): void {
+    if (namespace === 'rides') {
+      for (const [event, handlers] of this.ridesListeners.entries()) {
+        handlers.forEach((handler) => {
+          socket.on(event as never, handler as never);
+        });
+      }
+      return;
+    }
+
+    if (namespace === 'chat') {
+      for (const [event, handlers] of this.chatListeners.entries()) {
+        handlers.forEach((handler) => {
+          socket.on(event as never, handler as never);
+        });
+      }
+      return;
+    }
+
+    for (const [event, handlers] of this.adminListeners.entries()) {
+      handlers.forEach((handler) => {
+        socket.on(event as never, handler as never);
+      });
+    }
   }
 
   private setState(

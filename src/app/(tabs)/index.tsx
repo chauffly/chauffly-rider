@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Pressable, StyleSheet, View, Image } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -18,7 +18,7 @@ import { useTheme } from '@/context/theme-context';
 import { useLocation } from "@/context/location-context";
 import { spacing, borderRadius } from '@/constants/spacing';
 import { rideOptions } from '@/constants/ride-options';
-import { localJsonApi } from '@/api/local-json-api';
+import { useCurrentUser, useRideOptions } from '@/api-client';
 import { accountRoleService, type AccountRole } from '@/services/account-role';
 import {
   locationHistoryService,
@@ -26,6 +26,7 @@ import {
 } from "@/services/location-history";
 import { estimateDurationMinutes, getRouteDistanceKm } from '@/utils/route';
 import { googleDirectionsService } from '@/services/google-directions';
+import { asArray, asRecord, asString } from '@/utils/api-helpers';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -56,23 +57,21 @@ export default function HomeScreen() {
     setHasAskedPermission,
     getCurrentLocation,
   } = useLocation();
+  const { data: currentUserData } = useCurrentUser();
+  const { data: rideOptionsData } = useRideOptions();
 
   const mapRef = useRef<MapView>(null);
-  const [accountRole, setAccountRole] = useState<AccountRole>(
-    localJsonApi.getCurrentUserRole() === 'corporate' ? 'corporate' : 'rider'
-  );
+  const [accountRole, setAccountRole] = useState<AccountRole>('rider');
   const isCorporate = accountRole === 'corporate';
-  const uiDefaults = localJsonApi.getUiDefaults();
-  const pickupPlaceholder = uiDefaults.booking.pickup_placeholder;
-  const activeBooking = localJsonApi.getActiveBooking();
-  const bookingDriver = localJsonApi.getDriverById(activeBooking.driver_id);
+  const pickupPlaceholder = 'Pickup location';
+  const apiUser = asRecord(currentUserData);
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>("home");
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [modalHeight, setModalHeight] = useState(0);
-  const [selectedRideId, setSelectedRideId] = useState("go");
+  const [selectedRideId, setSelectedRideId] = useState('');
   const [showAllDestinations, setShowAllDestinations] = useState(false);
   const [routeDistanceKm, setRouteDistanceKm] = useState(0);
   const [routeDurationMinutes, setRouteDurationMinutes] = useState(0);
@@ -90,8 +89,18 @@ export default function HomeScreen() {
       setAccountRole(role);
     };
 
-    loadRole();
+    void loadRole();
   }, []);
+
+  useEffect(() => {
+    const role = asString(apiUser.role, '');
+    if (!role) {
+      return;
+    }
+    const nextRole: AccountRole = role === 'corporate_admin' ? 'corporate' : 'rider';
+    setAccountRole(nextRole);
+    void accountRoleService.setRole(nextRole);
+  }, [apiUser]);
 
   // Handle params from your-route screen
   useEffect(() => {
@@ -131,16 +140,6 @@ export default function HomeScreen() {
     pickupPlaceholder,
   ]);
 
-  // Debug current location
-  useEffect(() => {
-    console.log("📍 Current Location:", {
-      currentLocation,
-      hasLocation: !!currentLocation,
-      coordinates: currentLocation?.coordinates,
-      address: currentLocation?.address,
-    });
-  }, [currentLocation]);
-
   useEffect(() => {
     if (permissionStatus === "undetermined" && !hasAskedPermission) {
       const timer = setTimeout(() => {
@@ -162,7 +161,6 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (isMapReady && currentLocation && mapRef.current && viewMode === "home") {
-      console.log("🗺️ Animating map to:", currentLocation.coordinates);
       mapRef.current.animateToRegion(
         {
           latitude: currentLocation.coordinates.latitude,
@@ -277,8 +275,6 @@ export default function HomeScreen() {
   };
 
   const handleNextFromSetLocation = () => {
-    // Navigate to ride options/booking screen
-    console.log("Proceeding to next step with:", { origin, destinations });
     setViewMode("ride-options");
   };
 
@@ -294,14 +290,11 @@ export default function HomeScreen() {
         originLat: origin.coordinates.latitude.toString(),
         originLng: origin.coordinates.longitude.toString(),
         destinations: JSON.stringify(destinations),
-        selectedRideId,
+        selectedRideId: activeSelectedRideId,
+        selectedRideTier: activeSelectedRideTier,
         bookingType: "instant",
         estimatedDurationMinutes: (routeDurationMinutes || estimatedDurationMinutes).toString(),
         distanceKm: (routeDistanceKm || totalDistanceKm).toString(),
-        driverName: bookingDriver.display_name,
-        driverPhone: bookingDriver.phone_number,
-        driverRating: bookingDriver.rating.toFixed(1),
-        driverVehicle: bookingDriver.vehicle.display_name,
       },
     });
   };
@@ -318,14 +311,11 @@ export default function HomeScreen() {
         originLat: origin.coordinates.latitude.toString(),
         originLng: origin.coordinates.longitude.toString(),
         destinations: JSON.stringify(destinations),
-        selectedRideId,
+        selectedRideId: activeSelectedRideId,
+        selectedRideTier: activeSelectedRideTier,
         bookingType: "scheduled",
         estimatedDurationMinutes: (routeDurationMinutes || estimatedDurationMinutes).toString(),
         distanceKm: (routeDistanceKm || totalDistanceKm).toString(),
-        driverName: bookingDriver.display_name,
-        driverPhone: bookingDriver.phone_number,
-        driverRating: bookingDriver.rating.toFixed(1),
-        driverVehicle: bookingDriver.vehicle.display_name,
       },
     });
   };
@@ -336,7 +326,52 @@ export default function HomeScreen() {
     { key: "apartment", translationKey: "location.apartment" },
   ];
 
-  const rideOptionsList: RideOption[] = rideOptions;
+  const rideOptionsList = useMemo<(RideOption & { tier: string })[]>(() => {
+    const rideOptionsPayload = asRecord(rideOptionsData);
+    const apiOptions = asArray<Record<string, unknown>>(rideOptionsPayload.items).length
+      ? asArray<Record<string, unknown>>(rideOptionsPayload.items)
+      : asArray<Record<string, unknown>>(rideOptionsData);
+    if (apiOptions.length === 0) {
+      return rideOptions.map((option) => ({
+        ...option,
+        tier: option.id
+      }));
+    }
+
+    const imageByTier: Record<string, number> = {
+      go: require('../../../assets/images/ride-options/go.png'),
+      plus: require('../../../assets/images/ride-options/plus.png'),
+      luxe: require('../../../assets/images/ride-options/luxe.png'),
+      black: require('../../../assets/images/ride-options/black.png')
+    };
+
+    return apiOptions.map((option) => {
+      const tier = asString(option.tier, 'go');
+      return {
+        id: asString(option.id, tier),
+        nameKey: `ride_options.${tier}`,
+        subtitleKey: `ride_options.${tier}_subtitle`,
+        priceKey: `ride_options.${tier}_price`,
+        image: imageByTier[tier] ?? imageByTier.go,
+        tier
+      };
+    });
+  }, [rideOptionsData]);
+
+  useEffect(() => {
+    if (rideOptionsList.length === 0) {
+      return;
+    }
+
+    if (!rideOptionsList.some((option) => option.id === selectedRideId)) {
+      setSelectedRideId(rideOptionsList[0].id);
+    }
+  }, [rideOptionsList, selectedRideId]);
+
+  const activeSelectedRide =
+    rideOptionsList.find((option) => option.id === selectedRideId) ?? rideOptionsList[0];
+  const activeSelectedRideId = activeSelectedRide?.id ?? '';
+  const activeSelectedRideTier = activeSelectedRide?.tier ?? 'go';
 
   const mapRegion = currentLocation
     ? {
@@ -410,12 +445,12 @@ export default function HomeScreen() {
   const renderRideOptionsContent = () => (
     <RideOptionsContent
       rideOptions={rideOptionsList}
-      selectedRideId={selectedRideId}
+      selectedRideId={activeSelectedRideId}
       onSelectRide={setSelectedRideId}
       onProceed={handleProceedInstantRide}
       onSchedule={handleScheduleRide}
       etaMinutes={routeDurationMinutes || estimatedDurationMinutes || undefined}
-      defaultEtaMinutes={uiDefaults.booking.default_eta_minutes}
+      defaultEtaMinutes={3}
       isLoading={routeMetricsLoading}
       hasError={!!routeMetricsError}
     />

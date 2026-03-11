@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocationCoordinates } from '@/context/location-context';
+import { env } from '@/config/env';
 
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY';
+const GOOGLE_MAPS_API_KEY = env.googleMapsApiKey;
 
 export interface PlacePrediction {
   placeId: string;
@@ -106,14 +107,8 @@ async function fetchWithTimeout(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  console.log('🚀 Starting fetch request...');
-  const startTime = Date.now();
-
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    console.log('⏰ Timeout triggered after', REQUEST_TIMEOUT, 'ms');
-    controller.abort();
-  }, REQUEST_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
     const response = await fetch(url, {
@@ -121,11 +116,9 @@ async function fetchWithTimeout(
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    console.log('✅ Fetch completed in', Date.now() - startTime, 'ms');
     return response;
-  } catch (error: any) {
+  } catch (error) {
     clearTimeout(timeoutId);
-    console.log('❌ Fetch error after', Date.now() - startTime, 'ms:', error.name, error.message);
     throw error;
   }
 }
@@ -153,9 +146,6 @@ export const googlePlacesService = {
     }
 
     const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.toString()}`;
-    console.log('🌐 Calling Google Places Autocomplete API...');
-    console.log('🔑 API Key present:', !!GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY');
-    console.log('📍 Search input:', input);
 
     for (let attempt = 0; attempt < AUTOCOMPLETE_RETRY_COUNT; attempt += 1) {
       try {
@@ -165,10 +155,7 @@ export const googlePlacesService = {
           },
         });
 
-        console.log('📡 Response status code:', response.status);
         const data = await response.json();
-
-        console.log('📡 Places API Response Status:', data.status);
 
         if (data.status === 'OK' && data.predictions) {
           const predictions: PlacePrediction[] = data.predictions.map((prediction: any) => ({
@@ -187,17 +174,18 @@ export const googlePlacesService = {
         }
 
         if (data.status === 'REQUEST_DENIED') {
-          console.error('❌ Google API - REQUEST_DENIED:', data.error_message);
+          if (__DEV__) {
+            console.error('Google API request denied:', data.error_message);
+          }
           return [];
         }
 
         if (data.status === 'ZERO_RESULTS') {
-          console.log('⚠️ No results found for:', input);
           return [];
         }
 
         if (__DEV__) {
-          console.warn('⚠️ Unexpected Places status:', data.status, data.error_message || '');
+          console.warn('Unexpected Places status:', data.status, data.error_message || '');
         }
         return [];
       } catch (error: any) {
@@ -208,21 +196,17 @@ export const googlePlacesService = {
         }
 
         if (error.name === 'AbortError') {
-          console.log('ℹ️ Places autocomplete request cancelled or timed out');
         } else if (error instanceof TypeError) {
-          console.warn('⚠️ Network issue while fetching place autocomplete');
+          if (__DEV__) {
+            console.warn('Network issue while fetching place autocomplete');
+          }
         } else if (__DEV__) {
-          console.warn('⚠️ Error fetching place autocomplete:', error);
-        } else {
-          console.log('⚠️ Error fetching place autocomplete');
+          console.warn('Error fetching place autocomplete:', error);
         }
       }
     }
 
     const cachedPredictions = await getCachedPredictions(input);
-    if (cachedPredictions.length > 0) {
-      console.log(`📦 Using cached autocomplete results for "${input}"`);
-    }
     return cachedPredictions;
   },
 
@@ -259,7 +243,9 @@ export const googlePlacesService = {
 
       return null;
     } catch (error) {
-      console.error('Error fetching place details:', error);
+      if (__DEV__) {
+        console.error('Error fetching place details:', error);
+      }
       return null;
     }
   },
@@ -287,7 +273,9 @@ export const googlePlacesService = {
 
       return null;
     } catch (error) {
-      console.error('Error geocoding address:', error);
+      if (__DEV__) {
+        console.error('Error geocoding address:', error);
+      }
       return null;
     }
   },
@@ -311,7 +299,9 @@ export const googlePlacesService = {
 
       return null;
     } catch (error) {
-      console.error('Error reverse geocoding:', error);
+      if (__DEV__) {
+        console.error('Error reverse geocoding:', error);
+      }
       return null;
     }
   },

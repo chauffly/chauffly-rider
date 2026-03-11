@@ -1,31 +1,60 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { format } from 'date-fns';
 
+import {
+  useCorporateEmployees,
+  useCorporateJoinRequests,
+  useDecideCorporateJoinRequest,
+  useRemoveCorporateEmployee
+} from '@/api-client';
 import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
-import { localJsonApi } from '@/api/local-json-api';
 import { useTranslation } from '@/context/language-context';
+import { asArray, asBoolean, asRecord, asString } from '@/utils/api-helpers';
 
 type UsersView = 'employees' | 'join_requests';
+
+const getFullName = (record: Record<string, unknown>): string => {
+  const firstName = asString(record.firstName || record.first_name);
+  const lastName = asString(record.lastName || record.last_name);
+  return `${firstName} ${lastName}`.trim() || 'Unknown';
+};
 
 export default function UsersTabScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+
   const [view, setView] = useState<UsersView>('employees');
-  const usersData = localJsonApi.getCorporateUsersData();
+
+  const { data: employeesData } = useCorporateEmployees();
+  const { data: joinRequestsData } = useCorporateJoinRequests();
+  const removeEmployee = useRemoveCorporateEmployee();
+  const decideJoinRequest = useDecideCorporateJoinRequest();
+
+  const employees = useMemo(
+    () => asArray<Record<string, unknown>>(asRecord(employeesData).items),
+    [employeesData]
+  );
+  const joinRequests = useMemo(
+    () => asArray<Record<string, unknown>>(asRecord(joinRequestsData).items),
+    [joinRequestsData]
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 24}]}>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 24 }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
-          <Text variant="h1" weight="medium" size={"h2"}>{t('corporate.users.title')}</Text>
+          <Text variant="h1" weight="medium" size="h2">
+            {t('corporate.users.title')}
+          </Text>
           <MaterialCommunityIcons name="bell-outline" size={22} color={colors.textPrimary} />
         </View>
 
@@ -34,86 +63,151 @@ export default function UsersTabScreen() {
             onPress={() => setView('employees')}
             style={[styles.segmentButton, view === 'employees' && { backgroundColor: colors.textPrimary }]}
           >
-            <Text variant="bodySmall" color={view === 'employees' ? 'inverse' : 'muted'}>{t('corporate.users.employees')}</Text>
+            <Text variant="bodySmall" color={view === 'employees' ? 'inverse' : 'muted'}>
+              {t('corporate.users.employees')}
+            </Text>
           </Pressable>
           <Pressable
             onPress={() => setView('join_requests')}
             style={[styles.segmentButton, view === 'join_requests' && { backgroundColor: colors.textPrimary }]}
           >
-            <Text variant="bodySmall" color={view === 'join_requests' ? 'inverse' : 'muted'}>{t('corporate.users.join_request')}</Text>
+            <Text variant="bodySmall" color={view === 'join_requests' ? 'inverse' : 'muted'}>
+              {t('corporate.users.join_request')}
+            </Text>
           </Pressable>
         </View>
 
         {view === 'employees' ? (
-          usersData.employees.length === 0 ? (
+          employees.length === 0 ? (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="account-group-outline" size={86} color={colors.border} />
-              <Text variant="body" color="muted">{t('corporate.users.no_employees')}</Text>
-              <Button title={t('corporate.users.add_employee')} style={styles.addEmployeeButton} />
+              <Text variant="body" color="muted">
+                {t('corporate.users.no_employees')}
+              </Text>
+              <Button
+                title={t('corporate.users.add_employee')}
+                style={styles.addEmployeeButton}
+                onPress={() => router.push('/corporate/add-employee')}
+              />
             </View>
           ) : (
             <View style={styles.employeeList}>
-              {usersData.employees.map((employee) => (
-                <Pressable key={employee.id} style={[styles.employeeRow, { borderBottomColor: colors.border }]}>
-                  <View style={styles.employeeLeft}>
-                    <MaterialCommunityIcons name="account-outline" size={28} color={colors.textSecondary} />
-                    <View style={styles.employeeInfo}>
-                      <Text variant="body" weight="semiBold">{employee.name}</Text>
-                      <Text variant="caption" color="muted">{employee.email}</Text>
-                      <Text variant="caption" color="muted">{employee.last_active}</Text>
+              {employees.map((employee) => {
+                const user = asRecord(employee.user);
+                const memberId = asString(employee.id);
+                const joinedAt = asString(employee.joinedAt);
+                return (
+                  <Pressable
+                    key={memberId}
+                    style={[styles.employeeRow, { borderBottomColor: colors.border }]}
+                    onLongPress={() => removeEmployee.mutate({ id: memberId })}
+                  >
+                    <View style={styles.employeeLeft}>
+                      <MaterialCommunityIcons name="account-outline" size={28} color={colors.textSecondary} />
+                      <View style={styles.employeeInfo}>
+                        <Text variant="body" weight="semiBold">
+                          {getFullName(user)}
+                        </Text>
+                        <Text variant="caption" color="muted">
+                          {asString(user.email, '--')}
+                        </Text>
+                        <Text variant="caption" color="muted">
+                          {joinedAt ? format(new Date(joinedAt), 'MMM d, yyyy') : '--'}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  <View style={[styles.statusDot, { backgroundColor: employee.is_online ? colors.success : colors.textMuted }]} />
-                </Pressable>
-              ))}
+                    <View
+                      style={[
+                        styles.statusDot,
+                        {
+                          backgroundColor:
+                            asString(employee.status) === 'active' ? colors.success : colors.textMuted
+                        }
+                      ]}
+                    />
+                  </Pressable>
+                );
+              })}
             </View>
           )
         ) : (
           <View style={styles.requestsList}>
-            {usersData.join_requests.map((request) => (
-              <View key={request.id} style={[styles.requestCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={styles.requestContent}>
-                  <View style={styles.requestIdentity}>
-                    <MaterialCommunityIcons name="account-outline" size={20} color={colors.primary} />
-                    <View style={{ gap: 4 }}>
-                      <Text variant="body" weight="semiBold">{request.name}</Text>
-                      <Text variant="caption" color="muted">{request.email}</Text>
-                      <Text variant="caption" color="muted">{t('corporate.users.requested_on', { date: request.requested_date })}</Text>
+            {joinRequests.map((request) => {
+              const user = asRecord(request.user);
+              const requestId = asString(request.id);
+              const invitedAt = asString(request.invitedAt);
+              const pending = decideJoinRequest.isPending;
+              return (
+                <View
+                  key={requestId}
+                  style={[styles.requestCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.requestContent}>
+                    <View style={styles.requestIdentity}>
+                      <MaterialCommunityIcons name="account-outline" size={20} color={colors.primary} />
+                      <View style={{ gap: 4 }}>
+                        <Text variant="body" weight="semiBold">
+                          {getFullName(user)}
+                        </Text>
+                        <Text variant="caption" color="muted">
+                          {asString(user.email, '--')}
+                        </Text>
+                        <Text variant="caption" color="muted">
+                          {t('corporate.users.requested_on', {
+                            date: invitedAt ? format(new Date(invitedAt), 'MMM d, yyyy') : '--'
+                          })}
+                        </Text>
+                      </View>
                     </View>
                   </View>
+
+                  <View style={[styles.actionFooter, { borderTopColor: colors.border }]}>
+                    <Pressable
+                      style={styles.footerAction}
+                      disabled={pending}
+                      onPress={() => decideJoinRequest.mutate({ id: requestId, approved: true })}
+                    >
+                      <MaterialCommunityIcons name="check" size={18} color={colors.success} />
+                      <Text variant="body" weight="semiBold" color="success">
+                        {t('corporate.users.approve')}
+                      </Text>
+                    </Pressable>
+
+                    <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
+
+                    <Pressable
+                      style={styles.footerAction}
+                      disabled={pending}
+                      onPress={() => decideJoinRequest.mutate({ id: requestId, approved: false })}
+                    >
+                      <MaterialCommunityIcons name="close" size={18} color={colors.error} />
+                      <Text variant="body" weight="semiBold" color="error">
+                        {t('corporate.users.decline')}
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
-
-                <View style={[styles.actionFooter, { borderTopColor: colors.border }]}>
-                  <Pressable style={styles.footerAction}>
-                    <MaterialCommunityIcons name="check" size={18} color={colors.success} />
-                    <Text variant="body" weight="semiBold" color="success">
-                      {t('corporate.users.approve')}
-                    </Text>
-                  </Pressable>
-
-                  <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
-
-                  <Pressable style={styles.footerAction}>
-                    <MaterialCommunityIcons name="close" size={18} color={colors.error} />
-                    <Text variant="body" weight="semiBold" color="error">
-                      {t('corporate.users.decline')}
-                    </Text>
-                  </Pressable>
-                </View>
+              );
+            })}
+            {joinRequests.length === 0 ? (
+              <View style={[styles.requestCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text variant="body" color="muted">
+                  {t('corporate.users.no_requests')}
+                </Text>
               </View>
-            ))}
+            ) : null}
           </View>
         )}
       </ScrollView>
 
-      {view === 'employees' && (
+      {view === 'employees' ? (
         <Pressable
           style={[styles.fab, { backgroundColor: colors.buttonPrimary, bottom: insets.bottom + spacing.lg }]}
-          onPress={() => router.push('/corporate/add-employee' as never)}
+          onPress={() => router.push('/corporate/add-employee')}
         >
           <MaterialCommunityIcons name="plus" size={28} color={colors.buttonPrimaryText} />
         </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -132,47 +226,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth
   },
   employeeLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    flex: 1,
+    flex: 1
   },
   employeeInfo: {
     gap: 2,
-    flex: 1,
+    flex: 1
   },
   statusDot: {
     width: 10,
     height: 10,
-    borderRadius: 5,
+    borderRadius: 5
   },
   requestsList: { gap: spacing.md },
   requestCard: {
     borderWidth: 1,
     borderRadius: borderRadius.xxl,
     overflow: 'hidden',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md
   },
   requestContent: {
-    padding: spacing.md,
+    paddingVertical: spacing.xs
   },
   requestIdentity: { flexDirection: 'row', gap: spacing.sm, flex: 1 },
   actionFooter: {
     borderTopWidth: 1,
     flexDirection: 'row',
     minHeight: 52,
+    marginTop: spacing.sm
   },
   footerAction: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs
   },
   actionDivider: {
-    width: 1,
+    width: 1
   },
   fab: {
     position: 'absolute',
@@ -186,6 +283,6 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
+    shadowRadius: 4
+  }
 });

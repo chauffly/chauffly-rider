@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useInviteCorporateEmployee } from '@/api-client';
 import { TextInput } from '@/components/common/text-input';
 import { SelectInput } from '@/components/common/select-input';
 import { Button } from '@/components/common/button';
@@ -32,12 +33,27 @@ export default function AddEmployeeScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const inviteEmployee = useInviteCorporateEmployee();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
   const [defaultRole, setDefaultRole] = useState('');
   const [travelLimit, setTravelLimit] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleInvite = async () => {
+    if (!email.trim()) {
+      setErrorMessage(t('corporate.add_employee.email_required'));
+      return;
+    }
+
+    setErrorMessage('');
+    await inviteEmployee.mutateAsync({
+      email: email.trim().toLowerCase()
+    });
+    router.back();
+  };
 
   return (
     <View
@@ -111,11 +127,22 @@ export default function AddEmployeeScreen() {
         <Text variant="bodySmall" color="muted" style={styles.invitationNote}>
           {t('corporate.add_employee.invitation_note')}
         </Text>
+        {errorMessage ? (
+          <Text variant="bodySmall" color="error">
+            {errorMessage}
+          </Text>
+        ) : null}
       </ScrollView>
 
       <Button
-        translationKey="corporate.add_employee.send_invitation"
+        title={
+          inviteEmployee.isPending
+            ? t('common.loading')
+            : t('corporate.add_employee.send_invitation')
+        }
         style={styles.submitButton}
+        onPress={handleInvite}
+        disabled={inviteEmployee.isPending}
       />
     </View>
   );

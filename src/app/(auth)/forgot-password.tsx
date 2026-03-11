@@ -1,45 +1,79 @@
 import { useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
+  StyleSheet,
+  View
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ApiClientError, useApiClient } from '@/api-client';
+import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
-import { Button } from '@/components/common/button';
-import { useTheme } from '@/context/theme-context';
-import { useTranslation } from '@/context/language-context';
-import { spacing } from '@/constants/spacing';
 import CallOutline from '@/components/svg/CallOutline';
+import { spacing } from '@/constants/spacing';
+import { useTranslation } from '@/context/language-context';
+import { useTheme } from '@/context/theme-context';
+import { authFlowStorage } from '@/services/auth-flow-storage';
+
+const NIGERIAN_PHONE_REGEX = /^\+234\d{10}$/;
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof ApiClientError) {
+    return error.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+
+  return fallback;
+};
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const api = useApiClient();
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [generalError, setGeneralError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSendResetCode = () => {
-    if (!phoneNumber || phoneNumber.length < 10) {
-      setPhoneError(t('auth.invalid_phone'));
+  const handleSendResetCode = async () => {
+    if (!NIGERIAN_PHONE_REGEX.test(phoneNumber.trim())) {
+      setPhoneError('Use Nigerian format: +234XXXXXXXXXX');
       return;
     }
-    setPhoneError('');
-    router.push('/(auth)/verify-otp');
-  };
 
-  const handleLogin = () => {
-    router.push('/(auth)/login');
+    setSubmitting(true);
+    setGeneralError('');
+    setPhoneError('');
+
+    try {
+      await api.authApi.forgotPassword({
+        phone_number: phoneNumber.trim()
+      });
+
+      await authFlowStorage.set({
+        mode: 'reset_password',
+        phoneNumber: phoneNumber.trim()
+      });
+
+      router.push('/(auth)/verify-otp');
+    } catch (error) {
+      setGeneralError(extractErrorMessage(error, 'Unable to send reset code. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -51,7 +85,7 @@ export default function ForgotPasswordScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xxl },
+          { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xxl }
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -73,16 +107,23 @@ export default function ForgotPasswordScreen() {
         <View style={styles.form}>
           <TextInput
             labelTranslationKey="auth.phone_number"
-            placeholderTranslationKey="auth.phone_placeholder"
+            placeholder={'+2348123456789'}
             leftIcon={<CallOutline />}
             keyboardType="phone-pad"
             value={phoneNumber}
             onChangeText={(text) => {
               setPhoneNumber(text);
               if (phoneError) setPhoneError('');
+              if (generalError) setGeneralError('');
             }}
             error={phoneError}
           />
+
+          {generalError ? (
+            <Text variant="bodySmall" color="error" style={styles.errorText}>
+              {generalError}
+            </Text>
+          ) : null}
 
           <Button
             translationKey="auth.send_reset_code"
@@ -90,6 +131,8 @@ export default function ForgotPasswordScreen() {
             fullWidth
             onPress={handleSendResetCode}
             style={styles.submitButton}
+            disabled={submitting}
+            title={submitting ? 'Please wait...' : undefined}
           />
         </View>
 
@@ -97,7 +140,7 @@ export default function ForgotPasswordScreen() {
           <Text variant="bodySmall" color="muted">
             {t('auth.remember_password')}{' '}
           </Text>
-          <Pressable onPress={handleLogin}>
+          <Pressable onPress={() => router.push('/(auth)/login')} disabled={submitting}>
             <Text variant="bodySmall" weight="medium" style={{ textDecorationLine: 'underline' }}>
               {t('auth.log_in')}
             </Text>
@@ -110,33 +153,36 @@ export default function ForgotPasswordScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   header: {
     alignItems: 'center',
     marginBottom: spacing.xxxl,
-    marginTop: spacing.xxxxl,
+    marginTop: spacing.xxxxl
   },
   logo: {
     width: 100,
-    height: 100,
+    height: 100
   },
   title: {
-    marginBottom: spacing.sm,
+    marginBottom: spacing.sm
   },
   form: {
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xxl
   },
   submitButton: {
-    marginTop: spacing.xl,
+    marginTop: spacing.xl
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center'
   },
+  errorText: {
+    marginTop: spacing.sm
+  }
 });

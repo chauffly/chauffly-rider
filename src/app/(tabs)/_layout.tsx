@@ -5,15 +5,14 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { HapticTab } from "@/components/haptic-tab";
 import { useTheme } from "@/context/theme-context";
 import { accountRoleService, type AccountRole } from "@/services/account-role";
-import { localJsonApi } from "@/api/local-json-api";
+import { useCurrentUser } from "@/api-client";
 import { useTranslation } from "@/context/language-context";
 
 export default function TabLayout() {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const [accountRole, setAccountRole] = useState<AccountRole>(
-    localJsonApi.getCurrentUserRole() === "corporate" ? "corporate" : "rider",
-  );
+  const [accountRole, setAccountRole] = useState<AccountRole>("rider");
+  const { data: currentUser } = useCurrentUser();
   const isCorporate = accountRole === "corporate";
 
   useEffect(() => {
@@ -22,8 +21,15 @@ export default function TabLayout() {
       setAccountRole(role);
     };
 
-    loadRole();
+    void loadRole();
   }, []);
+
+  useEffect(() => {
+    const role = String((currentUser as Record<string, unknown> | undefined)?.role ?? '');
+    const nextRole: AccountRole = role === 'corporate_admin' ? 'corporate' : 'rider';
+    setAccountRole(nextRole);
+    void accountRoleService.setRole(nextRole);
+  }, [currentUser]);
 
   return (
     <Tabs

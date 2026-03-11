@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { useJoinCompany } from '@/api-client';
 import { TextInput } from '@/components/common/text-input';
 import { Button } from '@/components/common/button';
 import { StackHeader } from '@/components/common/stack-header';
@@ -17,17 +18,23 @@ export default function JoinCompanyScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const joinCompany = useJoinCompany();
 
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [showAwaitingModal, setShowAwaitingModal] = useState(false);
 
-  const handleSubmit = () => {
-    if (code.length !== 10) {
+  const handleSubmit = async () => {
+    const organizationCode = code.trim().toUpperCase();
+    if (!organizationCode) {
       setError(t('account.join_company_code_error'));
       return;
     }
+
     setError('');
+    await joinCompany.mutateAsync({
+      organization_code: organizationCode
+    });
     setShowAwaitingModal(true);
   };
 
@@ -43,15 +50,11 @@ export default function JoinCompanyScreen() {
         {
           backgroundColor: colors.background,
           paddingTop: insets.top + spacing.lg,
-          paddingBottom: insets.bottom + spacing.md,
-        },
+          paddingBottom: insets.bottom + spacing.md
+        }
       ]}
     >
-      <StackHeader
-        translationKey="account.join_company_title"
-        align="center"
-        onBack={() => router.back()}
-      />
+      <StackHeader translationKey="account.join_company_title" align="center" onBack={() => router.back()} />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -72,23 +75,18 @@ export default function JoinCompanyScreen() {
           }}
           error={error}
           autoCapitalize="characters"
-          maxLength={10}
+          maxLength={32}
         />
       </ScrollView>
 
       <Button
-        translationKey="account.join_company_submit"
+        title={joinCompany.isPending ? t('common.loading') : t('account.join_company_submit')}
         onPress={handleSubmit}
         style={styles.submitButton}
+        disabled={joinCompany.isPending}
       />
 
-      {/* Awaiting Approval Modal */}
-      <Modal
-        transparent
-        animationType="fade"
-        visible={showAwaitingModal}
-        onRequestClose={handleDone}
-      >
+      <Modal transparent animationType="fade" visible={showAwaitingModal} onRequestClose={handleDone}>
         <Pressable style={styles.modalOverlay} onPress={handleDone}>
           <Pressable style={[styles.modalCard, { backgroundColor: colors.surface }]} onPress={() => {}}>
             <View style={[styles.clockIcon, { backgroundColor: colors.primary }]}>
@@ -100,7 +98,7 @@ export default function JoinCompanyScreen() {
             </Text>
 
             <Text variant="body" color="muted" align="center" style={styles.modalMessage}>
-              {t('account.join_company_awaiting_message', { company: 'Orbitallens Holdings' })}
+              {t('account.join_company_awaiting_message', { company: 'Your organization' })}
             </Text>
 
             <View style={[styles.estimateChip, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
@@ -121,21 +119,21 @@ export default function JoinCompanyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   content: {
     gap: spacing.lg,
-    paddingBottom: spacing.xxxxl,
+    paddingBottom: spacing.xxxxl
   },
   submitButton: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.md
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: spacing.xxl
   },
   modalCard: {
     width: '100%',
@@ -143,7 +141,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxl,
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.md
   },
   clockIcon: {
     width: 56,
@@ -151,17 +149,17 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.sm
   },
   modalMessage: {
-    lineHeight: 22,
+    lineHeight: 22
   },
   estimateChip: {
     borderRadius: borderRadius.full,
     borderWidth: 1,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-     marginTop: spacing.sm,
-    width: "100%"
-  },
+    marginTop: spacing.sm,
+    width: '100%'
+  }
 });

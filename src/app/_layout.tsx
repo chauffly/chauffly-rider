@@ -20,6 +20,7 @@ import 'react-native-reanimated';
 import { ThemeProvider, useTheme } from '@/context/theme-context';
 import { LanguageProvider } from '@/context/language-context';
 import { LocationProvider } from '@/context/location-context';
+import { RiderRuntimeProvider } from '@/runtime/rider-runtime-provider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -47,13 +48,15 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <LocationProvider>
-          <RootLayoutNav />
-        </LocationProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <RiderRuntimeProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <LocationProvider>
+            <RootLayoutNav />
+          </LocationProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </RiderRuntimeProvider>
   );
 }
 

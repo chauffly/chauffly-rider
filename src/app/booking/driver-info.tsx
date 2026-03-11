@@ -3,12 +3,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { useBookingById } from '@/api-client';
 import { Text } from '@/components/common/text';
 import { Button } from '@/components/common/button';
 import { spacing, borderRadius } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
-import { localJsonApi } from '@/api/local-json-api';
+import { asRecord, asString } from '@/utils/api-helpers';
 
 export default function DriverInfoScreen() {
   const { colors } = useTheme();
@@ -16,17 +17,25 @@ export default function DriverInfoScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{
+    bookingId?: string;
     driverName?: string;
     driverPhone?: string;
     driverRating?: string;
     driverVehicle?: string;
   }>();
-  const apiDriver = localJsonApi.getPrimaryDriver();
+  const bookingId = params.bookingId ?? '';
+  const { data: bookingData } = useBookingById(bookingId, {
+    enabled: Boolean(bookingId)
+  });
 
-  const driverName = params.driverName || apiDriver.display_name;
-  const driverPhone = params.driverPhone || apiDriver.phone_number;
-  const driverRating = params.driverRating || apiDriver.rating.toFixed(1);
-  const vehicleName = params.driverVehicle || apiDriver.vehicle.display_name;
+  const detail = asRecord(bookingData);
+  const driver = asRecord(detail.driver);
+  const vehicle = asRecord(driver.vehicle);
+
+  const driverName = params.driverName || `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Driver';
+  const driverPhone = params.driverPhone || asString(driver.phoneNumber, '--');
+  const driverRating = params.driverRating || asString(driver.rating, '--');
+  const vehicleName = params.driverVehicle || `${asString(vehicle.make)} ${asString(vehicle.model)}`.trim() || '--';
 
   const handleCallDriver = async () => {
     const cleanPhone = driverPhone.replace(/[^0-9+]/g, '');
@@ -38,55 +47,90 @@ export default function DriverInfoScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.md }]}> 
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.md }
+      ]}
+    >
       <View style={styles.headerRow}>
         <Pressable onPress={() => router.back()} style={styles.headerIcon}>
           <MaterialCommunityIcons name="chevron-left" size={28} color={colors.textPrimary} />
         </Pressable>
-        <Text variant="h3" weight="medium">{t('booking.driver_information')}</Text>
+        <Text variant="h3" weight="medium">
+          {t('booking.driver_information')}
+        </Text>
         <View style={styles.headerIcon} />
       </View>
 
-      <View style={[styles.mainCard, { backgroundColor: colors.surface }]}> 
+      <View style={[styles.mainCard, { backgroundColor: colors.surface }]}>
         <Image source={require('../../../assets/images/avatar.png')} style={styles.avatar} />
-        <Text variant="h2" weight="medium" style={styles.mtMd}>{driverName}</Text>
-        <Text variant="body" color="muted">{driverPhone}</Text>
+        <Text variant="h2" weight="medium" style={styles.mtMd}>
+          {driverName}
+        </Text>
+        <Text variant="body" color="muted">
+          {driverPhone}
+        </Text>
 
         <View style={styles.metricsRow}>
           <View style={styles.metricItem}>
             <View style={styles.metricInline}>
               <MaterialCommunityIcons name="star" size={18} color={colors.primary} />
-              <Text variant="body" weight="medium">{driverRating}</Text>
+              <Text variant="body" weight="medium">
+                {driverRating}
+              </Text>
             </View>
-            <Text variant="body" color="muted">{t('booking.rating_label')}</Text>
+            <Text variant="body" color="muted">
+              {t('booking.rating_label')}
+            </Text>
           </View>
           <View style={styles.metricItem}>
-            <Text variant="body" weight="medium">{apiDriver.trips_completed}</Text>
-            <Text variant="body" color="muted">{t('booking.trips_label')}</Text>
+            <Text variant="body" weight="medium">
+              {asString(driver.tripsCompleted, '--')}
+            </Text>
+            <Text variant="body" color="muted">
+              {t('booking.trips_label')}
+            </Text>
           </View>
         </View>
       </View>
 
-      <View style={[styles.detailsCard, { backgroundColor: colors.surface }]}> 
+      <View style={[styles.detailsCard, { backgroundColor: colors.surface }]}>
         <View style={styles.detailRow}>
-          <Text variant="body" color="muted">{t('booking.member_since')}</Text>
-          <Text variant="body" weight="medium">{apiDriver.member_since}</Text>
+          <Text variant="body" color="muted">
+            {t('booking.member_since')}
+          </Text>
+          <Text variant="body" weight="medium">
+            {asString(driver.memberSince, '--')}
+          </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text variant="body" color="muted">{t('booking.car_model')}</Text>
-          <Text variant="body" weight="medium">{vehicleName}</Text>
+          <Text variant="body" color="muted">
+            {t('booking.car_model')}
+          </Text>
+          <Text variant="body" weight="medium">
+            {vehicleName}
+          </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text variant="body" color="muted">{t('booking.color')}</Text>
-          <Text variant="body" weight="medium">{apiDriver.vehicle.color}</Text>
+          <Text variant="body" color="muted">
+            {t('booking.color')}
+          </Text>
+          <Text variant="body" weight="medium">
+            {asString(vehicle.color, '--')}
+          </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text variant="body" color="muted">{t('booking.plate_number')}</Text>
-          <Text variant="body" weight="medium">{apiDriver.vehicle.plate_number}</Text>
+          <Text variant="body" color="muted">
+            {t('booking.plate_number')}
+          </Text>
+          <Text variant="body" weight="medium">
+            {asString(vehicle.plateNumber, '--')}
+          </Text>
         </View>
       </View>
 
-      <View style={[styles.footerRow, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.sm }]}> 
+      <View style={[styles.footerRow, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.sm }]}>
         <Button
           translationKey="booking.call"
           variant="outline"
@@ -99,7 +143,7 @@ export default function DriverInfoScreen() {
           translationKey="booking.chat"
           fullWidth
           navigateTo="/booking/message-driver"
-          navigateParams={params}
+          navigateParams={{ bookingId, driverName }}
           style={styles.footerButton}
         />
       </View>
@@ -110,58 +154,58 @@ export default function DriverInfoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.lg
   },
   headerIcon: {
     width: 36,
     height: 36,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   mainCard: {
     borderRadius: 28,
     padding: spacing.lg,
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.lg
   },
   avatar: {
     width: 120,
     height: 120,
-    borderRadius: 60,
+    borderRadius: 60
   },
   mtMd: {
-    marginTop: spacing.md,
+    marginTop: spacing.md
   },
   metricsRow: {
     marginTop: spacing.lg,
     flexDirection: 'row',
-    gap: spacing.xl,
+    gap: spacing.xl
   },
   metricItem: {
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs
   },
   metricInline: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs
   },
   detailsCard: {
     borderRadius: 28,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
+    gap: spacing.lg
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   footerRow: {
     position: 'absolute',
@@ -171,11 +215,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     paddingTop: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg
   },
   footerButton: {
     flex: 1,
     minHeight: 52,
-    borderRadius: borderRadius.full,
-  },
+    borderRadius: borderRadius.full
+  }
 });

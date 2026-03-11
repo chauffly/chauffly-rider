@@ -6,6 +6,8 @@ export interface PaymentMethodInput {
   type: 'card' | 'bank_account';
   provider: string;
   token?: string;
+  last_four?: string;
+  is_default?: boolean;
   metadata?: Record<string, unknown>;
 }
 
@@ -48,7 +50,14 @@ export const createWalletApi = (http: HttpClient): WalletApi => {
     },
 
     addPaymentMethod(input) {
-      return http.post('/wallet/payment-methods', input);
+      return http.post('/wallet/payment-methods', {
+        type: input.type,
+        provider: input.provider,
+        authorization_code: input.token ?? input.metadata?.authorization_code,
+        last_four: input.last_four ?? input.metadata?.last_four,
+        is_default: input.is_default,
+        metadata: input.metadata
+      });
     },
 
     listPaymentMethods() {

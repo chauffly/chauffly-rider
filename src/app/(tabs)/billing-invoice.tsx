@@ -1,21 +1,17 @@
-import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { format } from 'date-fns';
 
+import { useCorporateInvoices } from '@/api-client';
 import { Text } from '@/components/common/text';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
-import { localJsonApi, type CorporateInvoice } from '@/api/local-json-api';
 import { useTranslation } from '@/context/language-context';
-
-const invoiceImages: Record<CorporateInvoice['image'], number> = {
-  'go.png': require('@assets/images/ride-options/go.png'),
-  'plus.png': require('@assets/images/ride-options/plus.png'),
-  'luxe.png': require('@assets/images/ride-options/luxe.png'),
-  'black.png': require('@assets/images/ride-options/black.png'),
-};
+import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { formatNairaAmount } from '@/utils/currency';
 
 type BillingFilter = 'paid' | 'cancelled';
 
@@ -25,15 +21,22 @@ export default function BillingInvoiceTabScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [filter, setFilter] = useState<BillingFilter>('paid');
-  const invoices = localJsonApi.getCorporateInvoices();
 
-  const filteredInvoices = invoices.filter((inv) => inv.status === filter);
+  const { data: invoicesData } = useCorporateInvoices();
+  const invoices = asArray<Record<string, unknown>>(asRecord(invoicesData).items);
+
+  const filteredInvoices = useMemo(
+    () => invoices.filter((invoice) => asString(invoice.status) === filter),
+    [filter, invoices]
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 24}]}>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 24 }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
-          <Text variant="h2" weight="medium" >{t('corporate.billing.title')}</Text>
+          <Text variant="h2" weight="medium">
+            {t('corporate.billing.title')}
+          </Text>
           <MaterialCommunityIcons name="bell-outline" size={22} color={colors.textPrimary} />
         </View>
 
@@ -44,8 +47,8 @@ export default function BillingInvoiceTabScreen() {
               styles.filterChip,
               {
                 backgroundColor: filter === 'paid' ? colors.textPrimary : 'transparent',
-                borderColor: filter === 'paid' ? colors.textPrimary : colors.border,
-              },
+                borderColor: filter === 'paid' ? colors.textPrimary : colors.border
+              }
             ]}
           >
             <Text variant="bodySmall" color={filter === 'paid' ? 'inverse' : 'primary'}>
@@ -58,8 +61,8 @@ export default function BillingInvoiceTabScreen() {
               styles.filterChip,
               {
                 backgroundColor: filter === 'cancelled' ? colors.textPrimary : 'transparent',
-                borderColor: filter === 'cancelled' ? colors.textPrimary : colors.border,
-              },
+                borderColor: filter === 'cancelled' ? colors.textPrimary : colors.border
+              }
             ]}
           >
             <Text variant="bodySmall" color={filter === 'cancelled' ? 'inverse' : 'primary'}>
@@ -69,27 +72,57 @@ export default function BillingInvoiceTabScreen() {
         </View>
 
         <View style={styles.invoiceList}>
-          {filteredInvoices.map((invoice) => (
-            <Pressable
-              key={invoice.id}
-              style={[styles.invoiceRow, { borderBottomColor: colors.border }]}
-              onPress={() => router.push({ pathname: '/corporate/invoice-details' as never, params: { id: invoice.id } })}
-            >
-              <Image source={invoiceImages[invoice.image]} style={styles.invoiceImage} resizeMode="contain" />
-              <View style={styles.invoiceInfo}>
-                <Text variant="body" weight="medium" numberOfLines={1}>{invoice.destination}</Text>
-                <Text variant="caption" color="muted">{invoice.date}</Text>
-              </View>
-              <View style={styles.invoiceRight}>
-                <Text variant="body" weight="medium">{invoice.amount}</Text>
-                {filter === 'paid' ? (
-                  <Text variant="caption" color="muted">{invoice.payment_method}</Text>
-                ) : (
-                  <Text variant="caption" color="error">{t('corporate.billing.cancelled')}</Text>
-                )}
-              </View>
-            </Pressable>
-          ))}
+          {filteredInvoices.map((invoice) => {
+            const invoiceId = asString(invoice.id);
+            const amount = formatNairaAmount(invoice.totalAmount);
+            const periodStart = asString(invoice.periodStart);
+            const periodEnd = asString(invoice.periodEnd);
+            const createdAt = asString(invoice.createdAt);
+            const dateLabel = createdAt ? format(new Date(createdAt), 'MMM d, yyyy') : '--';
+            const periodLabel =
+              periodStart && periodEnd
+                ? `${format(new Date(periodStart), 'MMM d')} - ${format(new Date(periodEnd), 'MMM d')}`
+                : dateLabel;
+
+            return (
+              <Pressable
+                key={invoiceId}
+                style={[styles.invoiceRow, { borderBottomColor: colors.border }]}
+                onPress={() =>
+                  router.push({
+                    pathname: '/corporate/invoice-details',
+                    params: { id: invoiceId }
+                  })
+                }
+              >
+                <View style={[styles.invoiceIcon, { backgroundColor: colors.accent }]}>
+                  <MaterialCommunityIcons name="file-document-outline" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.invoiceInfo}>
+                  <Text variant="body" weight="medium" numberOfLines={1}>
+                    {t('corporate.billing.invoice_label')} #{invoiceId.slice(0, 8)}
+                  </Text>
+                  <Text variant="caption" color="muted">
+                    {periodLabel}
+                  </Text>
+                </View>
+                <View style={styles.invoiceRight}>
+                  <Text variant="body" weight="medium">
+                    {amount}
+                  </Text>
+                  {filter === 'paid' ? (
+                    <Text variant="caption" color="muted">
+                      {t('corporate.billing.completed')}
+                    </Text>
+                  ) : (
+                    <Text variant="caption" color="error">
+                      {t('corporate.billing.cancelled')}
+                    </Text>
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       </ScrollView>
     </View>
@@ -105,7 +138,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
-    borderWidth: 1,
+    borderWidth: 1
   },
   invoiceList: { gap: 0 },
   invoiceRow: {
@@ -113,18 +146,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: spacing.md,
+    gap: spacing.md
   },
-  invoiceImage: {
-    width: 56,
-    height: 36,
+  invoiceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   invoiceInfo: {
     flex: 1,
-    gap:8
+    gap: 8
   },
   invoiceRight: {
     alignItems: 'flex-end',
-    gap: 8,
-  },
+    gap: 8
+  }
 });

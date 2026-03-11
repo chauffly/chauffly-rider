@@ -1,21 +1,30 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+import { useCorporateSummary, useCorporateUsage } from '@/api-client';
 import { Text } from '@/components/common/text';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
-import { localJsonApi, type CorporatePeriodKey } from '@/api/local-json-api';
 import { useTranslation } from '@/context/language-context';
+import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { formatNairaAmount, normalizeAmount } from '@/utils/currency';
+
+type CorporatePeriodKey = 'today' | 'last_7_days' | 'last_30_days';
 
 const periodButtons: { key: CorporatePeriodKey; translationKey: string }[] = [
   { key: 'today', translationKey: 'corporate.dashboard.period_today' },
-  { key: 'yesterday', translationKey: 'corporate.dashboard.period_yesterday' },
   { key: 'last_7_days', translationKey: 'corporate.dashboard.period_last_7_days' },
-  { key: 'last_30_days', translationKey: 'corporate.dashboard.period_last_30_days' },
+  { key: 'last_30_days', translationKey: 'corporate.dashboard.period_last_30_days' }
 ];
+
+const getUsageTicks = (values: number[]): number[] => {
+  const max = Math.max(...values, 1);
+  const step = Math.max(1, Math.ceil(max / 4));
+  return [0, step, step * 2, step * 3, step * 4];
+};
 
 export function CorporateDashboardContent() {
   const { colors } = useTheme();
@@ -24,26 +33,53 @@ export function CorporateDashboardContent() {
   const router = useRouter();
   const [period, setPeriod] = useState<CorporatePeriodKey>('today');
 
-  const summary = localJsonApi.getCorporateSummary(period);
-  const usageOverview = localJsonApi.getCorporateUsageOverview(period);
-  const maxTick = Math.max(...usageOverview.yTicks, 1);
+  const { data: summaryData } = useCorporateSummary(period);
+  const { data: usageData } = useCorporateUsage({ limit: 7 });
+
+  const summary = asRecord(summaryData);
+  const usageItems = asArray<Record<string, unknown>>(asRecord(usageData).items);
+
+  const usagePoints = useMemo(
+    () =>
+      usageItems.slice(0, 7).map((item, index) => ({
+        label: `#${index + 1}`,
+        value: Number(normalizeAmount(item.totalSpend, 'naira'))
+      })),
+    [usageItems]
+  );
+  const yTicks = getUsageTicks(usagePoints.map((point) => point.value));
+  const maxTick = Math.max(...yTicks, 1);
+
+  const totalEmployees = Number(summary.totalEmployees ?? 0);
+  const totalRides = Number(summary.totalRides ?? 0);
+  const newEmployees = Number(summary.newEmployees ?? 0);
+  const monthlyUsage = formatNairaAmount(summary.monthlyUsage, { unit: 'naira' });
+
+  const growth = asRecord(summary.growth);
+  const ridesGrowth = `${Number(growth.ridesPercent ?? 0).toFixed(1)}%`;
+  const usageGrowth = `${Number(growth.usagePercent ?? 0).toFixed(1)}%`;
+  const employeesGrowth = `${Number(growth.employeesPercent ?? 0).toFixed(1)}%`;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.lg }]}> 
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.lg }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[0]}
       >
-        <View style={[styles.stickyHeader, { backgroundColor: colors.background }]}> 
+        <View style={[styles.stickyHeader, { backgroundColor: colors.background }]}>
           <View style={styles.header}>
             <View style={styles.avatarWrap}>
-              <View style={[styles.avatar, { backgroundColor: colors.border }]}> 
+              <View style={[styles.avatar, { backgroundColor: colors.border }]}>
                 <MaterialCommunityIcons name="account" size={30} color={colors.textSecondary} />
               </View>
               <View>
-                <Text variant="body" color="muted">{t('corporate.dashboard.greeting')}</Text>
-                <Text variant="body" weight="semiBold">{t('corporate.dashboard.admin')}</Text>
+                <Text variant="body" color="muted">
+                  {t('corporate.dashboard.greeting')}
+                </Text>
+                <Text variant="body" weight="semiBold">
+                  {t('corporate.dashboard.admin')}
+                </Text>
               </View>
             </View>
             <MaterialCommunityIcons name="bell-outline" size={22} color={colors.textPrimary} />
@@ -60,8 +96,8 @@ export function CorporateDashboardContent() {
                     styles.periodButton,
                     {
                       backgroundColor: active ? colors.textPrimary : colors.surface,
-                      borderColor: active ? colors.textPrimary : colors.border,
-                    },
+                      borderColor: active ? colors.textPrimary : colors.border
+                    }
                   ]}
                 >
                   <Text variant="bodySmall" color={active ? 'inverse' : 'secondary'}>
@@ -74,50 +110,78 @@ export function CorporateDashboardContent() {
         </View>
 
         <View style={styles.metricsGrid}>
-          <MetricCard title={t('corporate.dashboard.total_employee')} value={`${summary.total_employees}`} growth={summary.growth.total_employees} icon="account-group-outline" />
-          <MetricCard title={t('corporate.dashboard.total_rides')} value={`${summary.total_rides}`} growth={summary.growth.total_rides} icon="car-outline" />
-          <MetricCard title={t('corporate.dashboard.new_employee')} value={`${summary.new_employees}`} growth={summary.growth.new_employees} icon="account-plus-outline" />
-          <MetricCard title={t('corporate.dashboard.monthly_usage')} value={summary.monthly_usage} growth={summary.growth.monthly_usage} icon="pulse" />
+          <MetricCard
+            title={t('corporate.dashboard.total_employee')}
+            value={`${totalEmployees}`}
+            growth={employeesGrowth}
+            icon="account-group-outline"
+          />
+          <MetricCard
+            title={t('corporate.dashboard.total_rides')}
+            value={`${totalRides}`}
+            growth={ridesGrowth}
+            icon="car-outline"
+          />
+          <MetricCard
+            title={t('corporate.dashboard.new_employee')}
+            value={`${newEmployees}`}
+            growth={employeesGrowth}
+            icon="account-plus-outline"
+          />
+          <MetricCard
+            title={t('corporate.dashboard.monthly_usage')}
+            value={monthlyUsage}
+            growth={usageGrowth}
+            icon="pulse"
+          />
         </View>
 
         <View style={styles.actionRow}>
           <Pressable
             style={[styles.actionChip, { backgroundColor: colors.textPrimary }]}
-            onPress={() => router.push('/corporate/travel-policies' as never)}
+            onPress={() => router.push('/corporate/travel-policies')}
           >
             <MaterialCommunityIcons name="arrow-top-right" size={18} color={colors.textInverse} />
-            <Text variant="bodySmall" color="inverse" weight="medium">{t('corporate.dashboard.set_travel_limit')}</Text>
+            <Text variant="bodySmall" color="inverse" weight="medium">
+              {t('corporate.dashboard.set_travel_limit')}
+            </Text>
           </Pressable>
           <Pressable
             style={[styles.actionChip, { backgroundColor: colors.textPrimary }]}
-            onPress={() => router.push('/corporate/add-employee' as never)}
+            onPress={() => router.push('/corporate/add-employee')}
           >
             <MaterialCommunityIcons name="plus" size={18} color={colors.textInverse} />
-            <Text variant="bodySmall" color="inverse" weight="medium">{t('corporate.dashboard.add_employee')}</Text>
+            <Text variant="bodySmall" color="inverse" weight="medium">
+              {t('corporate.dashboard.add_employee')}
+            </Text>
           </Pressable>
         </View>
 
-        <View style={[styles.usageCard, { backgroundColor: colors.surface }]}> 
-          <Text variant="h3" weight="medium">{t('corporate.dashboard.usage_overview')}</Text>
+        <View style={[styles.usageCard, { backgroundColor: colors.surface }]}>
+          <Text variant="h3" weight="medium">
+            {t('corporate.dashboard.usage_overview')}
+          </Text>
 
           <View style={styles.chartRow}>
             <View style={styles.yAxisWrap}>
-              {[...usageOverview.yTicks].reverse().map((tick) => (
-                <Text key={tick} variant="caption" color="muted">{tick}</Text>
+              {[...yTicks].reverse().map((tick) => (
+                <Text key={tick} variant="caption" color="muted">
+                  {tick}
+                </Text>
               ))}
             </View>
 
             <View style={styles.chartAndXAxis}>
               <View style={styles.chartWrap}>
-                {usageOverview.points.map((point, index) => (
+                {usagePoints.map((point, index) => (
                   <View key={`${point.label}-${index}`} style={styles.barSlot}>
                     <View
                       style={[
                         styles.bar,
                         {
                           height: `${(point.value / maxTick) * 100}%`,
-                          backgroundColor: index % 2 === 0 ? colors.border : colors.primary,
-                        },
+                          backgroundColor: index % 2 === 0 ? colors.border : colors.primary
+                        }
                       ]}
                     />
                   </View>
@@ -125,7 +189,7 @@ export function CorporateDashboardContent() {
               </View>
 
               <View style={styles.xAxisWrap}>
-                {usageOverview.points.map((point, index) => (
+                {usagePoints.map((point, index) => (
                   <Text
                     key={`${point.label}-${index}-x`}
                     variant="caption"
@@ -145,16 +209,32 @@ export function CorporateDashboardContent() {
   );
 }
 
-function MetricCard({ title, value, growth, icon }: { title: string; value: string; growth: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }) {
+function MetricCard({
+  title,
+  value,
+  growth,
+  icon
+}: {
+  title: string;
+  value: string;
+  growth: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+}) {
   const { colors } = useTheme();
   return (
-    <View style={[styles.metricCard, { backgroundColor: colors.surface }]}> 
-      <Text variant="bodySmall" color="muted">{title}</Text>
+    <View style={[styles.metricCard, { backgroundColor: colors.surface }]}>
+      <Text variant="bodySmall" color="muted">
+        {title}
+      </Text>
       <View style={styles.metricValueRow}>
-        <Text variant="h3" weight="semiBold">{value}</Text>
+        <Text variant="h3" weight="semiBold">
+          {value}
+        </Text>
         <MaterialCommunityIcons name={icon} size={24} color={colors.textPrimary} />
       </View>
-      <Text variant="caption" color="success">{growth}</Text>
+      <Text variant="caption" color="success">
+        {growth}
+      </Text>
     </View>
   );
 }
@@ -180,7 +260,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.sm
   },
   usageCard: { borderRadius: borderRadius.xxl, padding: spacing.md, gap: spacing.md },
   chartRow: { flexDirection: 'row', gap: spacing.sm },
@@ -188,12 +268,12 @@ const styles = StyleSheet.create({
     width: 34,
     height: 150,
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'flex-start'
   },
   chartAndXAxis: { flex: 1, gap: spacing.xs },
   chartWrap: { height: 150, flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
   barSlot: { flex: 1, height: '100%', justifyContent: 'flex-end' },
   bar: { width: '100%', borderRadius: borderRadius.md },
   xAxisWrap: { flexDirection: 'row', gap: spacing.sm },
-  xAxisLabel: { flex: 1 },
+  xAxisLabel: { flex: 1 }
 });
