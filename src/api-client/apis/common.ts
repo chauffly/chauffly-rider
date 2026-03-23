@@ -1,5 +1,5 @@
-import { AxiosRequestConfig } from 'axios';
-import { HttpClient } from '../http';
+import type { AxiosRequestConfig } from 'axios';
+import type { HttpClient } from '../http';
 
 export type QueryParams = Record<string, string | number | boolean | undefined | null>;
 export type LooseQueryParams = Record<string, unknown>;

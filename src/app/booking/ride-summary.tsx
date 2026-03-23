@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useCreateBooking, useEstimateFare } from '@/api-client';
+import { useCreateBooking, useEstimateFare, useRideOptions } from '@/api-client';
 import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
 import { StackHeader } from '@/components/common/stack-header';
@@ -15,7 +15,7 @@ import { rideOptions } from '@/constants/ride-options';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
-import { asRecord, asString } from '@/utils/api-helpers';
+import { asArray, asRecord, asString } from '@/utils/api-helpers';
 import { formatNairaAmount } from '@/utils/currency';
 
 const generateIdempotencyKey = (): string => {
@@ -24,6 +24,10 @@ const generateIdempotencyKey = (): string => {
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value: string): boolean => UUID_REGEX.test(value);
 
 type DestinationInput = {
   id?: string;
@@ -44,8 +48,11 @@ export default function RideSummaryScreen() {
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const [isShimmering, setIsShimmering] = useState(true);
   const [bookingError, setBookingError] = useState('');
-  const estimateFare = useEstimateFare();
+  const [estimateError, setEstimateError] = useState('');
+  const estimateFareMutation = useEstimateFare();
   const createBooking = useCreateBooking();
+  const { data: rideOptionsData } = useRideOptions();
+  const { mutateAsync: estimateFareAsync, data: estimateFareData } = estimateFareMutation;
   const params = useLocalSearchParams<{
     originName?: string;
     originAddress?: string;
@@ -72,11 +79,61 @@ export default function RideSummaryScreen() {
     }
   }, [params.destinations]);
 
-  const selectedRideOptionId = asString(params.selectedRideId, '');
-  const selectedRide = rideOptions.find((option) => option.id === params.selectedRideTier)
-    ?? rideOptions.find((option) => option.id === selectedRideOptionId)
-    ?? rideOptions[0];
-  const rideOptionIdForApi = selectedRideOptionId || selectedRide.id;
+  const selectedRideOptionId = asString(params.selectedRideId, '').trim();
+  const selectedRideTier = asString(params.selectedRideTier, '').toLowerCase();
+
+  const apiRideOptions = useMemo<Record<string, unknown>[]>(() => {
+    const payload = asRecord(rideOptionsData);
+    const items = asArray<Record<string, unknown>>(payload.items);
+    return items.length > 0 ? items : asArray<Record<string, unknown>>(rideOptionsData);
+  }, [rideOptionsData]);
+
+  const selectedRideOption = useMemo<Record<string, unknown> | null>(() => {
+    if (apiRideOptions.length === 0) {
+      return null;
+    }
+
+    if (selectedRideOptionId && isUuid(selectedRideOptionId)) {
+      const byId = apiRideOptions.find((option) => asString(option.id) === selectedRideOptionId);
+      if (byId) {
+        return byId;
+      }
+    }
+
+    const tierCandidate = (selectedRideTier || selectedRideOptionId).toLowerCase();
+    if (tierCandidate) {
+      const byTier = apiRideOptions.find(
+        (option) => asString(option.tier).toLowerCase() === tierCandidate
+      );
+      if (byTier) {
+        return byTier;
+      }
+    }
+
+    return apiRideOptions[0];
+  }, [apiRideOptions, selectedRideOptionId, selectedRideTier]);
+
+  const rideOptionIdForApi = useMemo(() => {
+    if (selectedRideOption) {
+      return asString(selectedRideOption.id, '');
+    }
+    if (selectedRideOptionId && isUuid(selectedRideOptionId)) {
+      return selectedRideOptionId;
+    }
+    return '';
+  }, [selectedRideOption, selectedRideOptionId]);
+
+  const resolvedRideTier = asString(
+    selectedRideOption?.tier,
+    selectedRideTier || selectedRideOptionId
+  ).toLowerCase();
+
+  const selectedRide =
+    rideOptions.find((option) => option.id === resolvedRideTier) ??
+    rideOptions.find((option) => option.id === selectedRideTier) ??
+    rideOptions[0];
+
+  const fallbackBaseFare = selectedRideOption?.baseFare ?? selectedRideOption?.base_fare ?? 0;
   const durationMinutes = params.estimatedDurationMinutes ? Number(params.estimatedDurationMinutes) : 45;
   const distanceKm = params.distanceKm ? Number(params.distanceKm) : null;
   const pickupDate = params.pickupDate;
@@ -110,12 +167,19 @@ export default function RideSummaryScreen() {
 
   useEffect(() => {
     if (!pickupLat || !pickupLng || destinations.length === 0) {
+      setEstimateError('');
+      return;
+    }
+
+    if (!rideOptionIdForApi) {
+      setEstimateError('Unable to load ride pricing. Please go back and choose a ride type again.');
       return;
     }
 
     const runEstimate = async () => {
       try {
-        await estimateFare.mutateAsync({
+        setEstimateError('');
+        await estimateFareAsync({
           pickup: { lat: pickupLat, lng: pickupLng },
           stops: destinations.map((stop) => ({
             lat: stop.coordinates.latitude,
@@ -123,25 +187,34 @@ export default function RideSummaryScreen() {
           })),
           ride_option_id: rideOptionIdForApi
         });
-      } catch {
-        // Keep UI fallback pricing if estimate fails.
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to calculate fare estimate.';
+        setEstimateError(message);
       }
     };
 
     void runEstimate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickupLat, pickupLng, destinations.length, rideOptionIdForApi]);
+  }, [pickupLat, pickupLng, destinations, rideOptionIdForApi, estimateFareAsync]);
 
-  const estimateRecord = asRecord(estimateFare.data);
+  const estimateRecord = asRecord(estimateFareData);
   const fareBreakdown = asRecord(estimateRecord.fare_breakdown);
 
-  const tripFare = formatNairaAmount(fareBreakdown.trip_fare || estimateRecord.estimated_fare || 0);
+  const tripFare = formatNairaAmount(
+    fareBreakdown.trip_fare ?? estimateRecord.estimated_fare ?? fallbackBaseFare
+  );
   const tax = formatNairaAmount(fareBreakdown.tax || 0);
-  const total = formatNairaAmount(fareBreakdown.total || estimateRecord.estimated_fare || 0);
+  const total = formatNairaAmount(
+    fareBreakdown.total ?? estimateRecord.estimated_fare ?? fallbackBaseFare
+  );
 
   const handleCreateBooking = async () => {
     if (!params.originAddress || !pickupLat || !pickupLng || destinations.length === 0) {
       setBookingError('Missing route details. Please set pickup and destination again.');
+      return;
+    }
+
+    if (!rideOptionIdForApi) {
+      setBookingError('Ride type is unavailable. Please return and select a ride option again.');
       return;
     }
 
@@ -189,7 +262,7 @@ export default function RideSummaryScreen() {
         params: {
           bookingId,
           selectedRideId: rideOptionIdForApi,
-          selectedRideTier: selectedRide.id,
+          selectedRideTier: resolvedRideTier || selectedRide.id,
           originName: params.originName,
           originAddress: params.originAddress,
           destinations: JSON.stringify(destinations),
@@ -333,6 +406,11 @@ export default function RideSummaryScreen() {
             {bookingError}
           </Text>
         ) : null}
+        {estimateError ? (
+          <Text variant="bodySmall" color="error">
+            {estimateError}
+          </Text>
+        ) : null}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -340,7 +418,7 @@ export default function RideSummaryScreen() {
           translationKey="booking.book_ride"
           fullWidth
           onPress={handleCreateBooking}
-          disabled={createBooking.isPending}
+          disabled={createBooking.isPending || !rideOptionIdForApi}
           title={createBooking.isPending ? t('common.loading') : undefined}
         />
       </View>

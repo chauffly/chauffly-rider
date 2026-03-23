@@ -1,12 +1,13 @@
-import axios, {
+import axios from 'axios';
+import type {
   AxiosError,
   AxiosInstance,
   AxiosRequestConfig,
   AxiosResponse,
   InternalAxiosRequestConfig
 } from 'axios';
-import { TokenStorage } from './storage';
-import { ApiEnvelope, ApiErrorEnvelope, AuthTokens } from './types';
+import type { TokenStorage } from './storage';
+import type { ApiEnvelope, ApiErrorEnvelope, AuthTokens } from './types';
 
 interface ChaufflyRequestConfig extends InternalAxiosRequestConfig {
   __networkRetryCount?: number;
@@ -59,6 +60,15 @@ const buildApiBaseUrl = (baseURL: string, apiPrefix: string): string => {
 };
 
 const sanitizeForLog = (value: unknown): unknown => {
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return sanitizeForLog(parsed);
+    } catch {
+      return value;
+    }
+  }
+
   if (!value || typeof value !== 'object') {
     return value;
   }

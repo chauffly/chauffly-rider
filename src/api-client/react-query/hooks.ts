@@ -1,14 +1,13 @@
 import {
   useMutation,
   useQuery,
-  useQueryClient,
-  UseMutationOptions,
-  UseQueryOptions
+  useQueryClient
 } from '@tanstack/react-query';
+import type { UseMutationOptions, UseQueryOptions } from '@tanstack/react-query';
 
 import { useApiClient } from './provider';
 import { queryKeys } from './query-keys';
-import {
+import type {
   AuthSession,
   BookingCreateInput,
   BookingEstimateInput,
@@ -16,9 +15,9 @@ import {
   PaginatedResponse,
   WalletTopUpInput
 } from '../types';
-import { BookingActionResponse } from '../apis/bookings-api';
-import { SavedAddressInput } from '../apis/users-api';
-import { PaymentMethodInput, WalletTransactionsQuery } from '../apis/wallet-api';
+import type { BookingActionResponse } from '../apis/bookings-api';
+import type { SavedAddressInput } from '../apis/users-api';
+import type { PaymentMethodInput, WalletTransactionsQuery } from '../apis/wallet-api';
 
 type UnknownRecord = Record<string, unknown>;
 

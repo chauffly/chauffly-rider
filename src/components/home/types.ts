@@ -19,5 +19,6 @@ export interface RideOption {
   nameKey: string;
   subtitleKey: string;
   priceKey: string;
+  priceLabel?: string;
   image: ImageSourcePropType;
 }

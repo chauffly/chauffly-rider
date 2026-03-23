@@ -1,5 +1,5 @@
-import { HttpClient } from '../http';
-import { ChatSendMessageInput, PaginatedResponse } from '../types';
+import type { HttpClient } from '../http';
+import type { ChatSendMessageInput, PaginatedResponse } from '../types';
 import { withQuery } from './common';
 
 export interface ChatApi {

@@ -23,8 +23,7 @@ import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { connectRiderSockets } from '@/runtime/rider-runtime';
-
-const NIGERIAN_PHONE_REGEX = /^\+234\d{10}$/;
+import { normalizeNigerianPhoneNumber } from "@/utils/phone";
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof ApiClientError) {
@@ -45,15 +44,19 @@ export default function LoginScreen() {
   const { t } = useTranslation();
   const api = useApiClient();
 
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState("08123456789");
+  const [password, setPassword] = useState("StrongPass#2026");
   const [phoneError, setPhoneError] = useState('');
   const [generalError, setGeneralError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleLogin = async () => {
-    if (!NIGERIAN_PHONE_REGEX.test(phoneNumber.trim())) {
-      setPhoneError('Use Nigerian format: +234XXXXXXXXXX');
+    const normalizedPhoneNumber = normalizeNigerianPhoneNumber(phoneNumber);
+
+    if (!normalizedPhoneNumber) {
+      setPhoneError(
+        "Use a valid Nigerian number (e.g. 08012345678 or +2348012345678).",
+      );
       return;
     }
 
@@ -68,8 +71,8 @@ export default function LoginScreen() {
 
     try {
       const session = await api.authApi.login({
-        phone_number: phoneNumber.trim(),
-        password
+        phone_number: normalizedPhoneNumber,
+        password,
       });
 
       await api.session.setTokens(session.tokens);
@@ -85,45 +88,45 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <StatusBar style={colors.statusBar as 'light' | 'dark'} />
+      <StatusBar style={colors.statusBar as "light" | "dark"} />
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
           {
             paddingTop: insets.top + spacing.xxl,
-            paddingBottom: insets.bottom + spacing.xxl
-          }
+            paddingBottom: insets.bottom + spacing.xxl,
+          },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
           <Image
-            source={require('../../../assets/images/logo-sm.png')}
+            source={require("../../../assets/images/logo-sm.png")}
             style={styles.logo}
             contentFit="contain"
           />
           <Text variant="h1" font="medium" align="center" style={styles.title}>
-            {t('auth.welcome_back')}
+            {t("auth.welcome_back")}
           </Text>
           <Text variant="body" color="muted" align="center">
-            {t('auth.login_subtitle')}
+            {t("auth.login_subtitle")}
           </Text>
         </View>
 
         <View style={styles.form}>
           <TextInput
             labelTranslationKey="auth.phone_number"
-            placeholder={'+2348123456789'}
+            placeholder={"08012345678"}
             leftIcon={<CallOutline />}
             keyboardType="phone-pad"
             value={phoneNumber}
             onChangeText={(text) => {
               setPhoneNumber(text);
-              if (phoneError) setPhoneError('');
-              if (generalError) setGeneralError('');
+              if (phoneError) setPhoneError("");
+              if (generalError) setGeneralError("");
             }}
             error={phoneError}
           />
@@ -138,16 +141,16 @@ export default function LoginScreen() {
           />
 
           <Pressable
-            onPress={() => router.push('/(auth)/forgot-password')}
+            onPress={() => router.push("/(auth)/forgot-password")}
             style={styles.forgotPassword}
             disabled={submitting}
           >
             <Text
               variant="bodySmall"
               weight="medium"
-              style={{ textDecorationLine: 'underline' }}
+              style={{ textDecorationLine: "underline" }}
             >
-              {t('auth.forgot_password')}
+              {t("auth.forgot_password")}
             </Text>
           </Pressable>
 
@@ -163,8 +166,8 @@ export default function LoginScreen() {
             fullWidth
             onPress={handleLogin}
             style={styles.loginButton}
-            disabled={submitting}
-            title={submitting ? 'Please wait...' : undefined}
+            // disabled={submitting}
+            title={submitting ? "Please wait..." : undefined}
           />
         </View>
 
@@ -173,7 +176,7 @@ export default function LoginScreen() {
             style={[styles.dividerLine, { backgroundColor: colors.border }]}
           />
           <Text variant="caption" color="muted" style={styles.dividerText}>
-            {t('auth.or_continue_with')}
+            {t("auth.or_continue_with")}
           </Text>
           <View
             style={[styles.dividerLine, { backgroundColor: colors.border }]}
@@ -187,15 +190,18 @@ export default function LoginScreen() {
 
         <View style={styles.footer}>
           <Text variant="bodySmall" color="muted">
-            {t('auth.no_account')}{' '}
+            {t("auth.no_account")}{" "}
           </Text>
-          <Pressable onPress={() => router.push('/(auth)/register')} disabled={submitting}>
+          <Pressable
+            onPress={() => router.push("/(auth)/register")}
+            disabled={submitting}
+          >
             <Text
               variant="bodySmall"
               weight="medium"
-              style={{ textDecorationLine: 'underline' }}
+              style={{ textDecorationLine: "underline" }}
             >
-              {t('auth.sign_up')}
+              {t("auth.sign_up")}
             </Text>
           </Pressable>
         </View>

@@ -24,8 +24,7 @@ import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { authFlowStorage } from '@/services/auth-flow-storage';
-
-const NIGERIAN_PHONE_REGEX = /^\+234\d{10}$/;
+import { normalizeNigerianPhoneNumber } from '@/utils/phone';
 const PASSWORD_REGEX =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
@@ -56,8 +55,10 @@ export default function RegisterScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleCreateAccount = async () => {
-    if (!NIGERIAN_PHONE_REGEX.test(phoneNumber.trim())) {
-      setErrorMessage('Use Nigerian format: +234XXXXXXXXXX');
+    const normalizedPhoneNumber = normalizeNigerianPhoneNumber(phoneNumber);
+
+    if (!normalizedPhoneNumber) {
+      setErrorMessage('Use a valid Nigerian number (e.g. 08012345678 or +2348012345678).');
       return;
     }
 
@@ -81,14 +82,14 @@ export default function RegisterScreen() {
 
     try {
       await api.authApi.register({
-        phone_number: phoneNumber.trim(),
+        phone_number: normalizedPhoneNumber,
         password,
         role: 'rider'
       });
 
       await authFlowStorage.set({
         mode: 'register',
-        phoneNumber: phoneNumber.trim()
+        phoneNumber: normalizedPhoneNumber
       });
 
       router.push('/(auth)/verify-otp');
@@ -130,7 +131,7 @@ export default function RegisterScreen() {
         <View style={styles.form}>
           <TextInput
             labelTranslationKey="auth.phone_number"
-            placeholder={'+2348123456789'}
+            placeholder={'08012345678'}
             leftIcon={<CallOutline />}
             keyboardType="phone-pad"
             value={phoneNumber}

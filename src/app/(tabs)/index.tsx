@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Pressable, StyleSheet, View, Image } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
 import { Ionicons } from "@expo/vector-icons";
-import { Text } from "@/components/common/text";
 import { LocationPermissionModal } from '@/components/common/location-permission-modal';
 import { HomeContent } from "@/components/home/home-content";
 import { MapControls } from "@/components/home/map-controls";
@@ -27,6 +26,7 @@ import {
 import { estimateDurationMinutes, getRouteDistanceKm } from '@/utils/route';
 import { googleDirectionsService } from '@/services/google-directions';
 import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { formatNairaAmount } from '@/utils/currency';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -77,6 +77,7 @@ export default function HomeScreen() {
   const [routeDurationMinutes, setRouteDurationMinutes] = useState(0);
   const [routeMetricsLoading, setRouteMetricsLoading] = useState(false);
   const [routeMetricsError, setRouteMetricsError] = useState<string | null>(null);
+  const [roadPathCoordinates, setRoadPathCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
   const [isMapReady, setIsMapReady] = useState(false);
 
   // Route state for set-location view
@@ -347,13 +348,20 @@ export default function HomeScreen() {
 
     return apiOptions.map((option) => {
       const tier = asString(option.tier, 'go');
+      const normalizedTier =
+        tier === 'go' || tier === 'plus' || tier === 'luxe' || tier === 'black'
+          ? tier
+          : 'go';
+      const baseFare = option.baseFare ?? option.base_fare;
+
       return {
-        id: asString(option.id, tier),
-        nameKey: `ride_options.${tier}`,
-        subtitleKey: `ride_options.${tier}_subtitle`,
-        priceKey: `ride_options.${tier}_price`,
-        image: imageByTier[tier] ?? imageByTier.go,
-        tier
+        id: asString(option.id, normalizedTier),
+        nameKey: `booking.ride_option_${normalizedTier}`,
+        subtitleKey: `booking.ride_option_subtitle_${normalizedTier}`,
+        priceKey: `booking.ride_option_price_${normalizedTier}`,
+        priceLabel: baseFare !== undefined ? formatNairaAmount(baseFare, { unit: 'naira' }) : undefined,
+        image: imageByTier[normalizedTier] ?? imageByTier.go,
+        tier: normalizedTier
       };
     });
   }, [rideOptionsData]);
@@ -382,14 +390,16 @@ export default function HomeScreen() {
       }
     : DEFAULT_REGION;
 
-  // Route coordinates for polyline
-  const routeCoordinates = origin
-    ? [origin.coordinates, ...destinations.map((d) => d.coordinates)]
-    : [];
+  // Fallback straight-line route coordinates for polyline
+  const routeCoordinates = useMemo(
+    () => (origin ? [origin.coordinates, ...destinations.map((d) => d.coordinates)] : []),
+    [origin, destinations]
+  );
 
-  const totalDistanceKm = routeCoordinates.length >= 2
-    ? getRouteDistanceKm(routeCoordinates)
-    : 0;
+  const routeCoordinatesToDraw =
+    roadPathCoordinates.length >= 2 ? roadPathCoordinates : routeCoordinates;
+
+  const totalDistanceKm = routeCoordinates.length >= 2 ? getRouteDistanceKm(routeCoordinates) : 0;
   const estimatedDurationMinutes = estimateDurationMinutes(totalDistanceKm);
 
   useEffect(() => {
@@ -399,6 +409,7 @@ export default function HomeScreen() {
         setRouteDurationMinutes(0);
         setRouteMetricsLoading(false);
         setRouteMetricsError(null);
+        setRoadPathCoordinates([]);
         return;
       }
 
@@ -406,22 +417,27 @@ export default function HomeScreen() {
       setRouteMetricsError(null);
 
       try {
-        const metrics = await googleDirectionsService.getRouteMetrics(
+        const routeData = await googleDirectionsService.getRouteData(
           origin.coordinates,
           destinations.map((stop) => stop.coordinates)
         );
-        setRouteDistanceKm(metrics.distanceKm);
-        setRouteDurationMinutes(metrics.durationMinutes);
-      } catch {
+        setRouteDistanceKm(routeData.distanceKm);
+        setRouteDurationMinutes(routeData.durationMinutes);
+        setRoadPathCoordinates(routeData.pathCoordinates);
+      } catch (error) {
         setRouteDistanceKm(totalDistanceKm);
         setRouteDurationMinutes(estimatedDurationMinutes);
         setRouteMetricsError('fallback');
+        setRoadPathCoordinates([]);
+        if (__DEV__) {
+          console.warn('[route] falling back to straight path', error);
+        }
       } finally {
         setRouteMetricsLoading(false);
       }
     };
 
-    loadRouteMetrics();
+    void loadRouteMetrics();
   }, [origin, destinations, totalDistanceKm, estimatedDurationMinutes]);
 
   const renderHomeContent = () => (
@@ -477,9 +493,9 @@ export default function HomeScreen() {
           showsCompass={false}
         >
           {/* Route Polyline - only in set-location mode */}
-          {viewMode !== "home" && routeCoordinates.length >= 2 && (
+          {viewMode !== "home" && routeCoordinatesToDraw.length >= 2 && (
             <Polyline
-              coordinates={routeCoordinates}
+              coordinates={routeCoordinatesToDraw}
               strokeColor={colors.primary}
               strokeWidth={4}
               lineDashPattern={[0]}
@@ -496,10 +512,7 @@ export default function HomeScreen() {
                     { borderColor: colors.primary },
                   ]}
                 >
-                  <Image
-                    source={{ uri: "https://i.pravatar.cc/100" }}
-                    style={styles.userMarkerImage}
-                  />
+                  <Ionicons name="person" size={22} color={colors.primary} />
                 </View>
                 <View
                   style={[
@@ -513,29 +526,14 @@ export default function HomeScreen() {
 
           {/* Destination Markers - only in set-location mode */}
           {viewMode !== "home" &&
-            destinations.map((dest, index) => (
+            destinations.map((dest) => (
               <Marker
                 key={dest.id}
                 coordinate={dest.coordinates}
                 anchor={{ x: 0.5, y: 1 }}
               >
                 <View style={styles.destinationMarkerContainer}>
-                  <View
-                    style={[
-                      styles.destinationMarkerPin,
-                      { backgroundColor: "#E53935" },
-                    ]}
-                  >
-                    <Text style={styles.destinationMarkerText}>
-                      {String.fromCharCode(65 + index)}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.destinationMarkerTail,
-                      { borderTopColor: "#E53935" },
-                    ]}
-                  />
+                  <Ionicons name="location" size={34} color="#E53935" />
                 </View>
               </Marker>
             ))}
@@ -702,11 +700,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  userMarkerImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
   userMarkerPulse: {
     position: "absolute",
     width: 60,
@@ -717,33 +710,6 @@ const styles = StyleSheet.create({
   },
   destinationMarkerContainer: {
     alignItems: "center",
-  },
-  destinationMarkerPin: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  destinationMarkerText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  destinationMarkerTail: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    marginTop: -2,
   },
 });
 

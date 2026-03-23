@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.chauffly.chauffly",
+      "bundleIdentifier": "com.chauffly.rider",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Chauffly needs your location to show nearby drivers and calculate routes.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Chauffly needs your location to provide ride services even when the app is in the background.",
@@ -21,7 +21,7 @@
       }
     },
     "android": {
-      "package": "com.chauffly.chauffly",
+      "package": "com.chauffly.rider",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

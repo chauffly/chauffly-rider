@@ -1,5 +1,5 @@
-import { HttpClient } from '../http';
-import { DriverLocationUpdateInput, NearbyDriversInput, PaginatedResponse } from '../types';
+import type { HttpClient } from '../http';
+import type { DriverLocationUpdateInput, NearbyDriversInput, PaginatedResponse } from '../types';
 import { withQuery } from './common';
 
 export interface DriverStatusInput {

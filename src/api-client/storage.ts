@@ -1,6 +1,7 @@
-import { AuthTokens } from './types';
+import type { AuthTokens } from './types';
 
 const DEFAULT_TOKEN_STORAGE_KEY = 'chauffly:auth:tokens';
+const SECURE_STORE_KEY_FALLBACK = 'chauffly.auth.tokens';
 
 export interface TokenStorage {
   getTokens(): Promise<AuthTokens | null>;
@@ -19,6 +20,11 @@ export interface SecureStoreLike {
   setItemAsync(key: string, value: string): Promise<void>;
   deleteItemAsync(key: string): Promise<void>;
 }
+
+const toSecureStoreKey = (key: string): string => {
+  const sanitized = key.trim().replace(/[^A-Za-z0-9._-]/g, '_');
+  return sanitized.length > 0 ? sanitized : SECURE_STORE_KEY_FALLBACK;
+};
 
 const safeParseTokens = (raw: string | null): AuthTokens | null => {
   if (!raw) {
@@ -77,17 +83,19 @@ export const createSecureStoreTokenStorage = (
   secureStore: SecureStoreLike,
   key: string = DEFAULT_TOKEN_STORAGE_KEY
 ): TokenStorage => {
+  const secureStoreKey = toSecureStoreKey(key);
+
   return {
     async getTokens(): Promise<AuthTokens | null> {
-      return safeParseTokens(await secureStore.getItemAsync(key));
+      return safeParseTokens(await secureStore.getItemAsync(secureStoreKey));
     },
 
     async setTokens(tokens: AuthTokens): Promise<void> {
-      await secureStore.setItemAsync(key, JSON.stringify(tokens));
+      await secureStore.setItemAsync(secureStoreKey, JSON.stringify(tokens));
     },
 
     async clearTokens(): Promise<void> {
-      await secureStore.deleteItemAsync(key);
+      await secureStore.deleteItemAsync(secureStoreKey);
     }
   };
 };

@@ -1,5 +1,6 @@
-import { io, ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
-import {
+import { io, Socket } from 'socket.io-client';
+import type { ManagerOptions, SocketOptions } from 'socket.io-client';
+import type {
   AdminClientToServerEvents,
   AdminServerToClientEvents,
   ChatClientToServerEvents,

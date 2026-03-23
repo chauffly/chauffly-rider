@@ -1,4 +1,4 @@
-import { ChaufflyApiClient } from '../client';
+import type { ChaufflyApiClient } from '../client';
 
 export type RideTabKey = 'past' | 'upcoming' | 'ongoing' | 'canceled';
 
@@ -78,7 +78,11 @@ const toImageAsset = (tier: string): LegacyRideOption['imageAsset'] => {
 };
 
 export class LocalJsonApiAdapter {
-  constructor(private readonly apiClient: ChaufflyApiClient) {}
+  private readonly apiClient: ChaufflyApiClient;
+
+  constructor(apiClient: ChaufflyApiClient) {
+    this.apiClient = apiClient;
+  }
 
   public async getCurrentUser(): Promise<Record<string, unknown>> {
     return this.apiClient.usersApi.getCurrentUser();

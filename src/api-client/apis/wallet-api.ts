@@ -1,5 +1,5 @@
-import { HttpClient } from '../http';
-import { PaginatedResponse, WalletTopUpInput } from '../types';
+import type { HttpClient } from '../http';
+import type { PaginatedResponse, WalletTopUpInput } from '../types';
 import { withQuery } from './common';
 
 export interface PaymentMethodInput {

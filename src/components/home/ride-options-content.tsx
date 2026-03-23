@@ -107,7 +107,7 @@ export function RideOptionsContent({
               </View>
               <View style={styles.rideOptionPriceWrap}>
                 <Text variant="body" font="medium">
-                  {t(option.priceKey)}
+                  {option.priceLabel ?? t(option.priceKey)}
                 </Text>
                 {isLoading ? (
                   <Text variant="caption" color="muted" translationKey="booking.eta_loading" />

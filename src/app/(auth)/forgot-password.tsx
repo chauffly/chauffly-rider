@@ -21,8 +21,7 @@ import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { authFlowStorage } from '@/services/auth-flow-storage';
-
-const NIGERIAN_PHONE_REGEX = /^\+234\d{10}$/;
+import { normalizeNigerianPhoneNumber } from '@/utils/phone';
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof ApiClientError) {
@@ -49,8 +48,10 @@ export default function ForgotPasswordScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSendResetCode = async () => {
-    if (!NIGERIAN_PHONE_REGEX.test(phoneNumber.trim())) {
-      setPhoneError('Use Nigerian format: +234XXXXXXXXXX');
+    const normalizedPhoneNumber = normalizeNigerianPhoneNumber(phoneNumber);
+
+    if (!normalizedPhoneNumber) {
+      setPhoneError('Use a valid Nigerian number (e.g. 08012345678 or +2348012345678).');
       return;
     }
 
@@ -60,12 +61,12 @@ export default function ForgotPasswordScreen() {
 
     try {
       await api.authApi.forgotPassword({
-        phone_number: phoneNumber.trim()
+        phone_number: normalizedPhoneNumber
       });
 
       await authFlowStorage.set({
         mode: 'reset_password',
-        phoneNumber: phoneNumber.trim()
+        phoneNumber: normalizedPhoneNumber
       });
 
       router.push('/(auth)/verify-otp');
@@ -107,7 +108,7 @@ export default function ForgotPasswordScreen() {
         <View style={styles.form}>
           <TextInput
             labelTranslationKey="auth.phone_number"
-            placeholder={'+2348123456789'}
+            placeholder={'08012345678'}
             leftIcon={<CallOutline />}
             keyboardType="phone-pad"
             value={phoneNumber}

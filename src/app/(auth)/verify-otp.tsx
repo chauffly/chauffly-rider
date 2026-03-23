@@ -21,6 +21,7 @@ import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { connectRiderSockets } from '@/runtime/rider-runtime';
 import { AuthFlowState, authFlowStorage } from '@/services/auth-flow-storage';
+import { normalizeNigerianPhoneNumber } from '@/utils/phone';
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof ApiClientError) {
@@ -81,9 +82,16 @@ export default function VerifyOtpScreen() {
     setGeneralError('');
 
     try {
+      const normalizedPhoneNumber = normalizeNigerianPhoneNumber(flowState.phoneNumber);
+
+      if (!normalizedPhoneNumber) {
+        setGeneralError('Invalid phone number. Please start registration again.');
+        return;
+      }
+
       if (flowState.mode === 'register') {
         const session = await api.authApi.verifyOtp({
-          phone_number: flowState.phoneNumber,
+          phone_number: normalizedPhoneNumber,
           otp: otpCode
         });
         await api.session.setTokens(session.tokens);
@@ -96,7 +104,7 @@ export default function VerifyOtpScreen() {
       router.push({
         pathname: '/(auth)/create-new-password',
         params: {
-          phone_number: flowState.phoneNumber,
+          phone_number: normalizedPhoneNumber,
           otp: otpCode
         }
       });
@@ -114,9 +122,16 @@ export default function VerifyOtpScreen() {
 
     setGeneralError('');
     try {
+      const normalizedPhoneNumber = normalizeNigerianPhoneNumber(flowState.phoneNumber);
+
+      if (!normalizedPhoneNumber) {
+        setGeneralError('Invalid phone number. Please start password reset again.');
+        return;
+      }
+
       if (flowState.mode === 'reset_password') {
         await api.authApi.forgotPassword({
-          phone_number: flowState.phoneNumber
+          phone_number: normalizedPhoneNumber
         });
         return;
       }

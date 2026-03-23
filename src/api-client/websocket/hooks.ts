@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChaufflySocketClient } from './socket-client';
-import {
+import type {
   ChatServerToClientEvents,
   NamespaceConnectionState,
   RidesServerToClientEvents,

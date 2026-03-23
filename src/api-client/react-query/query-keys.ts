@@ -1,4 +1,4 @@
-import { BookingTab } from '../types';
+import type { BookingTab } from '../types';
 
 export const queryKeys = {
   auth: {

@@ -1,6 +1,7 @@
-import React, { createContext, PropsWithChildren, useContext } from 'react';
+import React, { createContext, useContext } from 'react';
+import type { PropsWithChildren } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ChaufflyApiClient } from '../client';
+import type { ChaufflyApiClient } from '../client';
 
 const ApiClientContext = createContext<ChaufflyApiClient | null>(null);
 

@@ -20,6 +20,7 @@ import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { authFlowStorage } from '@/services/auth-flow-storage';
+import { normalizeNigerianPhoneNumber } from '@/utils/phone';
 
 const PASSWORD_REGEX =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
@@ -70,7 +71,9 @@ export default function CreateNewPasswordScreen() {
   }, [phoneNumber, otp]);
 
   const handleSavePassword = async () => {
-    if (!phoneNumber || !otp) {
+    const normalizedPhoneNumber = normalizeNigerianPhoneNumber(phoneNumber);
+
+    if (!normalizedPhoneNumber || !otp) {
       setErrorMessage('Missing password reset context. Request a new OTP.');
       return;
     }
@@ -90,7 +93,7 @@ export default function CreateNewPasswordScreen() {
 
     try {
       await api.authApi.resetPassword({
-        phone_number: phoneNumber,
+        phone_number: normalizedPhoneNumber,
         otp,
         new_password: newPassword
       });

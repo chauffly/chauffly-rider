@@ -1,4 +1,4 @@
-import { HttpClient } from '../http';
+import type { HttpClient } from '../http';
 import { withQuery } from './common';
 
 export interface ReportIncidentInput {
