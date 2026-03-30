@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,6 +14,7 @@ import UserOutline from '@/components/svg/UserOutline';
 import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
+import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
 
 export default function CorporateAdminInfoScreen() {
   const router = useRouter();
@@ -26,6 +27,10 @@ export default function CorporateAdminInfoScreen() {
   const [workEmail, setWorkEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [position, setPosition] = useState('');
+
+  useEffect(() => {
+    void riderOnboardingProgressStorage.setCurrentRoute('/(auth)/profile-setup/corporate-admin-info');
+  }, []);
 
   const handleContinue = () => {
     router.push({

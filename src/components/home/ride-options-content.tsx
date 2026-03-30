@@ -101,9 +101,6 @@ export function RideOptionsContent({
                     </View>
                   )}
                 </View>
-                <Text variant="caption" color="muted" numberOfLines={1}>
-                  {t(option.subtitleKey)}
-                </Text>
               </View>
               <View style={styles.rideOptionPriceWrap}>
                 <Text variant="body" font="medium">

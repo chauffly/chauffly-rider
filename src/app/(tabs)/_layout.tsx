@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { HapticTab } from "@/components/haptic-tab";
@@ -7,11 +7,16 @@ import { useTheme } from "@/context/theme-context";
 import { accountRoleService, type AccountRole } from "@/services/account-role";
 import { useCurrentUser } from "@/api-client";
 import { useTranslation } from "@/context/language-context";
+import {
+  RiderOnboardingRoute,
+  riderOnboardingProgressStorage
+} from "@/services/rider-onboarding-progress";
 
 export default function TabLayout() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const [accountRole, setAccountRole] = useState<AccountRole>("rider");
+  const [pendingRoute, setPendingRoute] = useState<RiderOnboardingRoute | null | undefined>(undefined);
   const { data: currentUser } = useCurrentUser();
   const isCorporate = accountRole === "corporate";
 
@@ -25,11 +30,34 @@ export default function TabLayout() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const loadPendingOnboardingRoute = async () => {
+      const route = await riderOnboardingProgressStorage.getPendingRoute();
+      if (active) {
+        setPendingRoute(route);
+      }
+    };
+
+    void loadPendingOnboardingRoute();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const role = String((currentUser as Record<string, unknown> | undefined)?.role ?? '');
     const nextRole: AccountRole = role === 'corporate_admin' ? 'corporate' : 'rider';
     setAccountRole(nextRole);
     void accountRoleService.setRole(nextRole);
   }, [currentUser]);
+
+  if (pendingRoute === undefined) {
+    return null;
+  }
+
+  if (pendingRoute) {
+    return <Redirect href={pendingRoute} />;
+  }
 
   return (
     <Tabs

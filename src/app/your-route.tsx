@@ -382,7 +382,7 @@ export default function YourRouteScreen() {
 
       return (
         <FlatList
-          data={searchResults.length > 0 ? searchResults : historyMatches}
+          data={(searchResults.length > 0 ? searchResults : historyMatches) as (PlacePrediction | HistoryItemType)[]}
           keyExtractor={(item) =>
             'placeId' in item ? item.placeId : item.id
           }

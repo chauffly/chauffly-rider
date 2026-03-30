@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,6 +15,7 @@ import UserOutline from '@/components/svg/UserOutline';
 import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
+import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
 
 const businessTypeOptions = [
   { label: 'Technology', value: 'technology', translationKey: 'profile_setup.corporate_business_type_technology' },
@@ -41,6 +42,10 @@ export default function CorporateOrganizationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
   const [country, setCountry] = useState('nigeria');
+
+  useEffect(() => {
+    void riderOnboardingProgressStorage.setCurrentRoute('/(auth)/profile-setup/corporate-organization');
+  }, []);
 
   const handleContinue = () => {
     router.push({

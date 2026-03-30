@@ -5,14 +5,14 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { useBookingById, useBookingUpdates, useDriverLocation as useLiveDriverLocation } from '@/api-client';
+import { useActiveBooking, useBookingById, useBookingUpdates, useDriverLocation as useLiveDriverLocation } from '@/api-client';
 import { Text } from '@/components/common/text';
 import ChevronLeft from '@/components/svg/ChevronLeft';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { socketClient } from '@/runtime/rider-runtime';
-import { asRecord, asString } from '@/utils/api-helpers';
+import { asNumber, asRecord, asString } from '@/utils/api-helpers';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -21,16 +21,27 @@ const DEFAULT_REGION = {
   longitudeDelta: 0.08
 };
 
-type RideArrivalState = 'accepted' | 'heading' | 'arrived';
+type RideArrivalState = 'searching' | 'accepted' | 'heading' | 'arrived';
 
 const mapBookingStatus = (status: string): RideArrivalState => {
+  if (!status) {
+    return 'searching';
+  }
+
   if (status === 'driver_arrived') {
     return 'arrived';
   }
   if (status === 'driver_heading') {
     return 'heading';
   }
-  return 'accepted';
+  if (status === 'searching' || status === 'pending') {
+    return 'searching';
+  }
+  if (status === 'driver_assigned') {
+    return 'accepted';
+  }
+
+  return 'searching';
 };
 
 export default function DriverAcceptsScreen() {
@@ -40,43 +51,79 @@ export default function DriverAcceptsScreen() {
   const { t } = useTranslation();
   const params = useLocalSearchParams<{
     bookingId?: string;
-    originName?: string;
-    originAddress?: string;
-    destinations?: string;
-    selectedRideId?: string;
     driverName?: string;
     driverPhone?: string;
     driverRating?: string;
     driverVehicle?: string;
   }>();
-  const bookingId = params.bookingId ?? '';
+  const requestedBookingId = params.bookingId ?? '';
+  const { data: activeBookingData } = useActiveBooking({
+    enabled: !requestedBookingId,
+    refetchInterval: !requestedBookingId ? 5000 : false
+  });
+  const activeBookingRecord = asRecord(activeBookingData);
+  const activeBookingEntity = asRecord(activeBookingRecord.booking);
+  const bookingId = requestedBookingId || asString(activeBookingEntity.id, '');
 
   const { data: bookingData } = useBookingById(bookingId, {
     enabled: Boolean(bookingId),
     refetchInterval: 5000
   });
 
-  const [rideArrivalState, setRideArrivalState] = useState<RideArrivalState>('accepted');
+  const [rideArrivalState, setRideArrivalState] = useState<RideArrivalState>('searching');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
   const [livePin, setLivePin] = useState('');
+  const [liveAssignedDriver, setLiveAssignedDriver] = useState<Record<string, unknown> | null>(null);
+  const [liveAssignedVehicle, setLiveAssignedVehicle] = useState<Record<string, unknown> | null>(null);
+  const [terminalState, setTerminalState] = useState<{
+    type: 'no_drivers' | 'cancelled';
+    message: string;
+  } | null>(null);
 
   const driverLocation = useLiveDriverLocation(socketClient);
 
   useBookingUpdates(socketClient, {
     onStatusChanged: (payload) => {
-      if (payload.bookingId !== bookingId) {
+      if (!bookingId || payload.bookingId !== bookingId) {
         return;
       }
       setRideArrivalState(mapBookingStatus(payload.status));
     },
-    onDriverAssigned: () => {
+    onDriverAssigned: (payload) => {
+      if (!bookingId || asString(payload.bookingId) !== bookingId) {
+        return;
+      }
+
+      setLiveAssignedDriver(asRecord(payload.driver));
+      setLiveAssignedVehicle(asRecord(payload.vehicle));
       setRideArrivalState('accepted');
     },
-    onRideCancelled: () => {
-      router.replace('/(tabs)');
+    onRideCancelled: (payload) => {
+      if (!bookingId || payload.bookingId !== bookingId) {
+        return;
+      }
+
+      setTerminalState({
+        type: 'cancelled',
+        message: payload.reason?.trim() || 'This booking was cancelled.'
+      });
+    },
+    onNoDrivers: (payload) => {
+      if (!bookingId || payload.bookingId !== bookingId) {
+        return;
+      }
+
+      setTerminalState({
+        type: 'no_drivers',
+        message: 'No nearby drivers are currently available for this trip.'
+      });
     },
     onTripCompleted: () => {
+      if (!bookingId) {
+        return;
+      }
+
       router.replace({
         pathname: '/booking/trip-arrived',
         params: {
@@ -119,24 +166,46 @@ export default function DriverAcceptsScreen() {
   }, [rideArrivalState]);
 
   const detail = asRecord(bookingData);
-  const driver = asRecord(detail.driver);
-  const vehicle = asRecord(driver.vehicle);
-  const driverName = params.driverName || `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Driver';
+  const booking = asRecord(detail.booking);
+  const driver = Object.keys(liveAssignedDriver ?? {}).length > 0 ? liveAssignedDriver! : asRecord(detail.driver);
+  const vehicle =
+    Object.keys(liveAssignedVehicle ?? {}).length > 0
+      ? liveAssignedVehicle!
+      : asRecord(driver.vehicle);
+  const driverName =
+    params.driverName || `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Driver';
   const driverPhone = params.driverPhone || asString(driver.phoneNumber, '--');
   const driverRating = params.driverRating || asString(driver.rating, '--');
   const driverVehicle =
     params.driverVehicle || `${asString(vehicle.make)} ${asString(vehicle.model)}`.trim() || '--';
+  const hasAssignedDriver =
+    rideArrivalState !== 'searching' ||
+    Object.keys(driver).length > 0 ||
+    Boolean(params.driverName && params.driverName.trim());
+  const pickupCoordinates = asRecord(booking.pickupCoordinates);
+  const bookingPickupLatitude = asNumber(pickupCoordinates.lat, DEFAULT_REGION.latitude);
+  const bookingPickupLongitude = asNumber(pickupCoordinates.lng, DEFAULT_REGION.longitude);
 
   const markerCoordinates = useMemo(
     () => ({
-      latitude: driverLocation.lat ?? 9.18,
-      longitude: driverLocation.lng ?? 7.55
+      latitude: driverLocation.lat ?? bookingPickupLatitude,
+      longitude: driverLocation.lng ?? bookingPickupLongitude
     }),
-    [driverLocation.lat, driverLocation.lng]
+    [bookingPickupLatitude, bookingPickupLongitude, driverLocation.lat, driverLocation.lng]
+  );
+
+  const mapRegion = useMemo(
+    () => ({
+      latitude: bookingPickupLatitude,
+      longitude: bookingPickupLongitude,
+      latitudeDelta: 0.035,
+      longitudeDelta: 0.035
+    }),
+    [bookingPickupLatitude, bookingPickupLongitude]
   );
 
   const handlePinConfirm = () => {
-    if (!pin.trim()) {
+    if (!pin.trim() || !bookingId) {
       return;
     }
 
@@ -151,14 +220,18 @@ export default function DriverAcceptsScreen() {
   };
 
   const statusTitle =
-    rideArrivalState === 'accepted'
+    rideArrivalState === 'searching'
+      ? t('booking.driver_assigned_later')
+      : rideArrivalState === 'accepted'
       ? t('booking.chauffeur_accepts_ride')
       : rideArrivalState === 'heading'
         ? t('booking.driver_heading_to_location')
         : t('booking.chauffeur_has_arrived');
 
   const statusSubtitle =
-    rideArrivalState === 'accepted'
+    rideArrivalState === 'searching'
+      ? t('booking.driver_assigned_later_note')
+      : rideArrivalState === 'accepted'
       ? t('booking.driver_assigned_later_note')
       : rideArrivalState === 'heading'
         ? t('booking.arriving_in_one_minute')
@@ -174,6 +247,10 @@ export default function DriverAcceptsScreen() {
   };
 
   const openDriverChat = () => {
+    if (!bookingId) {
+      return;
+    }
+
     router.push({
       pathname: '/booking/message-driver',
       params: {
@@ -184,6 +261,10 @@ export default function DriverAcceptsScreen() {
   };
 
   const openDriverInfo = () => {
+    if (!bookingId) {
+      return;
+    }
+
     router.push({
       pathname: '/booking/driver-info',
       params: {
@@ -196,19 +277,37 @@ export default function DriverAcceptsScreen() {
     });
   };
 
+  const handleTerminalDismiss = () => {
+    setTerminalState(null);
+    router.replace('/(tabs)');
+  };
+
   return (
     <View style={styles.container}>
-      <MapView style={styles.map} initialRegion={DEFAULT_REGION}>
-        <Marker coordinate={markerCoordinates}>
-          <View style={[styles.marker, { backgroundColor: colors.primary }]}>
-            <MaterialCommunityIcons name="car" size={18} color={colors.textInverse} />
-          </View>
-        </Marker>
-        <Polyline
-          coordinates={[markerCoordinates, { latitude: 9.11, longitude: 7.52 }]}
-          strokeColor={colors.primary}
-          strokeWidth={4}
-        />
+      <MapView style={styles.map} region={mapRegion}>
+        {hasAssignedDriver ? (
+          <Marker coordinate={markerCoordinates}>
+            <View style={[styles.marker, { backgroundColor: colors.primary }]}>
+              <MaterialCommunityIcons name="car" size={18} color={colors.textInverse} />
+            </View>
+          </Marker>
+        ) : (
+          <Marker coordinate={{ latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }}>
+            <View style={[styles.marker, { backgroundColor: colors.primary }]}>
+              <MaterialCommunityIcons name="map-marker" size={18} color={colors.textInverse} />
+            </View>
+          </Marker>
+        )}
+        {hasAssignedDriver ? (
+          <Polyline
+            coordinates={[
+              markerCoordinates,
+              { latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }
+            ]}
+            strokeColor={colors.primary}
+            strokeWidth={4}
+          />
+        ) : null}
       </MapView>
 
       <Pressable
@@ -244,54 +343,97 @@ export default function DriverAcceptsScreen() {
           {statusSubtitle}
         </Text>
         <Text variant="body" style={styles.vehicleText}>
-          {driverVehicle}
+          {hasAssignedDriver ? driverVehicle : 'Matching your chauffeur'}
         </Text>
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-        <Pressable style={styles.driverRow} onPress={openDriverInfo}>
-          <View style={[styles.avatar, { backgroundColor: colors.border }]}>
-            <MaterialCommunityIcons name="account" size={28} color={colors.textSecondary} />
-          </View>
-          <View style={styles.driverInfo}>
-            <Text variant="body" font="medium">
-              {driverName}
-            </Text>
-            <View style={styles.ratingRow}>
-              <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
-              <Text variant="bodySmall" color="muted">
-                {driverRating}
+        {hasAssignedDriver ? (
+          <Pressable style={styles.driverRow} onPress={openDriverInfo}>
+            <View style={[styles.avatar, { backgroundColor: colors.border }]}>
+              <MaterialCommunityIcons name="account" size={28} color={colors.textSecondary} />
+            </View>
+            <View style={styles.driverInfo}>
+              <Text variant="body" font="medium">
+                {driverName}
+              </Text>
+              <View style={styles.ratingRow}>
+                <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
+                <Text variant="bodySmall" color="muted">
+                  {driverRating}
+                </Text>
+                <Text variant="bodySmall" color="muted">
+                  {driverPhone}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.actionIcons}>
+              <Pressable
+                style={[styles.iconButton, { backgroundColor: colors.accent }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('booking.message_driver')}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  openDriverChat();
+                }}
+              >
+                <MaterialCommunityIcons name="message-text-outline" size={20} color={colors.primary} />
+              </Pressable>
+              <Pressable
+                style={[styles.iconButton, { backgroundColor: colors.accent }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('booking.call_driver')}
+                onPress={async (event) => {
+                  event.stopPropagation();
+                  await handleCallDriver();
+                }}
+              >
+                <MaterialCommunityIcons name="phone-outline" size={20} color={colors.primary} />
+              </Pressable>
+            </View>
+          </Pressable>
+        ) : (
+          <View style={styles.driverRow}>
+            <View style={[styles.avatar, { backgroundColor: colors.border }]}>
+              <MaterialCommunityIcons name="account-search-outline" size={28} color={colors.textSecondary} />
+            </View>
+            <View style={styles.driverInfo}>
+              <Text variant="body" font="medium">
+                Looking for a chauffeur
               </Text>
               <Text variant="bodySmall" color="muted">
-                {driverPhone}
+                You will see driver details here as soon as one accepts.
               </Text>
             </View>
           </View>
-          <View style={styles.actionIcons}>
+        )}
+      </View>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(terminalState)}
+        onRequestClose={handleTerminalDismiss}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Text variant="h3" weight="medium" align="center">
+              {terminalState?.type === 'no_drivers' ? 'No drivers available' : 'Booking cancelled'}
+            </Text>
+            <Text variant="bodySmall" color="muted" align="center">
+              {terminalState?.message ?? ''}
+            </Text>
+
             <Pressable
-              style={[styles.iconButton, { backgroundColor: colors.accent }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('booking.message_driver')}
-              onPress={(event) => {
-                event.stopPropagation();
-                openDriverChat();
-              }}
+              style={[styles.confirmButton, { backgroundColor: colors.primary }]}
+              onPress={handleTerminalDismiss}
             >
-              <MaterialCommunityIcons name="message-text-outline" size={20} color={colors.primary} />
-            </Pressable>
-            <Pressable
-              style={[styles.iconButton, { backgroundColor: colors.accent }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('booking.call_driver')}
-              onPress={async (event) => {
-                event.stopPropagation();
-                await handleCallDriver();
-              }}
-            >
-              <MaterialCommunityIcons name="phone-outline" size={20} color={colors.primary} />
+              <Text variant="body" weight="medium" color="inverse">
+                Go Home
+              </Text>
             </Pressable>
           </View>
-        </Pressable>
-      </View>
+        </View>
+      </Modal>
 
       <Modal transparent animationType="slide" visible={showPinModal} onRequestClose={() => setShowPinModal(false)}>
         <View style={styles.modalOverlay}>

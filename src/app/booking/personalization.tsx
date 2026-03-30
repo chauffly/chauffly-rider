@@ -1,6 +1,6 @@
 import { StyleSheet, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams, type Href } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Text } from '@/components/common/text';
@@ -13,7 +13,7 @@ import { useTranslation } from '@/context/language-context';
 interface PersonalizationItem {
   key: string;
   titleKey: string;
-  route: Href<string>;
+  route: string;
 }
 
 const personalizationItems: PersonalizationItem[] = [
@@ -76,7 +76,7 @@ export default function PersonalizationScreen() {
               router.push({
                 pathname: item.route,
                 params,
-              })
+              } as never)
             }
             style={[styles.listItem, { backgroundColor: colors.surface }]}
             accessibilityRole="button"
@@ -100,7 +100,7 @@ export default function PersonalizationScreen() {
             router.push({
               pathname: isFromSchedule ? "/booking/schedule-detail" : "/booking/ride-summary",
               params,
-            })
+            } as never)
           }
         />
       </View>

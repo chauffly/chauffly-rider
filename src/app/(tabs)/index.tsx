@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { Pressable, StyleSheet, View } from "react-native";
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
+import { useQuery } from '@tanstack/react-query';
 
 import { Ionicons } from "@expo/vector-icons";
 import { LocationPermissionModal } from '@/components/common/location-permission-modal';
@@ -17,7 +18,7 @@ import { useTheme } from '@/context/theme-context';
 import { useLocation } from "@/context/location-context";
 import { spacing, borderRadius } from '@/constants/spacing';
 import { rideOptions } from '@/constants/ride-options';
-import { useCurrentUser, useRideOptions } from '@/api-client';
+import { useActiveBooking, useApiClient, useCurrentUser, useRideOptions } from '@/api-client';
 import { accountRoleService, type AccountRole } from '@/services/account-role';
 import {
   locationHistoryService,
@@ -25,7 +26,7 @@ import {
 } from "@/services/location-history";
 import { estimateDurationMinutes, getRouteDistanceKm } from '@/utils/route';
 import { googleDirectionsService } from '@/services/google-directions';
-import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
 import { formatNairaAmount } from '@/utils/currency';
 
 const DEFAULT_REGION = {
@@ -36,6 +37,16 @@ const DEFAULT_REGION = {
 };
 
 type ViewMode = "home" | "set-location" | "ride-options";
+type RideOptionWithPricing = RideOption & {
+  tier: string;
+  baseFareAmount?: number;
+  perKmRateAmount?: number;
+  perMinuteRateAmount?: number;
+  tierSurgeMultiplier?: number;
+};
+
+const VAT_RATE = 0.075;
+const roundCurrency = (value: number): number => Number(value.toFixed(2));
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -57,8 +68,12 @@ export default function HomeScreen() {
     setHasAskedPermission,
     getCurrentLocation,
   } = useLocation();
-  const { data: currentUserData } = useCurrentUser();
-  const { data: rideOptionsData } = useRideOptions();
+  const { data: currentUserData, refetch: refetchCurrentUser } = useCurrentUser();
+  const { data: rideOptionsData, refetch: refetchRideOptions } = useRideOptions();
+  const api = useApiClient();
+  const { data: activeBookingData } = useActiveBooking({
+    refetchInterval: 5000
+  });
 
   const mapRef = useRef<MapView>(null);
   const [accountRole, setAccountRole] = useState<AccountRole>('rider');
@@ -79,6 +94,8 @@ export default function HomeScreen() {
   const [routeMetricsError, setRouteMetricsError] = useState<string | null>(null);
   const [roadPathCoordinates, setRoadPathCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const recoveredBookingRef = useRef<string | null>(null);
 
   // Route state for set-location view
   const [origin, setOrigin] = useState<Origin | null>(null);
@@ -102,6 +119,34 @@ export default function HomeScreen() {
     setAccountRole(nextRole);
     void accountRoleService.setRole(nextRole);
   }, [apiUser]);
+
+  useEffect(() => {
+    const activeBooking = asRecord(activeBookingData);
+    const booking = asRecord(activeBooking.booking);
+    const bookingId = asString(booking.id);
+    const bookingStatus = asString(booking.status);
+
+    if (!bookingId || !bookingStatus) {
+      recoveredBookingRef.current = null;
+      return;
+    }
+
+    const recoveryKey = `${bookingId}:${bookingStatus}`;
+    if (recoveredBookingRef.current === recoveryKey) {
+      return;
+    }
+
+    recoveredBookingRef.current = recoveryKey;
+
+    if (['searching', 'pending', 'driver_assigned', 'driver_heading', 'driver_arrived'].includes(bookingStatus)) {
+      router.replace(`/booking/driver-accepts?bookingId=${encodeURIComponent(bookingId)}`);
+      return;
+    }
+
+    if (bookingStatus === 'in_progress') {
+      router.replace(`/booking/heading-destination?bookingId=${encodeURIComponent(bookingId)}`);
+    }
+  }, [activeBookingData, router]);
 
   // Handle params from your-route screen
   useEffect(() => {
@@ -213,6 +258,21 @@ export default function HomeScreen() {
     const locations = await locationHistoryService.getSavedLocations();
     setSavedLocations(locations);
   };
+
+  const handleRefreshHome = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      await Promise.allSettled([
+        refetchCurrentUser(),
+        refetchRideOptions(),
+        loadSavedLocations(),
+        permissionStatus === 'granted' ? getCurrentLocation() : Promise.resolve(null)
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [getCurrentLocation, permissionStatus, refetchCurrentUser, refetchRideOptions]);
 
   const handleGrantPermission = async () => {
     setShowPermissionModal(false);
@@ -327,7 +387,7 @@ export default function HomeScreen() {
     { key: "apartment", translationKey: "location.apartment" },
   ];
 
-  const rideOptionsList = useMemo<(RideOption & { tier: string })[]>(() => {
+  const rideOptionsList = useMemo<RideOptionWithPricing[]>(() => {
     const rideOptionsPayload = asRecord(rideOptionsData);
     const apiOptions = asArray<Record<string, unknown>>(rideOptionsPayload.items).length
       ? asArray<Record<string, unknown>>(rideOptionsPayload.items)
@@ -352,32 +412,165 @@ export default function HomeScreen() {
         tier === 'go' || tier === 'plus' || tier === 'luxe' || tier === 'black'
           ? tier
           : 'go';
-      const baseFare = option.baseFare ?? option.base_fare;
+      const baseFare = asNumber(option.baseFare ?? option.base_fare, 0);
+      const perKmRate = asNumber(option.perKmRate ?? option.per_km_rate, 0);
+      const perMinuteRate = asNumber(option.perMinuteRate ?? option.per_minute_rate, 0);
+      const tierSurgeMultiplier = Math.max(1, asNumber(option.surgeMultiplier ?? option.surge_multiplier, 1));
 
       return {
         id: asString(option.id, normalizedTier),
         nameKey: `booking.ride_option_${normalizedTier}`,
         subtitleKey: `booking.ride_option_subtitle_${normalizedTier}`,
         priceKey: `booking.ride_option_price_${normalizedTier}`,
-        priceLabel: baseFare !== undefined ? formatNairaAmount(baseFare, { unit: 'naira' }) : undefined,
+        priceLabel: formatNairaAmount(baseFare, { unit: 'naira' }),
         image: imageByTier[normalizedTier] ?? imageByTier.go,
-        tier: normalizedTier
+        tier: normalizedTier,
+        baseFareAmount: baseFare,
+        perKmRateAmount: perKmRate,
+        perMinuteRateAmount: perMinuteRate,
+        tierSurgeMultiplier
       };
     });
   }, [rideOptionsData]);
 
+  const estimateStopsPayload = useMemo(
+    () =>
+      destinations.map((stop) => ({
+        lat: stop.coordinates.latitude,
+        lng: stop.coordinates.longitude
+      })),
+    [destinations]
+  );
+
+  const estimateCoordinatesKey = useMemo(() => {
+    if (!origin || estimateStopsPayload.length === 0) {
+      return '';
+    }
+
+    const originKey = `${origin.coordinates.latitude.toFixed(6)},${origin.coordinates.longitude.toFixed(6)}`;
+    const stopsKey = estimateStopsPayload.map((stop) => `${stop.lat.toFixed(6)},${stop.lng.toFixed(6)}`).join('|');
+    return `${originKey}->${stopsKey}`;
+  }, [origin, estimateStopsPayload]);
+
+  const rideOptionIdsKey = useMemo(
+    () => rideOptionsList.map((option) => option.id).join('|'),
+    [rideOptionsList]
+  );
+
+  const canEstimateRideOptions =
+    viewMode === 'ride-options' &&
+    Boolean(origin) &&
+    estimateStopsPayload.length > 0 &&
+    rideOptionsList.length > 0;
+
+  const rideOptionEstimatesQuery = useQuery({
+    queryKey: ['ride-option-estimates', estimateCoordinatesKey, rideOptionIdsKey],
+    enabled: canEstimateRideOptions,
+    queryFn: async () => {
+      if (!origin || estimateStopsPayload.length === 0) {
+        return {} as Record<string, number>;
+      }
+
+      const pickup = {
+        lat: origin.coordinates.latitude,
+        lng: origin.coordinates.longitude
+      };
+
+      const estimates = await Promise.all(
+        rideOptionsList.map(async (option) => {
+          try {
+            const response = await api.bookingApi.estimate({
+              pickup,
+              stops: estimateStopsPayload,
+              ride_option_id: option.id
+            });
+            const payload = asRecord(response);
+            const fareBreakdown = asRecord(payload.fare_breakdown);
+            const total = asNumber(fareBreakdown.total ?? payload.estimated_fare, NaN);
+
+            if (!Number.isFinite(total) || total <= 0) {
+              return [option.id, null] as const;
+            }
+
+            return [option.id, total] as const;
+          } catch {
+            return [option.id, null] as const;
+          }
+        })
+      );
+
+      return estimates.reduce<Record<string, number>>((acc, [rideOptionId, amount]) => {
+        if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) {
+          acc[rideOptionId] = amount;
+        }
+        return acc;
+      }, {});
+    },
+    staleTime: 15_000
+  });
+
+  const rideOptionsWithEstimate = useMemo(() => {
+    const estimateMap = asRecord(rideOptionEstimatesQuery.data);
+    const fallbackRouteCoordinates = origin
+      ? [origin.coordinates, ...destinations.map((destination) => destination.coordinates)]
+      : [];
+    const fallbackDistanceKm =
+      routeDistanceKm > 0
+        ? routeDistanceKm
+        : fallbackRouteCoordinates.length >= 2
+          ? getRouteDistanceKm(fallbackRouteCoordinates)
+          : 0;
+    const fallbackDurationMinutes =
+      routeDurationMinutes > 0 ? routeDurationMinutes : estimateDurationMinutes(fallbackDistanceKm);
+
+    return rideOptionsList.map((option) => {
+      const estimatedAmount = asNumber(estimateMap[option.id], NaN);
+
+      if (Number.isFinite(estimatedAmount) && estimatedAmount > 0) {
+        return {
+          ...option,
+          priceLabel: formatNairaAmount(estimatedAmount, { unit: 'naira' })
+        };
+      }
+
+      const hasPricingParams =
+        typeof option.baseFareAmount === 'number' &&
+        typeof option.perKmRateAmount === 'number' &&
+        typeof option.perMinuteRateAmount === 'number';
+
+      if (hasPricingParams && fallbackDistanceKm > 0) {
+        const baseTripFare = roundCurrency(
+          option.baseFareAmount! +
+            fallbackDistanceKm * option.perKmRateAmount! +
+            fallbackDurationMinutes * option.perMinuteRateAmount!
+        );
+        const surgedTripFare = roundCurrency(baseTripFare * Math.max(1, option.tierSurgeMultiplier ?? 1));
+        const fallbackTotal = roundCurrency(surgedTripFare + surgedTripFare * VAT_RATE);
+
+        if (Number.isFinite(fallbackTotal) && fallbackTotal > 0) {
+          return {
+            ...option,
+            priceLabel: formatNairaAmount(fallbackTotal, { unit: 'naira' })
+          };
+        }
+      }
+
+      return option;
+    });
+  }, [destinations, origin, rideOptionEstimatesQuery.data, rideOptionsList, routeDistanceKm, routeDurationMinutes]);
+
   useEffect(() => {
-    if (rideOptionsList.length === 0) {
+    if (rideOptionsWithEstimate.length === 0) {
       return;
     }
 
-    if (!rideOptionsList.some((option) => option.id === selectedRideId)) {
-      setSelectedRideId(rideOptionsList[0].id);
+    if (!rideOptionsWithEstimate.some((option) => option.id === selectedRideId)) {
+      setSelectedRideId(rideOptionsWithEstimate[0].id);
     }
-  }, [rideOptionsList, selectedRideId]);
+  }, [rideOptionsWithEstimate, selectedRideId]);
 
   const activeSelectedRide =
-    rideOptionsList.find((option) => option.id === selectedRideId) ?? rideOptionsList[0];
+    rideOptionsWithEstimate.find((option) => option.id === selectedRideId) ?? rideOptionsWithEstimate[0];
   const activeSelectedRideId = activeSelectedRide?.id ?? '';
   const activeSelectedRideTier = activeSelectedRide?.tier ?? 'go';
 
@@ -460,14 +653,14 @@ export default function HomeScreen() {
 
   const renderRideOptionsContent = () => (
     <RideOptionsContent
-      rideOptions={rideOptionsList}
+      rideOptions={rideOptionsWithEstimate}
       selectedRideId={activeSelectedRideId}
       onSelectRide={setSelectedRideId}
       onProceed={handleProceedInstantRide}
       onSchedule={handleScheduleRide}
       etaMinutes={routeDurationMinutes || estimatedDurationMinutes || undefined}
       defaultEtaMinutes={3}
-      isLoading={routeMetricsLoading}
+      isLoading={routeMetricsLoading || rideOptionEstimatesQuery.isFetching}
       hasError={!!routeMetricsError}
     />
   );
@@ -611,7 +804,22 @@ export default function HomeScreen() {
           setModalHeight(height);
         }}
       >
-        {viewMode === "home" && renderHomeContent()}
+        {viewMode === "home" && (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.homeScrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefreshHome}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            }
+          >
+            {renderHomeContent()}
+          </ScrollView>
+        )}
         {viewMode === "set-location" && renderSetLocationContent()}
         {viewMode === "ride-options" && renderRideOptionsContent()}
       </View>
@@ -680,6 +888,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+  },
+  homeScrollContent: {
+    paddingBottom: spacing.xs,
   },
   // Map markers for set-location
   userMarkerContainer: {

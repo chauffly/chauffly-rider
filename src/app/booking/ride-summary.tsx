@@ -15,7 +15,7 @@ import { rideOptions } from '@/constants/ride-options';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
-import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
 import { formatNairaAmount } from '@/utils/currency';
 
 const generateIdempotencyKey = (): string => {
@@ -28,6 +28,8 @@ const generateIdempotencyKey = (): string => {
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const isUuid = (value: string): boolean => UUID_REGEX.test(value);
+const VAT_RATE = 0.075;
+const roundCurrency = (value: number): number => Number(value.toFixed(2));
 
 type DestinationInput = {
   id?: string;
@@ -133,9 +135,26 @@ export default function RideSummaryScreen() {
     rideOptions.find((option) => option.id === selectedRideTier) ??
     rideOptions[0];
 
-  const fallbackBaseFare = selectedRideOption?.baseFare ?? selectedRideOption?.base_fare ?? 0;
+  const fallbackBaseFare = asNumber(selectedRideOption?.baseFare ?? selectedRideOption?.base_fare, 0);
+  const fallbackPerKmRate = asNumber(selectedRideOption?.perKmRate ?? selectedRideOption?.per_km_rate, 0);
+  const fallbackPerMinuteRate = asNumber(
+    selectedRideOption?.perMinuteRate ?? selectedRideOption?.per_minute_rate,
+    0
+  );
+  const fallbackSurgeMultiplier = Math.max(
+    1,
+    asNumber(selectedRideOption?.surgeMultiplier ?? selectedRideOption?.surge_multiplier, 1)
+  );
   const durationMinutes = params.estimatedDurationMinutes ? Number(params.estimatedDurationMinutes) : 45;
   const distanceKm = params.distanceKm ? Number(params.distanceKm) : null;
+  const safeDistanceKm = Number.isFinite(distanceKm) && distanceKm !== null ? Math.max(distanceKm, 0) : 0;
+  const safeDurationMinutes = Number.isFinite(durationMinutes) ? Math.max(durationMinutes, 0) : 0;
+  const fallbackTripFareValue = roundCurrency(
+    fallbackBaseFare + safeDistanceKm * fallbackPerKmRate + safeDurationMinutes * fallbackPerMinuteRate
+  );
+  const fallbackSurgedFareValue = roundCurrency(fallbackTripFareValue * fallbackSurgeMultiplier);
+  const fallbackTaxValue = roundCurrency(fallbackSurgedFareValue * VAT_RATE);
+  const fallbackTotalFareValue = roundCurrency(fallbackSurgedFareValue + fallbackTaxValue);
   const pickupDate = params.pickupDate;
   const pickupTime = params.pickupTime;
   const pickupDateTime =
@@ -198,14 +217,22 @@ export default function RideSummaryScreen() {
 
   const estimateRecord = asRecord(estimateFareData);
   const fareBreakdown = asRecord(estimateRecord.fare_breakdown);
+  const apiTripFareValue = asNumber(fareBreakdown.trip_fare, NaN);
+  const apiSurgeFeeValue = asNumber(fareBreakdown.surge_fee, NaN);
+  const apiTaxValue = asNumber(fareBreakdown.tax, NaN);
+  const apiTotalValue = asNumber(fareBreakdown.total ?? estimateRecord.estimated_fare, NaN);
 
-  const tripFare = formatNairaAmount(
-    fareBreakdown.trip_fare ?? estimateRecord.estimated_fare ?? fallbackBaseFare
-  );
-  const tax = formatNairaAmount(fareBreakdown.tax || 0);
-  const total = formatNairaAmount(
-    fareBreakdown.total ?? estimateRecord.estimated_fare ?? fallbackBaseFare
-  );
+  const tripFareValue = Number.isFinite(apiTripFareValue) ? apiTripFareValue : fallbackTripFareValue;
+  const taxValue = Number.isFinite(apiTaxValue) ? apiTaxValue : fallbackTaxValue;
+  const totalValue = Number.isFinite(apiTotalValue) ? apiTotalValue : fallbackTotalFareValue;
+  const derivedSurgeFeeValue = roundCurrency(Math.max(0, totalValue - tripFareValue - taxValue));
+  const surgeFeeValue = Number.isFinite(apiSurgeFeeValue) ? apiSurgeFeeValue : derivedSurgeFeeValue;
+  const showSurgeFee = surgeFeeValue > 0.01;
+
+  const tripFare = formatNairaAmount(tripFareValue, { unit: 'naira' });
+  const surgeFee = formatNairaAmount(surgeFeeValue, { unit: 'naira' });
+  const tax = formatNairaAmount(taxValue, { unit: 'naira' });
+  const total = formatNairaAmount(totalValue, { unit: 'naira' });
 
   const handleCreateBooking = async () => {
     if (!params.originAddress || !pickupLat || !pickupLng || destinations.length === 0) {
@@ -251,27 +278,20 @@ export default function RideSummaryScreen() {
       });
 
       const result = asRecord(bookingResponse);
-      const booking = asRecord(result.booking);
-      const bookingEntity = asRecord(booking.booking);
-      const driver = asRecord(booking.driver);
-      const vehicle = asRecord(driver.vehicle);
-      const bookingId = asString(bookingEntity.id) || asString(result.bookingId);
+      const bookingDetail = asRecord(result.booking);
+      const bookingEntity = asRecord(bookingDetail.booking);
+      const bookingId =
+        asString(bookingEntity.id) ||
+        asString(bookingDetail.id) ||
+        asString(result.bookingId) ||
+        asString(result.booking_id);
 
-      router.push({
-        pathname: '/booking/driver-accepts',
-        params: {
-          bookingId,
-          selectedRideId: rideOptionIdForApi,
-          selectedRideTier: resolvedRideTier || selectedRide.id,
-          originName: params.originName,
-          originAddress: params.originAddress,
-          destinations: JSON.stringify(destinations),
-          driverName: `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim(),
-          driverPhone: asString(driver.phoneNumber),
-          driverRating: asString(driver.rating),
-          driverVehicle: `${asString(vehicle.make)} ${asString(vehicle.model)}`.trim()
-        }
-      });
+      if (bookingId) {
+        router.replace(`/booking/driver-accepts?bookingId=${encodeURIComponent(bookingId)}`);
+        return;
+      }
+
+      router.replace('/booking/driver-accepts');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create booking.';
       setBookingError(message);
@@ -340,6 +360,12 @@ export default function RideSummaryScreen() {
             <Text variant="caption" color="muted" translationKey="booking.trip_fare" />
             <Text variant="caption">{tripFare}</Text>
           </View>
+          {showSurgeFee ? (
+            <View style={styles.fareRow}>
+              <Text variant="caption" color="muted" translationKey="booking.surge_fee" />
+              <Text variant="caption">{surgeFee}</Text>
+            </View>
+          ) : null}
           <View style={styles.fareRow}>
             <Text variant="caption" color="muted" translationKey="booking.tax" />
             <Text variant="caption">{tax}</Text>

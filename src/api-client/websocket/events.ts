@@ -12,6 +12,7 @@ export interface RidesServerToClientEvents {
   ride_cancelled: (payload: { bookingId: string; reason?: string | null }) => void;
   ride_timeout: (payload: { bookingId: string }) => void;
   driver_assigned: (payload: {
+    bookingId: string;
     driver: Record<string, unknown> | null;
     vehicle: Record<string, unknown> | null;
     eta?: number | null;

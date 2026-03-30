@@ -19,10 +19,10 @@ const parseBoolean = (value: string | undefined, fallback = false): boolean => {
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
 export const env = {
-  apiBaseUrl: trimTrailingSlash(process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:5000'),
+  apiBaseUrl: trimTrailingSlash(process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:4000'),
   apiPrefix: process.env.EXPO_PUBLIC_API_PREFIX ?? '/api/v1',
   socketBaseUrl: trimTrailingSlash(
-    process.env.EXPO_PUBLIC_SOCKET_BASE_URL ?? process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:5000'
+    process.env.EXPO_PUBLIC_SOCKET_BASE_URL ?? process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:4000'
   ),
   socketPath: process.env.EXPO_PUBLIC_SOCKET_PATH ?? '/socket.io',
   requestTimeoutMs: parseNumber(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT_MS, 15_000),

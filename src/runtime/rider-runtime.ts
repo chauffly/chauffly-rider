@@ -1,7 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
-
 import {
   ChaufflySocketClient,
+  MemoryTokenStorage,
+  createAsyncStorageTokenStorage,
   createChaufflyApiClient,
   createDefaultQueryClient,
   createSecureStoreTokenStorage,
@@ -17,11 +17,62 @@ const buildRequestId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-export const tokenStorage = createSecureStoreTokenStorage({
-  getItemAsync: SecureStore.getItemAsync,
-  setItemAsync: SecureStore.setItemAsync,
-  deleteItemAsync: SecureStore.deleteItemAsync
-});
+const initializeTokenStorage = () => {
+  try {
+    // Keep SecureStore as primary persistence when native module is available.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const secureStore = require('expo-secure-store') as {
+      getItemAsync?: (key: string) => Promise<string | null>;
+      setItemAsync?: (key: string, value: string) => Promise<void>;
+      deleteItemAsync?: (key: string) => Promise<void>;
+    };
+
+    if (
+      typeof secureStore.getItemAsync === 'function' &&
+      typeof secureStore.setItemAsync === 'function' &&
+      typeof secureStore.deleteItemAsync === 'function'
+    ) {
+      return createSecureStoreTokenStorage({
+        getItemAsync: secureStore.getItemAsync,
+        setItemAsync: secureStore.setItemAsync,
+        deleteItemAsync: secureStore.deleteItemAsync
+      });
+    }
+  } catch {
+    // Fall through to AsyncStorage for simulators/builds missing SecureStore.
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const asyncStorageModule = require('@react-native-async-storage/async-storage') as {
+      default?: {
+        getItem?: (key: string) => Promise<string | null>;
+        setItem?: (key: string, value: string) => Promise<void>;
+        removeItem?: (key: string) => Promise<void>;
+      };
+    };
+    const asyncStorage = asyncStorageModule.default;
+
+    if (
+      asyncStorage &&
+      typeof asyncStorage.getItem === 'function' &&
+      typeof asyncStorage.setItem === 'function' &&
+      typeof asyncStorage.removeItem === 'function'
+    ) {
+      return createAsyncStorageTokenStorage({
+        getItem: asyncStorage.getItem.bind(asyncStorage),
+        setItem: asyncStorage.setItem.bind(asyncStorage),
+        removeItem: asyncStorage.removeItem.bind(asyncStorage),
+      });
+    }
+  } catch {
+    // Fall through to memory storage.
+  }
+
+  return new MemoryTokenStorage();
+};
+
+export const tokenStorage = initializeTokenStorage();
 
 export const queryClient = createDefaultQueryClient();
 

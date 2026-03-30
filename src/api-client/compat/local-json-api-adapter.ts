@@ -70,7 +70,7 @@ const toImageAsset = (tier: string): LegacyRideOption['imageAsset'] => {
     return 'luxe.png';
   }
 
-  if (normalized === 'black' || normalized === 'elite') {
+  if (normalized === 'black') {
     return 'black.png';
   }
 

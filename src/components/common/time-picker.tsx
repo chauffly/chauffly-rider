@@ -84,8 +84,7 @@ export function TimePicker({
             >
               <DateTimePicker
                 value={draftTime}
-                mode="time"
-                display={Platform.OS === "ios" ? "spinner" : "spinner"}
+                display="spinner"
                 minuteInterval={minuteInterval}
                 onChange={(event, date) => {
                   if (event?.type === "dismissed") {
@@ -96,8 +95,6 @@ export function TimePicker({
                     setDraftTime(date);
                   }
                 }}
-                textColor={colors.textPrimary}
-                accentColor={colors.primary}
                 style={styles.picker}
               />
               <View style={styles.timeActions}>

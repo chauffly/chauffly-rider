@@ -3,6 +3,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect } from 'react';
 
 import { Button } from '@/components/common/button';
 import { StackHeader } from '@/components/common/stack-header';
@@ -10,6 +11,7 @@ import { Text } from '@/components/common/text';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
+import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
 
 type UploadField = {
   titleKey: string;
@@ -44,6 +46,10 @@ export default function CorporateDocumentUploadScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+
+  useEffect(() => {
+    void riderOnboardingProgressStorage.setCurrentRoute('/(auth)/profile-setup/corporate-document-upload');
+  }, []);
 
   const handleContinue = () => {
     router.push({

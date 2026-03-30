@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -16,6 +16,7 @@ import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { accountRoleService } from '@/services/account-role';
+import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
 
 type RoleType = 'passenger' | 'driver' | 'corporate';
 
@@ -48,6 +49,10 @@ export default function RoleSelectionScreen() {
   const { t } = useTranslation();
 
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
+
+  useEffect(() => {
+    void riderOnboardingProgressStorage.setCurrentRoute('/(auth)/profile-setup/role-selection');
+  }, []);
 
   const handleRoleSelect = async (role: RoleType) => {
     setSelectedRole(role);

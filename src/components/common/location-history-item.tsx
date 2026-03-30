@@ -4,7 +4,7 @@ import { Text } from './text';
 import { useTheme } from '@/context/theme-context';
 import { borderRadius, spacing } from '@/constants/spacing';
 import LocationPinOutline from '@/components/svg/LocationPinOutline';
-import PinIcon from '@/components/svg/PinIcon';
+// PinIcon replaced by MaterialCommunityIcons pin
 import { format } from 'date-fns';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 

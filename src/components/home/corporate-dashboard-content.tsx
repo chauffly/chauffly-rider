@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -33,8 +33,9 @@ export function CorporateDashboardContent() {
   const router = useRouter();
   const [period, setPeriod] = useState<CorporatePeriodKey>('today');
 
-  const { data: summaryData } = useCorporateSummary(period);
-  const { data: usageData } = useCorporateUsage({ limit: 7 });
+  const { data: summaryData, refetch: refetchSummary } = useCorporateSummary(period);
+  const { data: usageData, refetch: refetchUsage } = useCorporateUsage({ limit: 7 });
+  const [refreshing, setRefreshing] = useState(false);
 
   const summary = asRecord(summaryData);
   const usageItems = asArray<Record<string, unknown>>(asRecord(usageData).items);
@@ -60,12 +61,30 @@ export function CorporateDashboardContent() {
   const usageGrowth = `${Number(growth.usagePercent ?? 0).toFixed(1)}%`;
   const employeesGrowth = `${Number(growth.employeesPercent ?? 0).toFixed(1)}%`;
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      await Promise.allSettled([refetchSummary(), refetchUsage()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchSummary, refetchUsage]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.lg }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[0]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         <View style={[styles.stickyHeader, { backgroundColor: colors.background }]}>
           <View style={styles.header}>

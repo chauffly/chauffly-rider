@@ -320,10 +320,10 @@ export const useCreateBooking = (
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ input, idempotencyKey }) => api.bookingApi.create(input, idempotencyKey),
-    onSuccess: async (data, variables, context, mutationContext) => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.bookings.active });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.bookings.list() });
-      await options?.onSuccess?.(data, variables, context, mutationContext);
+    onSuccess: (data, variables, context, mutationContext) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.active });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.list() });
+      options?.onSuccess?.(data, variables, context, mutationContext);
     },
     ...options
   });

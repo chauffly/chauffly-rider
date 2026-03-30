@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect } from 'react';
 
 import { Button } from '@/components/common/button';
 import { StackHeader } from '@/components/common/stack-header';
@@ -10,6 +11,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
+import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
 
 export default function CorporateKycVerificationScreen() {
   const router = useRouter();
@@ -18,7 +20,12 @@ export default function CorporateKycVerificationScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  const handleSetUpNow = () => {
+  useEffect(() => {
+    void riderOnboardingProgressStorage.setCurrentRoute('/(auth)/profile-setup/corporate-kyc-verification');
+  }, []);
+
+  const handleSetUpNow = async () => {
+    await riderOnboardingProgressStorage.markComplete();
     router.replace('/(tabs)');
   };
 

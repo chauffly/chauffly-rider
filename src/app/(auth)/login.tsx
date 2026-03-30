@@ -23,6 +23,7 @@ import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { connectRiderSockets } from '@/runtime/rider-runtime';
+import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
 import { normalizeNigerianPhoneNumber } from "@/utils/phone";
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
@@ -77,7 +78,11 @@ export default function LoginScreen() {
 
       await api.session.setTokens(session.tokens);
       await connectRiderSockets();
-      router.replace('/(tabs)');
+      const nextRoute = await riderOnboardingProgressStorage.resolvePostAuthRoute({
+        id: session.user.id,
+        status: session.user.status
+      });
+      router.replace(nextRoute);
     } catch (error) {
       setGeneralError(extractErrorMessage(error, 'Unable to log in. Please try again.'));
     } finally {

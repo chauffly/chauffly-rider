@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 
 import { tokenStorage } from '@/runtime/rider-runtime';
+import { RiderOnboardingRoute, riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
 
 export default function Index() {
-  const [targetRoute, setTargetRoute] = useState<'/(auth)/login' | '/(tabs)' | null>(null);
+  const [targetRoute, setTargetRoute] = useState<'/(auth)/login' | '/(tabs)' | RiderOnboardingRoute | null>(null);
 
   useEffect(() => {
     const resolveInitialRoute = async () => {
@@ -12,6 +13,12 @@ export default function Index() {
         const tokens = await tokenStorage.getTokens();
         if (!tokens?.accessToken) {
           setTargetRoute('/(auth)/login');
+          return;
+        }
+
+        const pendingOnboardingRoute = await riderOnboardingProgressStorage.getPendingRoute();
+        if (pendingOnboardingRoute) {
+          setTargetRoute(pendingOnboardingRoute);
           return;
         }
       } catch {

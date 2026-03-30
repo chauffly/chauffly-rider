@@ -21,6 +21,10 @@ import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { connectRiderSockets } from '@/runtime/rider-runtime';
 import { AuthFlowState, authFlowStorage } from '@/services/auth-flow-storage';
+import {
+  RIDER_ONBOARDING_START_ROUTE,
+  riderOnboardingProgressStorage
+} from '@/services/rider-onboarding-progress';
 import { normalizeNigerianPhoneNumber } from '@/utils/phone';
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
@@ -97,7 +101,8 @@ export default function VerifyOtpScreen() {
         await api.session.setTokens(session.tokens);
         await connectRiderSockets();
         await authFlowStorage.clear();
-        router.replace('/(tabs)');
+        await riderOnboardingProgressStorage.start(session.user.id, RIDER_ONBOARDING_START_ROUTE);
+        router.replace(RIDER_ONBOARDING_START_ROUTE);
         return;
       }
 

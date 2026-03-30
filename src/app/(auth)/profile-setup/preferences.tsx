@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -18,12 +18,12 @@ import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { spacing } from '@/constants/spacing';
 import { StackHeader } from '@/components/common/stack-header';
+import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
 
 const chauffeurOptions = [
   { label: 'Any Available', value: 'any' },
   { label: 'Male Chauffeur', value: 'male' },
   { label: 'Female Chauffeur', value: 'female' },
-  { label: 'Previous Chauffeurs', value: 'previous' },
 ];
 
 const rideStyleOptions = [
@@ -51,11 +51,16 @@ export default function PreferencesScreen() {
   const [rideStyle, setRideStyle] = useState('');
   const [accessibility, setAccessibility] = useState('');
 
+  useEffect(() => {
+    void riderOnboardingProgressStorage.setCurrentRoute('/(auth)/profile-setup/preferences');
+  }, []);
+
   const handleBack = () => {
     router.back();
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    await riderOnboardingProgressStorage.markComplete();
     router.replace('/(tabs)');
   };
 

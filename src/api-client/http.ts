@@ -46,6 +46,25 @@ export class ApiClientError extends Error {
   }
 }
 
+const getDetailMessage = (details: unknown): string | null => {
+  if (!Array.isArray(details)) {
+    return null;
+  }
+
+  for (const detail of details) {
+    if (!detail || typeof detail !== 'object') {
+      continue;
+    }
+
+    const message = (detail as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim().length > 0) {
+      return message;
+    }
+  }
+
+  return null;
+};
+
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const buildApiBaseUrl = (baseURL: string, apiPrefix: string): string => {
@@ -103,7 +122,9 @@ const sanitizeForLog = (value: unknown): unknown => {
 };
 
 const parseEnvelopeError = (payload: ApiErrorEnvelope): ApiClientError => {
-  return new ApiClientError(payload.error.message, {
+  const detailMessage = getDetailMessage(payload.error.details);
+
+  return new ApiClientError(detailMessage ?? payload.error.message, {
     status: payload.error.statusCode,
     code: payload.error.code,
     details: payload.error.details,
