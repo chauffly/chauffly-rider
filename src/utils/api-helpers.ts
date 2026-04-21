@@ -21,3 +21,26 @@ export const fullName = (user: Record<string, unknown>): string => {
   const combined = `${firstName} ${lastName}`.trim();
   return combined || asString(user.full_name, 'Driver');
 };
+
+export const parseDateTimeString = (dateString: string): Date | null => {
+  if (!dateString) {
+    return null;
+  }
+
+  // Example: "2026-03-30 17:26:33.297944+01"
+  // Needs to be converted to ISO-like format: "2026-03-30T17:26:33.297944+01:00"
+
+  let isoString = dateString.replace(' ', 'T');
+
+  // Check if timezone offset has a colon. If not, add :00
+  const timezoneOffsetMatch = isoString.match(/([+-]\d{2})$/);
+  if (timezoneOffsetMatch) {
+    isoString = isoString.replace(timezoneOffsetMatch[1], `${timezoneOffsetMatch[1]}:00`);
+  }
+
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) {
+    return null;
+  }
+  return date;
+};

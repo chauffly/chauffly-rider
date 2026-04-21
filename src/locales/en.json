@@ -59,7 +59,7 @@
   "profile_setup": {
     "role_selection_title": "How would you like to experience Chauffly?",
     "passenger_title": "Passenger",
-    "passenger_description": "Luxury travel designed around your comfort, safety, and schedule.",
+    "passenger_description": "Premium travel designed around your comfort, safety, and schedule.",
     "driver_title": "Become a Driver",
     "driver_description": "Join a trusted chauffeur network with structured trips and better earning potential.",
     "corporate_title": "Corporate and Businesses",
@@ -539,7 +539,8 @@
     },
     "actions": {
       "track_route": "Track Route"
-    }
+    },
+    "empty_state": "No rides found for this category."
   },
   "settings": {
     "title": "Settings",

@@ -49,17 +49,17 @@ export default function RootLayout() {
   }
 
   return (
-    <ErrorBoundary>
-      <RiderRuntimeProvider>
-        <ThemeProvider>
-          <LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <ErrorBoundary>
+          <RiderRuntimeProvider>
             <LocationProvider>
               <RootLayoutNav />
             </LocationProvider>
-          </LanguageProvider>
-        </ThemeProvider>
-      </RiderRuntimeProvider>
-    </ErrorBoundary>
+          </RiderRuntimeProvider>
+        </ErrorBoundary>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
 

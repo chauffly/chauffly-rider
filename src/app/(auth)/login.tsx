@@ -45,8 +45,8 @@ export default function LoginScreen() {
   const { t } = useTranslation();
   const api = useApiClient();
 
-  const [phoneNumber, setPhoneNumber] = useState("08123456789");
-  const [password, setPassword] = useState("StrongPass#2026");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [password, setPassword] = useState("");
   const [phoneError, setPhoneError] = useState('');
   const [generalError, setGeneralError] = useState('');
   const [submitting, setSubmitting] = useState(false);

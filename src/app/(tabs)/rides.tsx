@@ -12,7 +12,7 @@ import SearchIcon from '@/components/svg/SearchIcon';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
-import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { asArray, asRecord, asString, parseDateTimeString } from '@/utils/api-helpers';
 import { formatNairaAmount } from '@/utils/currency';
 
 type RideTabKey = 'past' | 'upcoming' | 'ongoing' | 'canceled';
@@ -160,7 +160,8 @@ export default function RidesScreen() {
             const driverName =
               `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Awaiting driver';
             const createdAt = asString(item.createdAt);
-            const createdAtLabel = createdAt ? format(new Date(createdAt), 'EEE, MMM d • h:mm a') : '--';
+            const parsedCreatedAt = parseDateTimeString(createdAt);
+            const createdAtLabel = parsedCreatedAt ? format(parsedCreatedAt, 'EEE, MMM d • h:mm a') : '--';
             const fareTotal = formatNairaAmount(item.fareTotal);
             const status = asString(item.status, '--');
             const statusText = statusLabel(status);
