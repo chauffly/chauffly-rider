@@ -1,8 +1,12 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
+import { captureRef } from 'react-native-view-shot';
 import { format } from 'date-fns';
+import { useRef } from 'react';
 
 import { useBookingById } from '@/api-client';
 import { Button } from '@/components/common/button';
@@ -13,7 +17,7 @@ import LocationPinRed from '@/components/svg/LocationPinRed';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
-import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { asArray, asRecord, asString, parseDateTimeString } from '@/utils/api-helpers';
 import { formatNairaAmount } from '@/utils/currency';
 
 type RideStatus = 'Completed' | 'Cancelled' | 'Ongoing';
@@ -31,6 +35,8 @@ export default function RideDetailScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const receiptRef = useRef<View>(null);
+
   const params = useLocalSearchParams<{
     bookingId?: string;
     rideStatus?: string;
@@ -61,29 +67,54 @@ export default function RideDetailScreen() {
 
   const pickupAddress = asString(booking.pickupAddress, 'Pickup');
   const pickupName = asString(booking.pickupName, pickupAddress);
-  const pickupTime = asString(booking.createdAt)
-    ? format(new Date(asString(booking.createdAt)), 'h:mm a')
-    : '--';
+  const pickupTime = (() => {
+    const d = parseDateTimeString(asString(booking.createdAt));
+    return d ? format(d, 'h:mm a') : '--';
+  })();
 
   const lastStop = stops.length > 0 ? asRecord(stops[stops.length - 1]) : {};
   const destinationAddress = asString(lastStop.address, '--');
   const destinationName = asString(lastStop.name, destinationAddress);
-  const destinationTime = asString(lastStop.arrivedAt)
-    ? format(new Date(asString(lastStop.arrivedAt)), 'h:mm a')
-    : '--';
+  const destinationTime = (() => {
+    const d = parseDateTimeString(asString(lastStop.arrivedAt));
+    return d ? format(d, 'h:mm a') : '--';
+  })();
 
   const driverName = `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Driver';
   const driverRating = asString(driver.rating, '--');
   const vehicleName = `${asString(vehicle.make)} ${asString(vehicle.model)}`.trim() || '--';
-  const bookingDate = asString(booking.createdAt)
-    ? format(new Date(asString(booking.createdAt)), 'd, MMM, yyyy')
-    : '--';
+  const bookingDateParsed = parseDateTimeString(asString(booking.createdAt));
+  const bookingDate = bookingDateParsed ? format(bookingDateParsed, 'd MMM yyyy') : '--';
 
   const totalFare = formatNairaAmount(fare.total);
   const tripFare = formatNairaAmount(fare.tripFare);
   const tax = formatNairaAmount(fare.tax);
   const bookingRef = asString(booking.id, bookingId || '--');
   const transactionRef = asString(fare.transactionId, '--');
+
+  const handleCopyBookingId = async () => {
+    if (!bookingRef || bookingRef === '--') return;
+    await Clipboard.setStringAsync(bookingRef);
+  };
+
+  const handleShareReceipt = async () => {
+    try {
+      const uri = await captureRef(receiptRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile'
+      });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: 'Share Receipt'
+        });
+      }
+    } catch {
+      // Sharing cancelled or failed silently
+    }
+  };
 
   return (
     <View
@@ -117,11 +148,16 @@ export default function RideDetailScreen() {
 
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.routeContainer}>
-            <View style={styles.routeIconColumn}>
-              <LocationPinGreen size={18} />
-              <View style={[styles.routeDash, { borderLeftColor: colors.border }]} />
-              <LocationPinRed size={18} />
-            </View>
+              <View style={styles.routeIconColumn}>
+                <LocationPinGreen size={18} />
+                <View
+                  style={[
+                    styles.routeDash,
+                    { backgroundColor: colors.textSecondary, opacity: 0.35 }
+                  ]}
+                />
+                <LocationPinRed size={18} />
+              </View>
             <View style={styles.routeDetails}>
               <View style={styles.routeStop}>
                 <View style={styles.routeStopText}>
@@ -223,9 +259,12 @@ export default function RideDetailScreen() {
             <Text variant="body" color="muted">
               {t('booking.booking_id_label')}
             </Text>
-            <Text variant="body" weight="medium">
-              {bookingRef}
-            </Text>
+            <Pressable onPress={handleCopyBookingId} style={styles.bookingIdPressable}>
+              <Text variant="body" weight="medium" numberOfLines={1} ellipsizeMode="middle">
+                {bookingRef}
+              </Text>
+              <MaterialCommunityIcons name="content-copy" size={16} color={colors.textSecondary} />
+            </Pressable>
           </View>
         </View>
 
@@ -259,7 +298,101 @@ export default function RideDetailScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button translationKey="booking.share_receipt" variant="outline" fullWidth onPress={() => {}} />
+        <Button translationKey="booking.share_receipt" variant="outline" fullWidth onPress={handleShareReceipt} />
+      </View>
+
+      {/* Off-screen receipt view for image capture */}
+      <View
+        ref={receiptRef}
+        collapsable={false}
+        style={styles.receiptCapture}
+      >
+        {/* Header */}
+        <View style={styles.receiptHeader}>
+          <Text variant="h3" weight="bold" style={{ color: '#c29d59' }}>
+            Chauffly
+          </Text>
+          <Text variant="caption" style={{ color: '#757575' }}>
+            Official Receipt
+          </Text>
+        </View>
+
+        {/* Status banner */}
+        <View style={[styles.receiptBanner, { backgroundColor: rideStatus === 'Completed' ? '#43A047' : rideStatus === 'Cancelled' ? '#E53935' : '#c29d59' }]}>
+          <Text variant="bodySmall" weight="semiBold" style={{ color: '#FFFFFF' }}>
+            {rideStatus}
+          </Text>
+        </View>
+
+        {/* Route */}
+        <View style={styles.receiptCard}>
+          <View style={styles.receiptRouteRow}>
+            <View style={[styles.receiptDot, { backgroundColor: '#43A047' }]} />
+            <View style={styles.receiptRouteText}>
+              <Text variant="caption" style={{ color: '#757575' }}>Pickup</Text>
+              <Text variant="bodySmall" weight="semiBold" style={{ color: '#212121' }}>{pickupName}</Text>
+              <Text variant="caption" style={{ color: '#757575' }}>{pickupTime}</Text>
+            </View>
+          </View>
+          <View style={styles.receiptRouteConnector} />
+          <View style={styles.receiptRouteRow}>
+            <View style={[styles.receiptDot, { backgroundColor: '#E53935' }]} />
+            <View style={styles.receiptRouteText}>
+              <Text variant="caption" style={{ color: '#757575' }}>Drop-off</Text>
+              <Text variant="bodySmall" weight="semiBold" style={{ color: '#212121' }}>{destinationName}</Text>
+              <Text variant="caption" style={{ color: '#757575' }}>{destinationTime}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Driver */}
+        <View style={styles.receiptCard}>
+          <Text variant="caption" weight="medium" style={{ color: '#757575', marginBottom: 6 }}>Driver</Text>
+          <View style={styles.receiptRow}>
+            <Text variant="bodySmall" weight="semiBold" style={{ color: '#212121' }}>{driverName}</Text>
+            <Text variant="bodySmall" style={{ color: '#757575' }}>{vehicleName}</Text>
+          </View>
+        </View>
+
+        {/* Details */}
+        <View style={styles.receiptCard}>
+          <View style={[styles.receiptDetailRow, { marginBottom: 4 }]}>
+            <Text variant="caption" style={{ color: '#757575' }}>Date</Text>
+            <Text variant="caption" weight="medium" style={{ color: '#212121' }}>{bookingDate}</Text>
+          </View>
+          <View style={[styles.receiptDetailRow, { marginBottom: 4 }]}>
+            <Text variant="caption" style={{ color: '#757575' }}>Transaction ID</Text>
+            <Text variant="caption" weight="medium" style={{ color: '#212121' }}>{transactionRef}</Text>
+          </View>
+          <View style={styles.receiptDetailRow}>
+            <Text variant="caption" style={{ color: '#757575' }}>Booking ID</Text>
+            <Text variant="caption" weight="medium" style={{ color: '#212121' }} numberOfLines={1} ellipsizeMode="middle">
+              {bookingRef}
+            </Text>
+          </View>
+        </View>
+
+        {/* Fare breakdown */}
+        <View style={styles.receiptCard}>
+          <View style={[styles.receiptDetailRow, { marginBottom: 4 }]}>
+            <Text variant="caption" style={{ color: '#757575' }}>Trip Fare</Text>
+            <Text variant="caption" weight="medium" style={{ color: '#212121' }}>{tripFare}</Text>
+          </View>
+          <View style={[styles.receiptDetailRow, { marginBottom: 8 }]}>
+            <Text variant="caption" style={{ color: '#757575' }}>Tax & Fees</Text>
+            <Text variant="caption" weight="medium" style={{ color: '#212121' }}>{tax}</Text>
+          </View>
+          <View style={[styles.receiptDivider, { backgroundColor: '#E5E7EB' }]} />
+          <View style={[styles.receiptDetailRow, { marginTop: 8 }]}>
+            <Text variant="bodySmall" weight="bold" style={{ color: '#212121' }}>Total</Text>
+            <Text variant="bodySmall" weight="bold" style={{ color: '#c29d59' }}>{totalFare}</Text>
+          </View>
+        </View>
+
+        {/* Footer */}
+        <Text variant="caption" style={{ color: '#BDBDBD', textAlign: 'center', marginTop: 8 }}>
+          Thank you for riding with Chauffly
+        </Text>
       </View>
     </View>
   );
@@ -292,9 +425,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs
   },
   routeDash: {
-    flex: 1,
-    borderLeftWidth: 1.5,
-    borderStyle: 'dashed',
+    width: 2,
+    flexGrow: 1,
+    minHeight: 28,
+    borderRadius: 999,
     marginVertical: spacing.xs
   },
   routeDetails: {
@@ -346,10 +480,79 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md
   },
+  bookingIdPressable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.xs,
+    minWidth: 0
+  },
   divider: {
     height: 1
   },
   footer: {
     marginTop: spacing.lg
+  },
+  // Off-screen receipt capture view
+  receiptCapture: {
+    position: 'absolute',
+    top: 10000,
+    left: 0,
+    width: 360,
+    backgroundColor: '#F7F7F7',
+    padding: spacing.lg,
+    gap: spacing.sm
+  },
+  receiptHeader: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    gap: 2
+  },
+  receiptBanner: {
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    alignSelf: 'center'
+  },
+  receiptCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md
+  },
+  receiptRouteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm
+  },
+  receiptDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 4
+  },
+  receiptRouteText: {
+    flex: 1,
+    gap: 2
+  },
+  receiptRouteConnector: {
+    width: 2,
+    height: 16,
+    backgroundColor: '#E5E7EB',
+    marginLeft: 4,
+    marginVertical: 4
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  receiptDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  receiptDivider: {
+    height: 1
   }
 });

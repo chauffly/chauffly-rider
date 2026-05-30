@@ -10,17 +10,32 @@ export interface OrganizationInput {
 }
 
 export interface CorporateTravelPolicyInput {
-  max_fare_per_trip?: number | null;
+  max_fare?: number | null;
   allowed_tiers?: string[] | null;
   allowed_hours?: Record<string, unknown> | null;
   budget_period?: 'daily' | 'weekly' | 'monthly';
   budget_limit?: number | null;
 }
 
+export interface MyCompanyBudgetResponse {
+  company: { id: string; name: string } | null;
+  memberStatus: string | null;
+  policy: {
+    maxFarePerTrip: number | null;
+    budgetLimit: number | null;
+    budgetPeriod: string | null;
+    allowedTiers: string[] | null;
+    allowedHours: Record<string, unknown> | null;
+  } | null;
+  usage: { periodSpend: number; periodRides: number } | null;
+}
+
 export interface CorporateApi {
   registerOrganization(input: OrganizationInput): Promise<Record<string, unknown>>;
   getOrganization(): Promise<Record<string, unknown>>;
   updateOrganization(input: Partial<OrganizationInput>): Promise<Record<string, unknown>>;
+  listOrganizationDocuments(): Promise<Record<string, unknown>>;
+  uploadOrganizationDocument(formData: FormData): Promise<Record<string, unknown>>;
 
   inviteEmployee(input: { email: string }): Promise<Record<string, unknown>>;
   listEmployees(params?: { status?: string; cursor?: string; limit?: number }): Promise<Record<string, unknown>>;
@@ -32,9 +47,11 @@ export interface CorporateApi {
 
   getTravelPolicies(): Promise<Record<string, unknown>>;
   updateTravelPolicies(input: CorporateTravelPolicyInput): Promise<Record<string, unknown>>;
+  getMyCompanyBudget(): Promise<MyCompanyBudgetResponse>;
 
   getSummary(period: 'today' | 'last_7_days' | 'last_30_days'): Promise<Record<string, unknown>>;
   getUsage(params?: { cursor?: string; limit?: number }): Promise<Record<string, unknown>>;
+  listRides(params?: { tab?: 'past' | 'upcoming' | 'ongoing' | 'cancelled'; cursor?: string; limit?: number }): Promise<Record<string, unknown>>;
   listInvoices(params?: { cursor?: string; limit?: number }): Promise<Record<string, unknown>>;
   getInvoiceDetail(id: string): Promise<Record<string, unknown>>;
 }
@@ -51,6 +68,18 @@ export const createCorporateApi = (http: HttpClient): CorporateApi => {
 
     updateOrganization(input) {
       return http.put('/corporate/organization', input);
+    },
+
+    listOrganizationDocuments() {
+      return http.get('/corporate/organization/documents');
+    },
+
+    uploadOrganizationDocument(formData) {
+      return http.post('/corporate/organization/documents', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
     },
 
     inviteEmployee(input) {
@@ -89,7 +118,10 @@ export const createCorporateApi = (http: HttpClient): CorporateApi => {
     },
 
     requestJoinCompany(input) {
-      return http.post('/riders/me/join-company', input);
+      return http.post('/riders/me/join-company', {
+        org_code: input.organization_code,
+        org_name: input.organization_name
+      });
     },
 
     getTravelPolicies() {
@@ -100,6 +132,10 @@ export const createCorporateApi = (http: HttpClient): CorporateApi => {
       return http.put('/corporate/travel-policies', input);
     },
 
+    getMyCompanyBudget() {
+      return http.get('/riders/me/company-budget') as Promise<MyCompanyBudgetResponse>;
+    },
+
     getSummary(period) {
       return http.get('/corporate/summary', withQuery(undefined, { period }));
     },
@@ -108,6 +144,17 @@ export const createCorporateApi = (http: HttpClient): CorporateApi => {
       return http.get(
         '/corporate/usage',
         withQuery(undefined, {
+          cursor: params?.cursor,
+          limit: params?.limit
+        })
+      );
+    },
+
+    listRides(params) {
+      return http.get(
+        '/corporate/rides',
+        withQuery(undefined, {
+          tab: params?.tab,
           cursor: params?.cursor,
           limit: params?.limit
         })

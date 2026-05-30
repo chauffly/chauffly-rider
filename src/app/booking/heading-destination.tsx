@@ -1,16 +1,21 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, type Region } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useBookingById, useBookingUpdates, useDriverLocation as useLiveDriverLocation } from '@/api-client';
+import { JourneyHomeButton } from '@/components/common/journey-home-button';
+import { PaymentModal } from '@/components/booking/payment-modal';
 import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { socketClient } from '@/runtime/rider-runtime';
-import { asRecord, asString } from '@/utils/api-helpers';
+import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
+import { decodePolyline } from '@/utils/route';
+
+type ArrivedFare = { tripFare: number; surgeFee: number; tax: number; total: number; currency: string };
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -27,6 +32,8 @@ export default function HeadingDestinationScreen() {
     bookingId?: string;
   }>();
   const bookingId = params.bookingId ?? '';
+  const mapRef = useRef<MapView>(null);
+  const hasInitialFitRef = useRef(false);
 
   const { data: bookingData } = useBookingById(bookingId, {
     enabled: Boolean(bookingId),
@@ -34,29 +41,29 @@ export default function HeadingDestinationScreen() {
   });
   const driverLocation = useLiveDriverLocation(socketClient);
 
+  const [arrivedFare, setArrivedFare] = useState<ArrivedFare | null>(null);
+  const [showPayment, setShowPayment] = useState(false);
+  const [userInteracting, setUserInteracting] = useState(false);
+
   useBookingUpdates(socketClient, {
     onStatusChanged: (payload) => {
       if (payload.bookingId !== bookingId) {
         return;
       }
 
-      if (payload.status === 'completed') {
-        router.replace({
-          pathname: '/booking/trip-arrived',
-          params: {
-            bookingId
-          }
-        });
+      if (payload.status === 'completed' || payload.status === 'pending_payment') {
+        // Keep the rider on the payment/heading flow until the payment modal confirms completion.
+        return;
       }
     },
-    onTripCompleted: () => {
-      router.replace({
-        pathname: '/booking/trip-arrived',
-        params: {
-          bookingId
-        }
-      });
+    onArrivedAtDestination: (payload) => {
+      if (payload.bookingId !== bookingId) {
+        return;
+      }
+      setArrivedFare(payload.fare);
+      setShowPayment(true);
     },
+    onTripCompleted: () => undefined,
     onRideCancelled: () => {
       router.replace('/(tabs)');
     }
@@ -75,20 +82,30 @@ export default function HeadingDestinationScreen() {
   useEffect(() => {
     const status = asString(booking.status);
     if (status === 'completed') {
-      router.replace({
-        pathname: '/booking/trip-arrived',
-        params: {
-          bookingId
-        }
-      });
+      return;
     }
-  }, [booking, bookingId, router]);
+    if (status === 'pending_payment' && !showPayment) {
+      const fareRecord = asRecord(detail.fare);
+      setArrivedFare({
+        tripFare: Number(fareRecord.tripFare ?? fareRecord.estimatedFare ?? 0),
+        surgeFee: Number(fareRecord.surgeFee ?? 0),
+        tax: Number(fareRecord.tax ?? 0),
+        total: Number(fareRecord.total ?? fareRecord.estimatedFare ?? 0),
+        currency: asString(fareRecord.currency, 'NGN')
+      });
+      setShowPayment(true);
+    }
+  }, [booking.status, detail, showPayment]);
 
   const handleCallDriver = async () => {
-    const phoneUrl = `tel:${driverPhone.replace(/[^0-9+]/g, '')}`;
-    const supported = await Linking.canOpenURL(phoneUrl);
-    if (supported) {
-      await Linking.openURL(phoneUrl);
+    const sanitized = driverPhone.replace(/[^0-9+]/g, '');
+    if (!sanitized) {
+      return;
+    }
+    try {
+      await Linking.openURL(`tel:${sanitized}`);
+    } catch {
+      // Dialer not available; no-op.
     }
   };
 
@@ -123,35 +140,79 @@ export default function HeadingDestinationScreen() {
     [driverLocation.lat, driverLocation.lng]
   );
 
+  // Decode the pre-computed road route from the booking
+  const encodedPolyline = asString(asRecord(detail.route).polyline);
+  const routeCoordinates = useMemo(
+    () => (encodedPolyline ? decodePolyline(encodedPolyline) : []),
+    [encodedPolyline]
+  );
+
+  // Destination is the last stop
+  const stops = asArray<Record<string, unknown>>(detail.stops);
+  const lastStop = stops.length > 0 ? asRecord(stops[stops.length - 1]) : null;
+  const destCoordsRecord = lastStop ? asRecord(lastStop.coordinates) : null;
+  const destinationCoord = destCoordsRecord
+    ? { latitude: asNumber(destCoordsRecord.lat), longitude: asNumber(destCoordsRecord.lng) }
+    : null;
+
+  // Fit map to the full route once on load
+  useEffect(() => {
+    if (hasInitialFitRef.current || userInteracting || !mapRef.current || routeCoordinates.length < 2) return;
+    mapRef.current.fitToCoordinates(routeCoordinates, {
+      edgePadding: { top: 80, right: 40, bottom: 320, left: 40 },
+      animated: true
+    });
+    hasInitialFitRef.current = true;
+  }, [routeCoordinates, userInteracting]);
+
+  const centerMap = () => {
+    if (!mapRef.current) return;
+    setUserInteracting(false);
+    const coords = routeCoordinates.length >= 2 ? routeCoordinates : [markerCoordinates];
+    mapRef.current.fitToCoordinates(coords, {
+      edgePadding: { top: 80, right: 40, bottom: 320, left: 40 },
+      animated: true
+    });
+  };
+
   return (
     <View style={styles.container}>
-      <MapView style={styles.map} initialRegion={DEFAULT_REGION}>
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        initialRegion={DEFAULT_REGION}
+        onPanDrag={() => setUserInteracting(true)}
+      >
         <Marker coordinate={markerCoordinates}>
           <MaterialCommunityIcons name="car" size={24} color={colors.textPrimary} />
         </Marker>
 
-        <Polyline
-          coordinates={[
-            markerCoordinates,
-            { latitude: 9.18, longitude: 7.47 },
-            { latitude: 9.17, longitude: 7.53 },
-            { latitude: 9.12, longitude: 7.52 }
-          ]}
-          strokeColor={colors.primary}
-          strokeWidth={6}
-        />
+        {destinationCoord && destinationCoord.latitude !== 0 && (
+          <Marker coordinate={destinationCoord}>
+            <MaterialCommunityIcons name="map-marker" size={32} color="#e74c3c" />
+          </Marker>
+        )}
+
+        {routeCoordinates.length >= 2 && (
+          <Polyline coordinates={routeCoordinates} strokeColor={colors.primary} strokeWidth={5} />
+        )}
       </MapView>
 
       <Pressable
         onPress={() => router.back()}
-        style={[styles.floatingButton, styles.leftButton, { top: insets.top + spacing.xxxxl, backgroundColor: colors.surface }]}
+        style={[styles.backButton, { top: insets.top + spacing.md, backgroundColor: colors.surface }]}
       >
-        <MaterialCommunityIcons name="chevron-left" size={24} color={colors.textPrimary} />
+        <MaterialCommunityIcons name="chevron-left" size={22} color={colors.textPrimary} />
       </Pressable>
 
-      <View style={[styles.floatingButton, styles.rightButton, { bottom: 420, backgroundColor: colors.surface }]}>
-        <MaterialCommunityIcons name="crosshairs-gps" size={24} color={colors.textPrimary} />
-      </View>
+      <Pressable
+        onPress={centerMap}
+        style={[styles.centerButton, { top: insets.top + spacing.md, backgroundColor: colors.surface }]}
+      >
+        <MaterialCommunityIcons name="crosshairs-gps" size={20} color={colors.textPrimary} />
+      </Pressable>
+
+      <JourneyHomeButton />
 
       <View style={[styles.bottomCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}>
         <View style={[styles.handle, { backgroundColor: colors.border }]} />
@@ -212,7 +273,19 @@ export default function HeadingDestinationScreen() {
             </Pressable>
           </View>
         </Pressable>
+
       </View>
+
+      <PaymentModal
+        visible={showPayment}
+        bookingId={bookingId}
+        fare={arrivedFare}
+        onClose={() => setShowPayment(false)}
+        onPaid={() => {
+          setShowPayment(false);
+          router.replace({ pathname: '/booking/trip-arrived', params: { bookingId } });
+        }}
+      />
     </View>
   );
 }
@@ -224,24 +297,33 @@ const styles = StyleSheet.create({
   map: {
     ...StyleSheet.absoluteFillObject
   },
-  floatingButton: {
+  backButton: {
     position: 'absolute',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    left: spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 4
   },
-  leftButton: {
-    left: spacing.lg
-  },
-  rightButton: {
-    right: spacing.lg
+  centerButton: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4
   },
   bottomCard: {
     position: 'absolute',
@@ -306,5 +388,5 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center'
-  }
+  },
 });

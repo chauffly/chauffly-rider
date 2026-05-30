@@ -41,12 +41,15 @@ export const queryKeys = {
   },
   corporate: {
     organization: ['corporate', 'organization'] as const,
+    documents: ['corporate', 'documents'] as const,
     employees: ['corporate', 'employees'] as const,
     joinRequests: ['corporate', 'join-requests'] as const,
     summary: (period: string) => ['corporate', 'summary', period] as const,
     usage: (cursor?: string) => ['corporate', 'usage', cursor ?? 'first'] as const,
+    rides: (tab?: string, cursor?: string) => ['corporate', 'rides', tab ?? 'all', cursor ?? 'first'] as const,
     invoices: ['corporate', 'invoices'] as const,
-    policies: ['corporate', 'travel-policies'] as const
+    policies: ['corporate', 'travel-policies'] as const,
+    myBudget: ['riders', 'me', 'company-budget'] as const
   },
   admin: {
     dashboard: ['admin', 'dashboard'] as const,

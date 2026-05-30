@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { type Href, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 
 import { useApiClient, useCurrentUser, useWalletBalance } from '@/api-client';
 import { Button } from '@/components/common/button';
@@ -68,13 +69,14 @@ export default function AccountScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const api = useApiClient();
+  const isFocused = useIsFocused();
 
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
   const [accountRole, setAccountRole] = useState<AccountRole>('rider');
   const [loggingOut, setLoggingOut] = useState(false);
 
   const { data: currentUserData } = useCurrentUser();
-  const { data: walletData } = useWalletBalance();
+  const { data: walletData, refetch: refetchWalletBalance } = useWalletBalance();
 
   const userRecord = asRecord(currentUserData);
   const walletRecord = asRecord(walletData);
@@ -83,6 +85,10 @@ export default function AccountScreen() {
   const userDisplayName = fullName(userRecord) || 'Rider';
   const userPhone = asString(userRecord.phoneNumber ?? userRecord.phone_number, '--');
   const avatarUrl = asString(userRecord.avatarUrl ?? userRecord.avatar_url);
+  const companyMembership = asRecord(userRecord.companyMembership);
+  const companyOrganization = asRecord(companyMembership.organization);
+  const companyMember = asRecord(companyMembership.membership);
+  const companyPolicy = asRecord(companyMembership.policy);
 
   const availableBalance = useMemo(
     () => resolveAvailableBalance(userRecord, walletRecord),
@@ -99,15 +105,30 @@ export default function AccountScreen() {
   }, []);
 
   useEffect(() => {
-    const role = asString(userRecord.role, '');
-    if (!role) {
+    let active = true;
+    const syncRole = async () => {
+      const storedRole = await accountRoleService.getRole();
+      const nextRole = accountRoleService.resolveRole(asString(userRecord.role, ''), storedRole);
+      if (!active) {
+        return;
+      }
+      setAccountRole(nextRole);
+      await accountRoleService.setRole(nextRole);
+    };
+
+    void syncRole();
+    return () => {
+      active = false;
+    };
+  }, [userRecord]);
+
+  useEffect(() => {
+    if (!isFocused) {
       return;
     }
 
-    const nextRole: AccountRole = role === 'corporate_admin' ? 'corporate' : 'rider';
-    setAccountRole(nextRole);
-    void accountRoleService.setRole(nextRole);
-  }, [userRecord]);
+    void refetchWalletBalance();
+  }, [isFocused, refetchWalletBalance]);
 
   const handleConfirmLogout = async () => {
     if (loggingOut) {
@@ -236,21 +257,33 @@ export default function AccountScreen() {
           onPress={() => router.push('/account/personal-info')}
         >
           <View style={styles.profileHeader}>
-            <Image
-              source={
-                avatarUrl
-                  ? { uri: avatarUrl }
-                  : require('../../../assets/images/avatar.png')
-              }
-              style={[
-                styles.avatar,
-                {
-                  width: avatarSize,
-                  height: avatarSize,
-                  borderRadius: avatarSize / 2
-                }
-              ]}
-            />
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={[
+                  styles.avatar,
+                  {
+                    width: avatarSize,
+                    height: avatarSize,
+                    borderRadius: avatarSize / 2
+                  }
+                ]}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.avatarFallback,
+                  {
+                    width: avatarSize,
+                    height: avatarSize,
+                    borderRadius: avatarSize / 2,
+                    backgroundColor: colors.border
+                  }
+                ]}
+              >
+                <Ionicons name="person-outline" size={avatarSize * 0.48} color={colors.textMuted} />
+              </View>
+            )}
             <View style={styles.profileInfo}>
               <Text variant="h3" size="xxl" weight="medium">
                 {userDisplayName}
@@ -306,6 +339,31 @@ export default function AccountScreen() {
             </Pressable>
           </View>
         </Pressable>
+
+        {!isCorporate && asString(companyMember.status) ? (
+          <Pressable
+            style={[
+              styles.companyStatusCard,
+              { backgroundColor: colors.surface, borderColor: colors.border }
+            ]}
+            onPress={() => router.push('/account/company-details')}
+          >
+            <View style={styles.companyStatusHeader}>
+              <Ionicons name="business-outline" size={20} color={colors.primary} />
+              <Text variant="body" weight="semiBold">
+                {asString(companyOrganization.name, 'Company membership')}
+              </Text>
+            </View>
+            <Text variant="caption" color="muted">
+              Status: {asString(companyMember.status, '--')}
+            </Text>
+            {typeof companyPolicy.budgetLimit === 'number' ? (
+              <Text variant="caption" color="muted">
+                Travel limit: ₦{companyPolicy.budgetLimit}
+              </Text>
+            ) : null}
+          </Pressable>
+        ) : null}
 
         <View style={styles.menuList}>
           {menuItems.map((item) => (
@@ -408,6 +466,17 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl,
     gap: spacing.lg
   },
+  companyStatusCard: {
+    borderWidth: 1,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.md,
+    gap: spacing.xs
+  },
+  companyStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm
+  },
   profileCard: {
     borderRadius: borderRadius.xxl,
     padding: spacing.lg
@@ -418,6 +487,10 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   avatar: {},
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   profileInfo: {
     flex: 1
   },

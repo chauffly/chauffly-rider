@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   GestureResponderEvent,
   Pressable,
   ScrollView,
@@ -26,6 +27,7 @@ import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { StackHeader } from '@/components/common/stack-header';
+import { googlePlacesService, PlacePrediction } from '@/services/google-places';
 import { asArray, asBoolean, asRecord, asString } from '@/utils/api-helpers';
 
 type AddressLabel = 'home' | 'office' | 'apartment' | 'other';
@@ -84,43 +86,107 @@ export default function SavedAddressesScreen() {
   const [menuTarget, setMenuTarget] = useState<SavedAddressVm | null>(null);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [addressName, setAddressName] = useState('');
-  const [addressValue, setAddressValue] = useState('');
-  const [latValue, setLatValue] = useState('');
-  const [lngValue, setLngValue] = useState('');
+  const [addressQuery, setAddressQuery] = useState('');
+  const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [editAddressName, setEditAddressName] = useState('');
-  const [editAddressValue, setEditAddressValue] = useState('');
-  const [editLatValue, setEditLatValue] = useState('');
-  const [editLngValue, setEditLngValue] = useState('');
+  const [editAddressQuery, setEditAddressQuery] = useState('');
+  const [editSelectedCoords, setEditSelectedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
+  const [editPredictions, setEditPredictions] = useState<PlacePrediction[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isEditSearching, setIsEditSearching] = useState(false);
+  const [hasAddressSelection, setHasAddressSelection] = useState(false);
+  const [hasEditAddressSelection, setHasEditAddressSelection] = useState(false);
 
   const closeAddModal = () => {
     setIsAddModalVisible(false);
     setAddressName('');
-    setAddressValue('');
-    setLatValue('');
-    setLngValue('');
+    setAddressQuery('');
+    setSelectedCoords(null);
+    setPredictions([]);
+    setHasAddressSelection(false);
   };
 
-  const parseCoordinate = (value: string): number | null => {
-    const parsed = Number.parseFloat(value.trim());
-    return Number.isFinite(parsed) ? parsed : null;
+  const searchAddressSuggestions = useCallback(
+    async (input: string, setList: (list: PlacePrediction[]) => void, setLoading: (loading: boolean) => void) => {
+      if (input.length < 2) {
+        setList([]);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const results = await googlePlacesService.autocomplete(input);
+        setList(results);
+      } catch {
+        setList([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // Add modal: debounce search
+  useEffect(() => {
+    if (!isAddModalVisible || hasAddressSelection) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void searchAddressSuggestions(addressQuery.trim(), setPredictions, setIsSearching);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [addressQuery, hasAddressSelection, isAddModalVisible, searchAddressSuggestions]);
+
+  // Edit modal: debounce search
+  useEffect(() => {
+    if (!isEditModalVisible || hasEditAddressSelection) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void searchAddressSuggestions(editAddressQuery.trim(), setEditPredictions, setIsEditSearching);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [editAddressQuery, hasEditAddressSelection, isEditModalVisible, searchAddressSuggestions]);
+
+  const handleAddressSelected = async (prediction: PlacePrediction) => {
+    const details = await googlePlacesService.getPlaceDetails(prediction.placeId);
+    if (!details) {
+      return;
+    }
+    setAddressQuery(details.address || prediction.description);
+    setSelectedCoords({
+      lat: details.coordinates.latitude,
+      lng: details.coordinates.longitude
+    });
+    setPredictions([]);
+    setHasAddressSelection(true);
+  };
+
+  const handleEditAddressSelected = async (prediction: PlacePrediction) => {
+    const details = await googlePlacesService.getPlaceDetails(prediction.placeId);
+    if (!details) {
+      return;
+    }
+    setEditAddressQuery(details.address || prediction.description);
+    setEditSelectedCoords({
+      lat: details.coordinates.latitude,
+      lng: details.coordinates.longitude
+    });
+    setEditPredictions([]);
+    setHasEditAddressSelection(true);
   };
 
   const handleSaveAddress = async () => {
-    if (!addressName.trim() || !addressValue.trim()) {
-      return;
-    }
-
-    const lat = parseCoordinate(latValue);
-    const lng = parseCoordinate(lngValue);
-    if (lat === null || lng === null) {
+    if (!addressName.trim() || !addressQuery.trim() || !selectedCoords) {
       return;
     }
 
     await createAddress.mutateAsync({
       label: 'other',
       custom_label: addressName.trim(),
-      address_line: addressValue.trim(),
-      coordinates: { lat, lng },
+      address_line: addressQuery.trim(),
+      coordinates: selectedCoords,
       is_pinned: false
     });
     closeAddModal();
@@ -142,9 +208,14 @@ export default function SavedAddressesScreen() {
   const openEditModal = () => {
     if (!menuTarget) return;
     setEditAddressName(menuTarget.customLabel || menuTarget.title);
-    setEditAddressValue(menuTarget.address);
-    setEditLatValue(menuTarget.lat);
-    setEditLngValue(menuTarget.lng);
+    setEditAddressQuery(menuTarget.address);
+    const lat = Number.parseFloat(menuTarget.lat);
+    const lng = Number.parseFloat(menuTarget.lng);
+    setEditSelectedCoords(
+      Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null
+    );
+    setEditPredictions([]);
+    setHasEditAddressSelection(true);
     setIsMenuVisible(false);
     setIsEditModalVisible(true);
   };
@@ -152,19 +223,14 @@ export default function SavedAddressesScreen() {
   const closeEditModal = () => {
     setIsEditModalVisible(false);
     setEditAddressName('');
-    setEditAddressValue('');
-    setEditLatValue('');
-    setEditLngValue('');
+    setEditAddressQuery('');
+    setEditSelectedCoords(null);
+    setEditPredictions([]);
+    setHasEditAddressSelection(false);
   };
 
   const handleSaveEditedAddress = async () => {
-    if (!menuTarget || !editAddressName.trim() || !editAddressValue.trim()) {
-      return;
-    }
-
-    const lat = parseCoordinate(editLatValue);
-    const lng = parseCoordinate(editLngValue);
-    if (lat === null || lng === null) {
+    if (!menuTarget || !editAddressName.trim() || !editAddressQuery.trim() || !editSelectedCoords) {
       return;
     }
 
@@ -173,8 +239,8 @@ export default function SavedAddressesScreen() {
       input: {
         label: 'other',
         custom_label: editAddressName.trim(),
-        address_line: editAddressValue.trim(),
-        coordinates: { lat, lng }
+        address_line: editAddressQuery.trim(),
+        coordinates: editSelectedCoords
       }
     });
     closeEditModal();
@@ -318,16 +384,57 @@ export default function SavedAddressesScreen() {
           <TextInput
             labelTranslationKey="account.address_label"
             placeholderTranslationKey="account.address_placeholder"
-            value={addressValue}
-            onChangeText={setAddressValue}
+            value={addressQuery}
+            onChangeText={(text) => {
+              setAddressQuery(text);
+              setHasAddressSelection(false);
+              if (text.length === 0) {
+                setSelectedCoords(null);
+                setPredictions([]);
+              }
+            }}
             leftIcon={<Ionicons name="location-outline" size={20} color={colors.primary} />}
-            multiline
-            numberOfLines={2}
+            rightIcon={isSearching ? <ActivityIndicator size="small" color={colors.primary} /> : undefined}
           />
-          <TextInput label="Latitude" value={latValue} onChangeText={setLatValue} keyboardType="decimal-pad" />
-          <TextInput label="Longitude" value={lngValue} onChangeText={setLngValue} keyboardType="decimal-pad" />
+          {predictions.length > 0 ? (
+            <View style={[styles.suggestionsBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                {predictions.map((p) => (
+                  <Pressable
+                    key={p.placeId}
+                    onPress={() => handleAddressSelected(p)}
+                    style={styles.suggestionRow}
+                  >
+                    <Ionicons name="location-outline" size={18} color={colors.textMuted} />
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodySmall" weight="medium" numberOfLines={1}>
+                        {p.mainText}
+                      </Text>
+                      <Text variant="caption" color="muted" numberOfLines={1}>
+                        {p.secondaryText}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
 
-          <Button title={t('common.save')} fullWidth onPress={handleSaveAddress} />
+          {selectedCoords ? (
+            <View style={styles.coordsRow}>
+              <Ionicons name="navigate-outline" size={16} color={colors.textMuted} />
+              <Text variant="caption" color="muted">
+                {selectedCoords.lat.toFixed(5)}, {selectedCoords.lng.toFixed(5)}
+              </Text>
+            </View>
+          ) : null}
+
+          <Button
+            title={t('common.save')}
+            fullWidth
+            onPress={handleSaveAddress}
+            disabled={!addressName.trim() || !selectedCoords}
+          />
         </View>
       </BottomSheet>
 
@@ -353,16 +460,57 @@ export default function SavedAddressesScreen() {
           <TextInput
             labelTranslationKey="account.address_label"
             placeholderTranslationKey="account.address_placeholder"
-            value={editAddressValue}
-            onChangeText={setEditAddressValue}
+            value={editAddressQuery}
+            onChangeText={(text) => {
+              setEditAddressQuery(text);
+              setHasEditAddressSelection(false);
+              if (text.length === 0) {
+                setEditSelectedCoords(null);
+                setEditPredictions([]);
+              }
+            }}
             leftIcon={<Ionicons name="location-outline" size={20} color={colors.primary} />}
-            multiline
-            numberOfLines={2}
+            rightIcon={isEditSearching ? <ActivityIndicator size="small" color={colors.primary} /> : undefined}
           />
-          <TextInput label="Latitude" value={editLatValue} onChangeText={setEditLatValue} keyboardType="decimal-pad" />
-          <TextInput label="Longitude" value={editLngValue} onChangeText={setEditLngValue} keyboardType="decimal-pad" />
+          {editPredictions.length > 0 ? (
+            <View style={[styles.suggestionsBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                {editPredictions.map((p) => (
+                  <Pressable
+                    key={p.placeId}
+                    onPress={() => handleEditAddressSelected(p)}
+                    style={styles.suggestionRow}
+                  >
+                    <Ionicons name="location-outline" size={18} color={colors.textMuted} />
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodySmall" weight="medium" numberOfLines={1}>
+                        {p.mainText}
+                      </Text>
+                      <Text variant="caption" color="muted" numberOfLines={1}>
+                        {p.secondaryText}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
 
-          <Button title={t('common.save')} fullWidth onPress={handleSaveEditedAddress} />
+          {editSelectedCoords ? (
+            <View style={styles.coordsRow}>
+              <Ionicons name="navigate-outline" size={16} color={colors.textMuted} />
+              <Text variant="caption" color="muted">
+                {editSelectedCoords.lat.toFixed(5)}, {editSelectedCoords.lng.toFixed(5)}
+              </Text>
+            </View>
+          ) : null}
+
+          <Button
+            title={t('common.save')}
+            fullWidth
+            onPress={handleSaveEditedAddress}
+            disabled={!editAddressName.trim() || !editSelectedCoords}
+          />
         </View>
       </BottomSheet>
 
@@ -451,5 +599,23 @@ const styles = StyleSheet.create({
   },
   modalSheet: {
     gap: spacing.md
+  },
+  suggestionsBox: {
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    maxHeight: 220,
+    overflow: 'hidden'
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
+  },
+  coordsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs
   }
 });

@@ -13,10 +13,11 @@ import {
 } from '@/api-client';
 import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
+import { TextInput } from '@/components/common/text-input';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
-import { asArray, asBoolean, asRecord, asString } from '@/utils/api-helpers';
+import { asArray, asRecord, asString, parseDateTimeString } from '@/utils/api-helpers';
 
 type UsersView = 'employees' | 'join_requests';
 
@@ -33,20 +34,41 @@ export default function UsersTabScreen() {
   const router = useRouter();
 
   const [view, setView] = useState<UsersView>('employees');
+  const [search, setSearch] = useState('');
 
   const { data: employeesData } = useCorporateEmployees();
   const { data: joinRequestsData } = useCorporateJoinRequests();
   const removeEmployee = useRemoveCorporateEmployee();
   const decideJoinRequest = useDecideCorporateJoinRequest();
 
-  const employees = useMemo(
-    () => asArray<Record<string, unknown>>(asRecord(employeesData).items),
-    [employeesData]
-  );
-  const joinRequests = useMemo(
-    () => asArray<Record<string, unknown>>(asRecord(joinRequestsData).items),
-    [joinRequestsData]
-  );
+  const employees = useMemo(() => {
+    const items = asArray<Record<string, unknown>>(asRecord(employeesData).items);
+    const normalized = search.trim().toLowerCase();
+    if (!normalized) {
+      return items;
+    }
+
+    return items.filter((employee) => {
+      const user = asRecord(employee.user);
+      const name = getFullName(user).toLowerCase();
+      const email = asString(user.email || employee.invitedEmail || employee.invited_email).toLowerCase();
+      return name.includes(normalized) || email.includes(normalized);
+    });
+  }, [employeesData, search]);
+  const joinRequests = useMemo(() => {
+    const items = asArray<Record<string, unknown>>(asRecord(joinRequestsData).items);
+    const normalized = search.trim().toLowerCase();
+    if (!normalized) {
+      return items;
+    }
+
+    return items.filter((request) => {
+      const user = asRecord(request.user);
+      const name = getFullName(user).toLowerCase();
+      const email = asString(user.email || request.invitedEmail || request.invited_email).toLowerCase();
+      return name.includes(normalized) || email.includes(normalized);
+    });
+  }, [joinRequestsData, search]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 24 }]}>
@@ -77,6 +99,13 @@ export default function UsersTabScreen() {
           </Pressable>
         </View>
 
+        <TextInput
+          label="Search"
+          placeholder={view === 'employees' ? 'Search employees' : 'Search join requests'}
+          value={search}
+          onChangeText={setSearch}
+        />
+
         {view === 'employees' ? (
           employees.length === 0 ? (
             <View style={styles.emptyState}>
@@ -96,6 +125,7 @@ export default function UsersTabScreen() {
                 const user = asRecord(employee.user);
                 const memberId = asString(employee.id);
                 const joinedAt = asString(employee.joinedAt);
+                const joinedAtDate = parseDateTimeString(joinedAt);
                 return (
                   <Pressable
                     key={memberId}
@@ -109,10 +139,10 @@ export default function UsersTabScreen() {
                           {getFullName(user)}
                         </Text>
                         <Text variant="caption" color="muted">
-                          {asString(user.email, '--')}
+                          {asString(user.email || employee.invitedEmail || employee.invited_email, '--')}
                         </Text>
                         <Text variant="caption" color="muted">
-                          {joinedAt ? format(new Date(joinedAt), 'MMM d, yyyy') : '--'}
+                          {joinedAtDate ? format(joinedAtDate, 'MMM d, yyyy') : '--'}
                         </Text>
                       </View>
                     </View>
@@ -136,6 +166,7 @@ export default function UsersTabScreen() {
               const user = asRecord(request.user);
               const requestId = asString(request.id);
               const invitedAt = asString(request.invitedAt);
+              const invitedAtDate = parseDateTimeString(invitedAt);
               const pending = decideJoinRequest.isPending;
               return (
                 <View
@@ -150,11 +181,11 @@ export default function UsersTabScreen() {
                           {getFullName(user)}
                         </Text>
                         <Text variant="caption" color="muted">
-                          {asString(user.email, '--')}
+                          {asString(user.email || request.invitedEmail || request.invited_email, '--')}
                         </Text>
                         <Text variant="caption" color="muted">
                           {t('corporate.users.requested_on', {
-                            date: invitedAt ? format(new Date(invitedAt), 'MMM d, yyyy') : '--'
+                            date: invitedAtDate ? format(invitedAtDate, 'MMM d, yyyy') : '--'
                           })}
                         </Text>
                       </View>

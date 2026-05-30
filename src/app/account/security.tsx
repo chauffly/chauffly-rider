@@ -158,7 +158,9 @@ export default function AccountSecurityScreen() {
                       {userAgent}
                     </Text>
                     <Text variant="caption" color="muted">
-                      {createdAt ? formatDistanceToNow(new Date(createdAt), { addSuffix: true }) : '--'}
+                      {createdAt && !isNaN(new Date(createdAt).getTime())
+                        ? formatDistanceToNow(new Date(createdAt), { addSuffix: true })
+                        : '--'}
                     </Text>
                   </View>
                   {isCurrent ? (

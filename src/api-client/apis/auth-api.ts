@@ -5,6 +5,7 @@ import type {
   LoginInput,
   RefreshInput,
   RegisterInput,
+  ResendOtpInput,
   ResetPasswordInput,
   VerifyOtpInput
 } from '../types';
@@ -20,6 +21,7 @@ export interface AuthApi {
   login(input: LoginInput): Promise<AuthSession>;
   refresh(input: RefreshInput): Promise<AuthSession>;
   forgotPassword(input: ForgotPasswordInput): Promise<{ message: string }>;
+  resendOtp(input: ResendOtpInput): Promise<{ message: string }>;
   resetPassword(input: ResetPasswordInput): Promise<{ message: string }>;
   logout(): Promise<{ message: string }>;
 }
@@ -44,6 +46,10 @@ export const createAuthApi = (http: HttpClient): AuthApi => {
 
     forgotPassword(input) {
       return http.post<{ message: string }>('/auth/forgot-password', input);
+    },
+
+    resendOtp(input) {
+      return http.post<{ message: string }>('/auth/resend-otp', input);
     },
 
     resetPassword(input) {

@@ -147,6 +147,20 @@ const toApiClientError = (error: unknown): ApiClientError => {
     return parseEnvelopeError(payload);
   }
 
+  if (error.code === 'ECONNABORTED') {
+    return new ApiClientError('The request timed out while waiting for the server. Please try again.', {
+      status: error.response?.status,
+      requestId:
+        typeof error.response?.headers?.['x-request-id'] === 'string'
+          ? (error.response.headers['x-request-id'] as string)
+          : undefined
+    });
+  }
+
+  if (!error.response) {
+    return new ApiClientError('Unable to reach the server right now. Please check your connection and try again.');
+  }
+
   return new ApiClientError(error.message, {
     status: error.response?.status,
     requestId:

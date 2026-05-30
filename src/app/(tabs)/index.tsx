@@ -15,11 +15,15 @@ import { RideOptionsContent } from "@/components/home/ride-options-content";
 import { CorporateDashboardContent } from '@/components/home/corporate-dashboard-content';
 import { Origin, RouteStop, RideOption } from "@/components/home/types";
 import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
 import { useLocation } from "@/context/location-context";
 import { spacing, borderRadius } from '@/constants/spacing';
 import { rideOptions } from '@/constants/ride-options';
-import { useActiveBooking, useApiClient, useCurrentUser, useRideOptions } from '@/api-client';
+import { useActiveBooking, useApiClient, useCurrentUser, useRideOptions, useSavedAddresses } from '@/api-client';
+import type { QuickDestination } from '@/components/home/home-content';
+import { ResumeJourneyButton } from '@/components/common/resume-journey-button';
 import { accountRoleService, type AccountRole } from '@/services/account-role';
+import { journeyStateService } from '@/services/journey-state';
 import {
   locationHistoryService,
   SavedLocation,
@@ -74,7 +78,38 @@ export default function HomeScreen() {
   const { data: activeBookingData } = useActiveBooking({
     refetchInterval: 5000
   });
+  const { data: savedAddressesData } = useSavedAddresses();
 
+  const quickDestinations = useMemo<QuickDestination[]>(() => {
+    const root = asRecord(savedAddressesData);
+    const items = asArray<Record<string, unknown>>(root.items).length
+      ? asArray<Record<string, unknown>>(root.items)
+      : asArray<Record<string, unknown>>(savedAddressesData);
+
+    return items
+      .map((entry) => {
+        const coordinates = asRecord(entry.coordinates);
+        const lat = asNumber(coordinates.lat ?? coordinates.latitude, NaN);
+        const lng = asNumber(coordinates.lng ?? coordinates.longitude, NaN);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return null;
+        }
+        const name =
+          asString(entry.customLabel ?? entry.custom_label) ||
+          asString(entry.label, 'Saved');
+        const address = asString(entry.addressLine ?? entry.address_line, '');
+        return {
+          id: asString(entry.id),
+          name,
+          address,
+          coordinates: { latitude: lat, longitude: lng }
+        } satisfies QuickDestination;
+      })
+      .filter((value): value is QuickDestination => value !== null)
+      .slice(0, 3);
+  }, [savedAddressesData]);
+
+  const { t } = useTranslation();
   const mapRef = useRef<MapView>(null);
   const [accountRole, setAccountRole] = useState<AccountRole>('rider');
   const isCorporate = accountRole === 'corporate';
@@ -111,13 +146,21 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    const role = asString(apiUser.role, '');
-    if (!role) {
-      return;
-    }
-    const nextRole: AccountRole = role === 'corporate_admin' ? 'corporate' : 'rider';
-    setAccountRole(nextRole);
-    void accountRoleService.setRole(nextRole);
+    let active = true;
+    const syncRole = async () => {
+      const storedRole = await accountRoleService.getRole();
+      const nextRole = accountRoleService.resolveRole(asString(apiUser.role, ''), storedRole);
+      if (!active) {
+        return;
+      }
+      setAccountRole(nextRole);
+      await accountRoleService.setRole(nextRole);
+    };
+
+    void syncRole();
+    return () => {
+      active = false;
+    };
   }, [apiUser]);
 
   useEffect(() => {
@@ -128,6 +171,7 @@ export default function HomeScreen() {
 
     if (!bookingId || !bookingStatus) {
       recoveredBookingRef.current = null;
+      void journeyStateService.clearDismissedBookingId();
       return;
     }
 
@@ -136,16 +180,32 @@ export default function HomeScreen() {
       return;
     }
 
-    recoveredBookingRef.current = recoveryKey;
+    let cancelled = false;
+    void journeyStateService.getDismissedBookingId().then((dismissedId) => {
+      if (cancelled) {
+        return;
+      }
+      // The user explicitly went home for this booking — respect that and skip the auto-redirect.
+      if (dismissedId === bookingId) {
+        recoveredBookingRef.current = recoveryKey;
+        return;
+      }
 
-    if (['searching', 'pending', 'driver_assigned', 'driver_heading', 'driver_arrived'].includes(bookingStatus)) {
-      router.replace(`/booking/driver-accepts?bookingId=${encodeURIComponent(bookingId)}`);
-      return;
-    }
+      recoveredBookingRef.current = recoveryKey;
 
-    if (bookingStatus === 'in_progress') {
-      router.replace(`/booking/heading-destination?bookingId=${encodeURIComponent(bookingId)}`);
-    }
+      if (['searching', 'pending', 'driver_assigned', 'driver_heading', 'driver_arrived'].includes(bookingStatus)) {
+        router.replace(`/booking/driver-accepts?bookingId=${encodeURIComponent(bookingId)}`);
+        return;
+      }
+
+      if (bookingStatus === 'in_progress') {
+        router.replace(`/booking/heading-destination?bookingId=${encodeURIComponent(bookingId)}`);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeBookingData, router]);
 
   // Handle params from your-route screen
@@ -308,6 +368,31 @@ export default function HomeScreen() {
     });
   };
 
+  const handleQuickDestinationPress = (destination: QuickDestination) => {
+    if (!currentLocation) {
+      if (permissionStatus !== "granted") {
+        setShowPermissionModal(true);
+        return;
+      }
+      void getCurrentLocation();
+      return;
+    }
+    setOrigin({
+      name: t("location.your_current_location"),
+      address: currentLocation.address,
+      coordinates: currentLocation.coordinates,
+    });
+    setDestinations([
+      {
+        id: destination.id,
+        name: destination.name,
+        address: destination.address,
+        coordinates: destination.coordinates,
+      },
+    ]);
+    setViewMode("ride-options");
+  };
+
   const handleBackToHome = () => {
     setViewMode("home");
     setOrigin(null);
@@ -406,7 +491,9 @@ export default function HomeScreen() {
       black: require('../../../assets/images/ride-options/black.png')
     };
 
-    return apiOptions.map((option) => {
+    const tierOrder: Record<string, number> = { go: 0, plus: 1, black: 2, luxe: 3 };
+
+    const mapped = apiOptions.map((option) => {
       const tier = asString(option.tier, 'go');
       const normalizedTier =
         tier === 'go' || tier === 'plus' || tier === 'luxe' || tier === 'black'
@@ -431,6 +518,10 @@ export default function HomeScreen() {
         tierSurgeMultiplier
       };
     });
+
+    return mapped.sort(
+      (a, b) => (tierOrder[a.tier] ?? 99) - (tierOrder[b.tier] ?? 99)
+    );
   }, [rideOptionsData]);
 
   const estimateStopsPayload = useMemo(
@@ -635,10 +726,9 @@ export default function HomeScreen() {
 
   const renderHomeContent = () => (
     <HomeContent
-      quickLocations={quickLocations}
-      savedLocations={savedLocations}
+      quickDestinations={quickDestinations}
       onEnterLocationPress={handleEnterLocationPress}
-      onQuickLocationPress={handleQuickLocationPress}
+      onQuickDestinationPress={handleQuickDestinationPress}
     />
   );
 
@@ -830,6 +920,8 @@ export default function HomeScreen() {
         onGrantPermission={handleGrantPermission}
         onMaybeLater={handleMaybeLater}
       />
+
+      <ResumeJourneyButton />
     </View>
   );
 }

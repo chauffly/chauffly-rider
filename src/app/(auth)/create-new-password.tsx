@@ -20,7 +20,6 @@ import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { authFlowStorage } from '@/services/auth-flow-storage';
-import { normalizeNigerianPhoneNumber } from '@/utils/phone';
 
 const PASSWORD_REGEX =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
@@ -43,9 +42,9 @@ export default function CreateNewPasswordScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const api = useApiClient();
-  const params = useLocalSearchParams<{ phone_number?: string; otp?: string }>();
+  const params = useLocalSearchParams<{ email?: string; otp?: string }>();
 
-  const [phoneNumber, setPhoneNumber] = useState(params.phone_number ?? '');
+  const [email, setEmail] = useState(params.email ?? '');
   const [otp, setOtp] = useState(params.otp ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -53,7 +52,7 @@ export default function CreateNewPasswordScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (phoneNumber && otp) {
+    if (email && otp) {
       return;
     }
 
@@ -61,19 +60,19 @@ export default function CreateNewPasswordScreen() {
     const loadFlow = async () => {
       const flow = await authFlowStorage.get();
       if (!mounted || !flow) return;
-      setPhoneNumber((current) => current || flow.phoneNumber);
+      setEmail((current) => current || flow.email);
     };
     void loadFlow();
 
     return () => {
       mounted = false;
     };
-  }, [phoneNumber, otp]);
+  }, [email, otp]);
 
   const handleSavePassword = async () => {
-    const normalizedPhoneNumber = normalizeNigerianPhoneNumber(phoneNumber);
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!normalizedPhoneNumber || !otp) {
+    if (!normalizedEmail || !otp) {
       setErrorMessage('Missing password reset context. Request a new OTP.');
       return;
     }
@@ -93,7 +92,7 @@ export default function CreateNewPasswordScreen() {
 
     try {
       await api.authApi.resetPassword({
-        phone_number: normalizedPhoneNumber,
+        email: normalizedEmail,
         otp,
         new_password: newPassword
       });
@@ -177,7 +176,7 @@ export default function CreateNewPasswordScreen() {
             onPress={handleSavePassword}
             style={styles.submitButton}
             disabled={submitting}
-            title={submitting ? 'Please wait...' : undefined}
+            loading={submitting}
           />
         </View>
       </ScrollView>

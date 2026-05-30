@@ -11,6 +11,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import { ApiClientError, useApiClient } from '@/api-client';
 import { Button } from '@/components/common/button';
@@ -19,6 +20,7 @@ import { SocialButton } from '@/components/common/social-button';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
 import CallOutline from '@/components/svg/CallOutline';
+import EmailOutline from '@/components/svg/EmailOutline';
 import Password from '@/components/svg/Password';
 import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
@@ -47,6 +49,8 @@ export default function RegisterScreen() {
   const { t } = useTranslation();
   const api = useApiClient();
 
+  const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -54,11 +58,34 @@ export default function RegisterScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleCreateAccount = async () => {
-    const normalizedPhoneNumber = normalizeNigerianPhoneNumber(phoneNumber);
+  const isEmailValid = email.trim().includes('@');
+  const normalizedFullName = fullName.trim().replace(/\s+/g, ' ');
+  const fullNameParts = normalizedFullName.split(' ').filter(Boolean);
+  const isFullNameValid = fullNameParts.length >= 2;
+  const normalizedPhoneNumber = normalizeNigerianPhoneNumber(phoneNumber);
+  const isPhoneValid = Boolean(normalizedPhoneNumber);
+  const isPasswordValid = PASSWORD_REGEX.test(password);
+  const doPasswordsMatch = password.length > 0 && password === confirmPassword;
+  const canSubmit = !submitting;
 
-    if (!normalizedPhoneNumber) {
-      setErrorMessage('Use a valid Nigerian number (e.g. 08012345678 or +2348012345678).');
+  const handleCreateAccount = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = fullName.trim().replace(/\s+/g, ' ');
+    const nameParts = normalizedName.split(' ').filter(Boolean);
+    const normalizedPhone = normalizeNigerianPhoneNumber(phoneNumber);
+
+    if (nameParts.length < 2) {
+      setErrorMessage('Enter your full name.');
+      return;
+    }
+
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setErrorMessage('Enter a valid email address.');
+      return;
+    }
+
+    if (!normalizedPhone) {
+      setErrorMessage('Enter a valid phone number using digits, with an optional leading +.');
       return;
     }
 
@@ -81,15 +108,20 @@ export default function RegisterScreen() {
     setErrorMessage('');
 
     try {
+      const [firstName, ...lastNameParts] = nameParts;
       await api.authApi.register({
-        phone_number: normalizedPhoneNumber,
+        first_name: firstName,
+        last_name: lastNameParts.join(' '),
+        email: normalizedEmail,
+        phone_number: normalizedPhone,
         password,
         role: 'rider'
       });
 
       await authFlowStorage.set({
         mode: 'register',
-        phoneNumber: normalizedPhoneNumber
+        email: normalizedEmail,
+        phoneNumber: normalizedPhone
       });
 
       router.push('/(auth)/verify-otp');
@@ -130,12 +162,48 @@ export default function RegisterScreen() {
 
         <View style={styles.form}>
           <TextInput
+            labelTranslationKey="account.full_name_label"
+            placeholderTranslationKey="account.name_placeholder"
+            leftIcon={<Ionicons name="person-outline" size={20} color={colors.primary} />}
+            value={fullName}
+            onChangeText={(text) => {
+              setFullName(text);
+              if (errorMessage) setErrorMessage('');
+            }}
+            autoCapitalize="words"
+            error={fullName.length > 0 && !isFullNameValid ? 'Enter your full name.' : undefined}
+          />
+
+          <TextInput
+            labelTranslationKey="auth.email"
+            placeholder="name@example.com"
+            leftIcon={<EmailOutline />}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (errorMessage) setErrorMessage('');
+            }}
+            error={email.length > 0 && !isEmailValid ? 'Enter a valid email address.' : undefined}
+          />
+
+          <TextInput
             labelTranslationKey="auth.phone_number"
             placeholder={'08012345678'}
             leftIcon={<CallOutline />}
             keyboardType="phone-pad"
             value={phoneNumber}
-            onChangeText={setPhoneNumber}
+            onChangeText={(text) => {
+              setPhoneNumber(text);
+              if (errorMessage) setErrorMessage('');
+            }}
+            error={
+              phoneNumber.length > 0 && !isPhoneValid
+                ? 'Enter a valid phone number using digits, with an optional leading +.'
+                : undefined
+            }
           />
 
           <TextInput
@@ -144,7 +212,15 @@ export default function RegisterScreen() {
             leftIcon={<Password />}
             secureTextEntry
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (errorMessage) setErrorMessage('');
+            }}
+            error={
+              password.length > 0 && !isPasswordValid
+                ? 'Password must be 8+ chars with uppercase, lowercase, number, and symbol.'
+                : undefined
+            }
           />
 
           <TextInput
@@ -153,19 +229,21 @@ export default function RegisterScreen() {
             leftIcon={<Password />}
             secureTextEntry
             value={confirmPassword}
-            onChangeText={setConfirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              if (errorMessage) setErrorMessage('');
+            }}
+            error={
+              confirmPassword.length > 0 && !doPasswordsMatch ? 'Passwords do not match.' : undefined
+            }
           />
 
-          <Pressable
-            onPress={() => setAgreeToTerms(!agreeToTerms)}
-            style={styles.termsContainer}
-            disabled={submitting}
-          >
+          <View style={styles.termsContainer}>
             <Checkbox checked={agreeToTerms} onPress={() => setAgreeToTerms(!agreeToTerms)} />
             <Text variant="caption" color="muted" style={styles.termsText}>
               {t('auth.agree_to_terms')}
             </Text>
-          </Pressable>
+          </View>
 
           {errorMessage ? (
             <Text variant="bodySmall" color="error" style={styles.errorText}>
@@ -178,9 +256,9 @@ export default function RegisterScreen() {
             variant="primary"
             fullWidth
             onPress={handleCreateAccount}
-            disabled={submitting || !agreeToTerms}
+            disabled={!canSubmit}
             style={styles.createButton}
-            title={submitting ? 'Please wait...' : undefined}
+            loading={submitting}
           />
         </View>
 

@@ -76,13 +76,16 @@ export interface AuthSession {
 }
 
 export interface RegisterInput {
+  first_name?: string;
+  last_name?: string;
+  email: string;
   phone_number: string;
   password: string;
   role: Extract<UserRole, 'rider' | 'driver' | 'corporate_admin'>;
 }
 
 export interface LoginInput {
-  phone_number: string;
+  email: string;
   password: string;
 }
 
@@ -91,16 +94,21 @@ export interface RefreshInput {
 }
 
 export interface VerifyOtpInput {
-  phone_number: string;
+  email: string;
   otp: string;
 }
 
 export interface ForgotPasswordInput {
-  phone_number: string;
+  email: string;
+}
+
+export interface ResendOtpInput {
+  email: string;
+  purpose: 'registration' | 'password_reset';
 }
 
 export interface ResetPasswordInput {
-  phone_number: string;
+  email: string;
   otp: string;
   new_password: string;
 }
@@ -126,6 +134,8 @@ export interface BookingCreateInput {
   booking_type: 'instant' | 'scheduled';
   scheduled_at?: string;
   payment_method_id?: string;
+  payment_source?: 'card' | 'wallet' | 'company';
+  preferences?: Record<string, unknown>;
 }
 
 export interface DriverLocationUpdateInput {

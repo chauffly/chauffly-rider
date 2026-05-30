@@ -16,6 +16,7 @@ import type {
   WalletTopUpInput
 } from '../types';
 import type { BookingActionResponse } from '../apis/bookings-api';
+import type { CorporateTravelPolicyInput, MyCompanyBudgetResponse } from '../apis/corporate-api';
 import type { SavedAddressInput } from '../apis/users-api';
 import type { PaymentMethodInput, WalletTransactionsQuery } from '../apis/wallet-api';
 
@@ -173,7 +174,7 @@ export const useMarkNotificationRead = (
 };
 
 export const useMarkAllNotificationsRead = (
-  options?: UseMutationOptions<{ updated: number }, unknown, void>
+  options?: UseMutationOptions<{ updatedCount: number }, unknown, void>
 ) => {
   const api = useApiClient();
   const queryClient = useQueryClient();
@@ -339,6 +340,21 @@ export const useEstimateFare = (
   });
 };
 
+export const useBookingStart = (
+  options?: UseMutationOptions<BookingActionResponse, unknown, { bookingId: string }>
+) => {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId }) => api.bookingApi.start(bookingId),
+    onSuccess: async (data, variables, context, mutationContext) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(variables.bookingId) });
+      await options?.onSuccess?.(data, variables, context, mutationContext);
+    },
+    ...options
+  });
+};
+
 export const useBookingCancel = (
   options?: UseMutationOptions<BookingActionResponse, unknown, { bookingId: string; reason: string }>
 ) => {
@@ -366,8 +382,31 @@ export const useBookingRate = (
   });
 };
 
+export const useBookingPay = (
+  options?: UseMutationOptions<
+    import('../apis/bookings-api').PayForBookingResult,
+    unknown,
+    { bookingId: string; method: 'wallet' | 'paystack' | 'company'; reference?: string }
+  >
+) => {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: ({ bookingId, method, reference }) =>
+      api.bookingApi.payForBooking(bookingId, { method, reference }),
+    ...options
+  });
+};
+
 export const useWalletBalance = (
-  options?: Omit<UseQueryOptions<{ available_balance: number; ledger_balance: number; currency: string }>, 'queryKey' | 'queryFn'>
+  options?: Omit<
+    UseQueryOptions<{
+      available_balance_kobo: number;
+      ledger_balance_kobo: number;
+      currency: string;
+      updated_at?: string;
+    }>,
+    'queryKey' | 'queryFn'
+  >
 ) => {
   const api = useApiClient();
   return useQuery({
@@ -396,6 +435,22 @@ export const useWalletTopUp = (
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input) => api.walletApi.topUp(input),
+    onSuccess: async (data, variables, context, mutationContext) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.wallet.transactions() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.wallet.balance });
+      await options?.onSuccess?.(data, variables, context, mutationContext);
+    },
+    ...options
+  });
+};
+
+export const useWalletVerifyTopUp = (
+  options?: UseMutationOptions<{ credited: boolean; amount_kobo: number }, unknown, string>
+) => {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reference) => api.walletApi.verifyTopUp(reference),
     onSuccess: async (data, variables, context, mutationContext) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.wallet.transactions() });
       await queryClient.invalidateQueries({ queryKey: queryKeys.wallet.balance });
@@ -529,6 +584,72 @@ export const useCorporateOrganization = (
   });
 };
 
+export const useCorporateTravelPolicies = (
+  options?: Omit<UseQueryOptions<UnknownRecord>, 'queryKey' | 'queryFn'>
+) => {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: queryKeys.corporate.policies,
+    queryFn: () => api.corporateApi.getTravelPolicies(),
+    ...options
+  });
+};
+
+export const useUpdateCorporateTravelPolicies = (
+  options?: UseMutationOptions<UnknownRecord, unknown, CorporateTravelPolicyInput>
+) => {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => api.corporateApi.updateTravelPolicies(input),
+    onSuccess: async (data, variables, context, mutationContext) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.corporate.policies });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.corporate.organization });
+      await options?.onSuccess?.(data, variables, context, mutationContext);
+    },
+    ...options
+  });
+};
+
+export const useMyCompanyBudget = (
+  options?: Omit<UseQueryOptions<MyCompanyBudgetResponse>, 'queryKey' | 'queryFn'>
+) => {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: queryKeys.corporate.myBudget,
+    queryFn: () => api.corporateApi.getMyCompanyBudget(),
+    ...options
+  });
+};
+
+export const useCorporateDocuments = (
+  options?: Omit<UseQueryOptions<UnknownRecord>, 'queryKey' | 'queryFn'>
+) => {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: queryKeys.corporate.documents,
+    queryFn: () => api.corporateApi.listOrganizationDocuments(),
+    ...options
+  });
+};
+
+export const useUploadCorporateDocument = (
+  options?: UseMutationOptions<UnknownRecord, unknown, FormData>
+) => {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (formData) => api.corporateApi.uploadOrganizationDocument(formData),
+    onSuccess: async (data, variables, context, mutationContext) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.corporate.documents });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.corporate.organization });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.users.me });
+      await options?.onSuccess?.(data, variables, context, mutationContext);
+    },
+    ...options
+  });
+};
+
 export const useCorporateEmployees = (
   params?: { status?: string; cursor?: string; limit?: number },
   options?: Omit<UseQueryOptions<UnknownRecord>, 'queryKey' | 'queryFn'>
@@ -594,6 +715,7 @@ export const useDecideCorporateJoinRequest = (
     onSuccess: async (data, variables, context, mutationContext) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.corporate.joinRequests });
       await queryClient.invalidateQueries({ queryKey: queryKeys.corporate.employees });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.users.me });
       await options?.onSuccess?.(data, variables, context, mutationContext);
     },
     ...options
@@ -608,6 +730,18 @@ export const useCorporateUsage = (
   return useQuery({
     queryKey: queryKeys.corporate.usage(params?.cursor),
     queryFn: () => api.corporateApi.getUsage(params),
+    ...options
+  });
+};
+
+export const useCorporateRides = (
+  params?: { tab?: 'past' | 'upcoming' | 'ongoing' | 'cancelled'; cursor?: string; limit?: number },
+  options?: Omit<UseQueryOptions<UnknownRecord>, 'queryKey' | 'queryFn'>
+) => {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: queryKeys.corporate.rides(params?.tab, params?.cursor),
+    queryFn: () => api.corporateApi.listRides(params),
     ...options
   });
 };
@@ -641,8 +775,14 @@ export const useJoinCompany = (
   options?: UseMutationOptions<UnknownRecord, unknown, { organization_code?: string; organization_name?: string }>
 ) => {
   const api = useApiClient();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input) => api.corporateApi.requestJoinCompany(input),
+    onSuccess: async (data, variables, context, mutationContext) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.users.me });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.corporate.joinRequests });
+      await options?.onSuccess?.(data, variables, context, mutationContext);
+    },
     ...options
   });
 };
@@ -668,13 +808,13 @@ export const useTriggerSos = (
 };
 
 export const useLogin = (
-  options?: UseMutationOptions<AuthSession, unknown, { phone_number: string; password: string }>
+  options?: UseMutationOptions<AuthSession, unknown, { email: string; password: string }>
 ) => {
   const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { phone_number: string; password: string }) => {
+    mutationFn: async (input: { email: string; password: string }) => {
       const session = await api.authApi.login(input);
       await api.session.setTokens(session.tokens);
       return session;

@@ -19,7 +19,13 @@ export interface WalletTransactionsQuery {
 
 export interface WalletApi {
   topUp(input: WalletTopUpInput): Promise<{ authorization_url?: string; reference?: string }>;
-  getBalance(): Promise<{ available_balance: number; ledger_balance: number; currency: string }>;
+  verifyTopUp(reference: string): Promise<{ credited: boolean; amount_kobo: number }>;
+  getBalance(): Promise<{
+    available_balance_kobo: number;
+    ledger_balance_kobo: number;
+    currency: string;
+    updated_at?: string;
+  }>;
   getTransactions(params?: WalletTransactionsQuery): Promise<PaginatedResponse<Record<string, unknown>>>;
 
   addPaymentMethod(input: PaymentMethodInput): Promise<Record<string, unknown>>;
@@ -32,6 +38,10 @@ export const createWalletApi = (http: HttpClient): WalletApi => {
   return {
     topUp(input) {
       return http.post('/wallet/top-up', input);
+    },
+
+    verifyTopUp(reference) {
+      return http.post('/wallet/verify-top-up', { reference });
     },
 
     getBalance() {

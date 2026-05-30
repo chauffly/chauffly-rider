@@ -39,6 +39,7 @@ export interface BookingUpdateHandlers {
   onDriverLocation?: RidesServerToClientEvents['driver_location_update'];
   onRideCancelled?: RidesServerToClientEvents['ride_cancelled'];
   onTripCompleted?: RidesServerToClientEvents['trip_completed'];
+  onArrivedAtDestination?: RidesServerToClientEvents['arrived_at_destination'];
   onNoDrivers?: RidesServerToClientEvents['no_drivers_available'];
 }
 
@@ -62,6 +63,9 @@ export const useBookingUpdates = (
         : undefined,
       handlers.onTripCompleted
         ? socketClient.onRideEvent('trip_completed', handlers.onTripCompleted)
+        : undefined,
+      handlers.onArrivedAtDestination
+        ? socketClient.onRideEvent('arrived_at_destination', handlers.onArrivedAtDestination)
         : undefined,
       handlers.onNoDrivers
         ? socketClient.onRideEvent('no_drivers_available', handlers.onNoDrivers)

@@ -6,6 +6,7 @@ import MapView from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useBookingById } from '@/api-client';
+import { JourneyHomeButton } from '@/components/common/journey-home-button';
 import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
@@ -60,6 +61,8 @@ export default function TripArrivedScreen() {
       <MapView style={styles.map} initialRegion={DEFAULT_REGION} />
 
       <View style={[styles.overlay, { backgroundColor: 'rgba(255,255,255,0.70)' }]} />
+
+      <JourneyHomeButton />
 
       <View style={[styles.bottomCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}>
         <View style={[styles.arrivedBadge, { backgroundColor: colors.primary }]}>

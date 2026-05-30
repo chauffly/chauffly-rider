@@ -17,14 +17,14 @@ import { Button } from '@/components/common/button';
 import { SocialButton } from '@/components/common/social-button';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
-import CallOutline from '@/components/svg/CallOutline';
+import EmailOutline from '@/components/svg/EmailOutline';
 import Password from '@/components/svg/Password';
 import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { connectRiderSockets } from '@/runtime/rider-runtime';
+import { accountRoleService } from '@/services/account-role';
 import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
-import { normalizeNigerianPhoneNumber } from "@/utils/phone";
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof ApiClientError) {
@@ -45,19 +45,17 @@ export default function LoginScreen() {
   const { t } = useTranslation();
   const api = useApiClient();
 
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState("");
-  const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [generalError, setGeneralError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleLogin = async () => {
-    const normalizedPhoneNumber = normalizeNigerianPhoneNumber(phoneNumber);
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!normalizedPhoneNumber) {
-      setPhoneError(
-        "Use a valid Nigerian number (e.g. 08012345678 or +2348012345678).",
-      );
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setEmailError('Enter a valid email address.');
       return;
     }
 
@@ -68,15 +66,18 @@ export default function LoginScreen() {
 
     setSubmitting(true);
     setGeneralError('');
-    setPhoneError('');
+    setEmailError('');
 
     try {
       const session = await api.authApi.login({
-        phone_number: normalizedPhoneNumber,
+        email: normalizedEmail,
         password,
       });
 
       await api.session.setTokens(session.tokens);
+      await accountRoleService.setRole(
+        session.user.role === 'corporate_admin' ? 'corporate' : 'rider'
+      );
       await connectRiderSockets();
       const nextRoute = await riderOnboardingProgressStorage.resolvePostAuthRoute({
         id: session.user.id,
@@ -123,17 +124,19 @@ export default function LoginScreen() {
 
         <View style={styles.form}>
           <TextInput
-            labelTranslationKey="auth.phone_number"
-            placeholder={"08012345678"}
-            leftIcon={<CallOutline />}
-            keyboardType="phone-pad"
-            value={phoneNumber}
+            labelTranslationKey="auth.email"
+            placeholder="name@example.com"
+            leftIcon={<EmailOutline />}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
             onChangeText={(text) => {
-              setPhoneNumber(text);
-              if (phoneError) setPhoneError("");
+              setEmail(text);
+              if (emailError) setEmailError("");
               if (generalError) setGeneralError("");
             }}
-            error={phoneError}
+            error={emailError}
           />
 
           <TextInput
@@ -171,8 +174,8 @@ export default function LoginScreen() {
             fullWidth
             onPress={handleLogin}
             style={styles.loginButton}
-            // disabled={submitting}
-            title={submitting ? "Please wait..." : undefined}
+            disabled={submitting}
+            loading={submitting}
           />
         </View>
 

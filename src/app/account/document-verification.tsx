@@ -1,57 +1,90 @@
-import { useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
+import {
+  ApiClientError,
+  useCorporateDocuments,
+  useCorporateOrganization,
+  useUploadCorporateDocument
+} from '@/api-client';
 import { Button } from '@/components/common/button';
 import { StackHeader } from '@/components/common/stack-header';
 import { Text } from '@/components/common/text';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
+import { asArray, asRecord, asString } from '@/utils/api-helpers';
 
 type TabView = 'documents' | 'verification';
 
-type DocumentItem = {
-  key: string;
+type DocumentKey =
+  | 'registration_certificate'
+  | 'address_proof'
+  | 'tax_id'
+  | 'letterhead'
+  | 'admin_identity';
+
+type DocumentDefinition = {
+  key: DocumentKey;
   titleKey: string;
   descriptionKey: string;
   required?: boolean;
-  uploaded: boolean;
-  previewUri?: string;
 };
 
-const initialDocuments: DocumentItem[] = [
+const documentDefinitions: DocumentDefinition[] = [
   {
     key: 'registration_certificate',
     titleKey: 'profile_setup.corporate_doc_registration_certificate',
     descriptionKey: 'profile_setup.corporate_doc_registration_certificate_note',
-    required: true,
-    uploaded: true,
-    previewUri: 'https://placehold.co/600x400/e8e8e8/999?text=Registration+Certificate',
+    required: true
   },
   {
     key: 'address_proof',
     titleKey: 'profile_setup.corporate_doc_address_proof',
     descriptionKey: 'profile_setup.corporate_doc_address_proof_note',
-    required: true,
-    uploaded: true,
-    previewUri: 'https://placehold.co/600x400/e8e8e8/999?text=Proof+of+Address',
+    required: true
   },
   {
     key: 'tax_id',
     titleKey: 'profile_setup.corporate_doc_tax_id',
-    descriptionKey: 'profile_setup.corporate_doc_tax_id_note',
-    uploaded: false,
+    descriptionKey: 'profile_setup.corporate_doc_tax_id_note'
   },
   {
     key: 'letterhead',
     titleKey: 'profile_setup.corporate_doc_letterhead_authorization',
-    descriptionKey: 'profile_setup.corporate_doc_letterhead_authorization_note',
-    uploaded: false,
+    descriptionKey: 'profile_setup.corporate_doc_letterhead_authorization_note'
   },
+  {
+    key: 'admin_identity',
+    titleKey: 'profile_setup.corporate_identity_validation',
+    descriptionKey: 'profile_setup.corporate_identity_validation_note',
+    required: true
+  }
 ];
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof ApiClientError) {
+    return error.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+
+  return fallback;
+};
+
+const statusLabelKey = (status: string) => {
+  if (status === 'active') {
+    return 'account.verification_status_verified';
+  }
+
+  return 'account.verification_status_pending';
+};
 
 export default function DocumentVerificationScreen() {
   const router = useRouter();
@@ -59,8 +92,73 @@ export default function DocumentVerificationScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const [tab, setTab] = useState<TabView>('documents');
-  const [documents] = useState<DocumentItem[]>(initialDocuments);
-  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [uploadingType, setUploadingType] = useState<DocumentKey | null>(null);
+
+  const { data: organizationData } = useCorporateOrganization();
+  const { data: documentsData, refetch } = useCorporateDocuments();
+  const uploadDocument = useUploadCorporateDocument({
+    onSuccess: async () => {
+      await refetch();
+    }
+  });
+
+  const organization = asRecord(asRecord(organizationData).organization);
+  const documents = useMemo(() => {
+    const items = asArray<Record<string, unknown>>(asRecord(documentsData).documents);
+    return Object.fromEntries(
+      items
+        .map((item) => {
+          const documentType = asString(item.documentType) as DocumentKey;
+          return documentType ? [documentType, item] : [];
+        })
+        .filter((entry) => entry.length > 0)
+    ) as Partial<Record<DocumentKey, Record<string, unknown>>>;
+  }, [documentsData]);
+
+  const handleUpload = async (documentType: DocumentKey) => {
+    setErrorMessage('');
+    try {
+      setUploadingType(documentType);
+      const imageResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1
+      });
+
+      if (imageResult.canceled || !imageResult.assets?.length) {
+        return;
+      }
+
+      const asset = imageResult.assets[0];
+      const file = {
+        uri: asset.uri,
+        type: asset.mimeType ?? 'image/jpeg',
+        name: asset.fileName ?? `${documentType}-${Date.now()}.jpg`
+      };
+
+      if (!file) {
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('document_type', documentType);
+      formData.append('file', file as any);
+      await uploadDocument.mutateAsync(formData);
+    } catch (error) {
+      setErrorMessage(extractErrorMessage(error, 'Upload failed.'));
+    } finally {
+      setUploadingType(null);
+    }
+  };
+
+  const organizationStatus = asString(organization.status, 'pending');
+  const verificationNote =
+    organizationStatus === 'active'
+      ? 'Your corporate account has been approved and is now active.'
+      : organizationStatus === 'inactive'
+        ? 'Your application was not approved. Upload updated documents to resume admin review.'
+        : 'Your application is pending admin review. Corporate bookings, top-ups, employees, and billing remain disabled until approval.';
 
   return (
     <View
@@ -69,8 +167,8 @@ export default function DocumentVerificationScreen() {
         {
           backgroundColor: colors.background,
           paddingTop: insets.top + spacing.lg,
-          paddingBottom: insets.bottom + spacing.md,
-        },
+          paddingBottom: insets.bottom + spacing.md
+        }
       ]}
     >
       <StackHeader
@@ -79,7 +177,6 @@ export default function DocumentVerificationScreen() {
         onBack={() => router.back()}
       />
 
-      {/* Segment Control */}
       <View style={[styles.segmentWrap, { backgroundColor: colors.surface }]}>
         <Pressable
           onPress={() => setTab('documents')}
@@ -99,285 +196,181 @@ export default function DocumentVerificationScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {tab === 'documents' ? (
           <>
-            {documents.map((doc) => (
-              <View key={doc.key} style={[styles.docCard, { backgroundColor: colors.surface }]}>
-                <View style={styles.docHeader}>
-                  <View style={styles.docTitleRow}>
-                    <MaterialCommunityIcons
-                      name={doc.uploaded ? 'file-check-outline' : 'file-outline'}
-                      size={22}
-                      color={doc.uploaded ? colors.success : colors.textSecondary}
-                    />
-                    <View style={styles.docTitleWrap}>
-                      <Text variant="body" weight="medium" numberOfLines={1}>
-                        {t(doc.titleKey)}
-                        {doc.required ? <Text color="error"> *</Text> : null}
-                      </Text>
-                      <Text variant="caption" color={doc.uploaded ? 'success' : 'muted'}>
-                        {doc.uploaded ? t('account.doc_uploaded') : t('account.doc_not_uploaded')}
-                      </Text>
+            {documentDefinitions.map((doc) => {
+              const uploadedDocument = documents[doc.key];
+              const uploaded = Boolean(uploadedDocument);
+              const isBusy = uploadingType === doc.key;
+
+              return (
+                <View key={doc.key} style={[styles.docCard, { backgroundColor: colors.surface }]}>
+                  <View style={styles.docHeader}>
+                    <View style={styles.docTitleRow}>
+                      <MaterialCommunityIcons
+                        name={uploaded ? 'file-check-outline' : 'file-outline'}
+                        size={22}
+                        color={uploaded ? colors.success : colors.textSecondary}
+                      />
+                      <View style={styles.docTitleWrap}>
+                        <Text variant="body" weight="medium" numberOfLines={1}>
+                          {t(doc.titleKey)}
+                          {doc.required ? <Text color="error"> *</Text> : null}
+                        </Text>
+                        <Text variant="caption" color={uploaded ? 'success' : 'muted'}>
+                          {uploaded ? t('account.doc_uploaded') : t('account.doc_not_uploaded')}
+                        </Text>
+                        {uploaded ? (
+                          <Text variant="caption" color="muted">
+                            {asString(asRecord(uploadedDocument).originalFileName)}
+                          </Text>
+                        ) : null}
+                      </View>
                     </View>
-                  </View>
-                </View>
 
-                <Text variant="caption" color="muted" style={styles.docDescription}>
-                  {t(doc.descriptionKey)}
-                </Text>
-
-                {doc.uploaded && doc.previewUri && (
-                  <Pressable onPress={() => setPreviewDoc(doc)}>
-                    <Image
-                      source={{ uri: doc.previewUri }}
-                      style={[styles.docPreview, { backgroundColor: colors.border }]}
-                      resizeMode="cover"
+                    <Button
+                      title={isBusy ? 'Uploading...' : uploaded ? t('account.doc_update') : t('account.doc_upload')}
+                      size="sm"
+                      variant="outline"
+                      onPress={() => void handleUpload(doc.key)}
+                      loading={isBusy}
+                      disabled={isBusy}
                     />
-                  </Pressable>
-                )}
+                  </View>
 
-                <View style={styles.docActions}>
-                  {doc.uploaded ? (
-                    <>
-                      <Pressable
-                        style={[styles.docActionButton, { backgroundColor: colors.accent }]}
-                        onPress={() => setPreviewDoc(doc)}
-                      >
-                        <MaterialCommunityIcons name="eye-outline" size={16} color={colors.primary} />
-                        <Text variant="caption" weight="medium" color="primary">{t('account.doc_view')}</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.docActionButton, { backgroundColor: colors.accent }]}
-                      >
-                        <MaterialCommunityIcons name="pencil-outline" size={16} color={colors.primary} />
-                        <Text variant="caption" weight="medium" color="primary">{t('account.doc_update')}</Text>
-                      </Pressable>
-                    </>
-                  ) : (
-                    <Pressable
-                      style={[styles.docActionButton, { backgroundColor: colors.accent }]}
-                    >
-                      <MaterialCommunityIcons name="plus" size={16} color={colors.primary} />
-                      <Text variant="caption" weight="medium" color="primary">{t('account.doc_upload')}</Text>
-                    </Pressable>
-                  )}
+                  <Text variant="bodySmall" color="muted">
+                    {t(doc.descriptionKey)}
+                  </Text>
                 </View>
-              </View>
-            ))}
+              );
+            })}
+
+            {errorMessage ? (
+              <Text variant="bodySmall" color="error" style={styles.errorText}>
+                {errorMessage}
+              </Text>
+            ) : null}
           </>
         ) : (
-          <>
-            <View style={[styles.verificationCard, { backgroundColor: colors.surface }]}>
-              <View style={styles.verificationIconWrap}>
-                <MaterialCommunityIcons name="shield-check-outline" size={64} color={colors.textPrimary} />
-              </View>
-
-              <Text variant="h3" weight="medium" size="xl">
-                {t('profile_setup.corporate_identity_validation')}
+          <View style={[styles.verificationCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.verificationIconWrap}>
+              <MaterialCommunityIcons
+                name={organizationStatus === 'active' ? 'shield-check-outline' : 'progress-clock'}
+                size={68}
+                color={organizationStatus === 'active' ? colors.success : colors.primary}
+              />
+            </View>
+            <Text variant="body" weight="medium" style={styles.verificationTitle}>
+              {t('account.verification_section')}
+            </Text>
+            <Text variant="bodySmall" color="muted" style={styles.verificationDesc}>
+              {verificationNote}
+            </Text>
+            <View style={styles.statusRow}>
+              <Text variant="bodySmall" color="muted">
+                {t('account.verification_status_label')}
               </Text>
-
-              <Text variant="bodySmall" color="muted" style={styles.verificationDesc}>
-                {t('profile_setup.corporate_identity_validation_note')}
-              </Text>
-
-              <View style={styles.bullets}>
-                <Text variant="bodySmall" color="muted">
-                  {`\u2022 ${t('profile_setup.corporate_identity_bullet_1')}`}
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    borderColor: organizationStatus === 'active' ? colors.success : colors.primary
+                  }
+                ]}
+              >
+                <Text
+                  variant="bodySmall"
+                  color={organizationStatus === 'active' ? 'success' : 'primary'}
+                  weight="medium"
+                >
+                  {t(statusLabelKey(organizationStatus))}
                 </Text>
-                <Text variant="bodySmall" color="muted">
-                  {`\u2022 ${t('profile_setup.corporate_identity_bullet_2')}`}
-                </Text>
-              </View>
-
-              <View style={[styles.statusDivider, { backgroundColor: colors.border }]} />
-
-              <View style={styles.statusRow}>
-                <Text variant="body" weight="medium">{t('account.verification_status_label')}</Text>
-                <View style={[styles.statusBadge, { borderColor: colors.success }]}>
-                  <Text variant="caption" color="success">{t('account.verification_status_verified')}</Text>
-                </View>
               </View>
             </View>
-
             <Button
-              translationKey="account.reverify_identity"
+              translationKey="account.update_documents"
               variant="outline"
-              style={styles.reverifyButton}
+              fullWidth
+              onPress={() => setTab('documents')}
             />
-          </>
+          </View>
         )}
       </ScrollView>
-
-      {/* Document Preview Modal */}
-      <Modal
-        transparent
-        animationType="fade"
-        visible={!!previewDoc}
-        onRequestClose={() => setPreviewDoc(null)}
-      >
-        <View style={styles.previewOverlay}>
-          <View style={[styles.previewCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.previewHeader}>
-              <Text variant="body" weight="semiBold" numberOfLines={1} style={styles.previewTitle}>
-                {previewDoc ? t(previewDoc.titleKey) : ''}
-              </Text>
-              <Pressable onPress={() => setPreviewDoc(null)} hitSlop={8}>
-                <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
-              </Pressable>
-            </View>
-
-            {previewDoc?.previewUri && (
-              <Image
-                source={{ uri: previewDoc.previewUri }}
-                style={[styles.previewImage, { backgroundColor: colors.border }]}
-                resizeMode="contain"
-              />
-            )}
-
-            <View style={styles.previewActions}>
-              <Button
-                translationKey="account.doc_update"
-                variant="outline"
-                style={styles.previewActionButton}
-                onPress={() => setPreviewDoc(null)}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
+    flex: 1
   },
   segmentWrap: {
+    marginHorizontal: spacing.lg,
     borderRadius: borderRadius.full,
-    padding: 4,
     flexDirection: 'row',
-    marginBottom: spacing.lg,
+    padding: spacing.xs,
+    marginBottom: spacing.lg
   },
   segmentButton: {
     flex: 1,
+    minHeight: 40,
     borderRadius: borderRadius.full,
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    justifyContent: 'center'
   },
   content: {
-    paddingBottom: spacing.xxxxl,
-    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.md
   },
   docCard: {
-    borderRadius: borderRadius.xxl,
+    borderRadius: borderRadius.xl,
     padding: spacing.lg,
-    gap: spacing.sm,
+    gap: spacing.sm
   },
   docHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md
   },
   docTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
-    flex: 1,
+    flex: 1
   },
   docTitleWrap: {
     flex: 1,
-    gap: 2,
-  },
-  docDescription: {
-    lineHeight: 18,
-  },
-  docPreview: {
-    width: '100%',
-    height: 140,
-    borderRadius: borderRadius.lg,
-    marginTop: spacing.xs,
-  },
-  docActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  docActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
+    gap: 2
   },
   verificationCard: {
-    borderRadius: borderRadius.xxl,
-    padding: spacing.lg,
-    gap: spacing.md,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    gap: spacing.lg
   },
   verificationIconWrap: {
-    alignItems: 'center',
-    marginVertical: spacing.sm,
+    alignItems: 'center'
+  },
+  verificationTitle: {
+    textAlign: 'center'
   },
   verificationDesc: {
-    lineHeight: 20,
-  },
-  bullets: {
-    gap: spacing.sm,
-  },
-  statusDivider: {
-    height: 1,
+    textAlign: 'center'
   },
   statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   statusBadge: {
     borderWidth: 1,
     borderRadius: borderRadius.full,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xs
   },
-  reverifyButton: {
-    marginTop: spacing.sm,
-  },
-  previewOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  previewCard: {
-    borderRadius: borderRadius.xxl,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  previewTitle: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  previewImage: {
-    width: '100%',
-    height: 280,
-    borderRadius: borderRadius.lg,
-  },
-  previewActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  previewActionButton: {
-    flex: 1,
-  },
+  errorText: {
+    marginTop: spacing.sm
+  }
 });

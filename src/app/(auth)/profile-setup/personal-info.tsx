@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Image,
   View,
   StyleSheet,
   ScrollView,
@@ -9,6 +10,8 @@ import {
   Modal,
   useWindowDimensions,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,17 +22,16 @@ import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
 import { SelectInput } from '@/components/common/select-input';
 import { Button } from '@/components/common/button';
+import { useCurrentUser, useUploadAvatar } from '@/api-client';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { borderRadius, spacing } from '@/constants/spacing';
-import UserOutline from '@/components/svg/UserOutline';
-import EmailOutline from '@/components/svg/EmailOutline';
 import GenderOutline from '@/components/svg/GenderOutline';
 import CalendarOutline from '@/components/svg/CalendarOutline';
 import CameraOutline from '@/components/svg/CameraOutline';
-import PersonPlaceholder from '@/components/svg/PersonPlaceholder';
 import { StackHeader } from '@/components/common/stack-header';
 import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
+import { asRecord, asString } from '@/utils/api-helpers';
 
 const genderOptions = [
   { label: 'Male', value: 'male', translationKey: 'profile_setup.gender_male' },
@@ -43,12 +45,15 @@ export default function PersonalInfoScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const { data: currentUserData } = useCurrentUser();
+  const uploadAvatar = useUploadAvatar();
 
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
   const [gender, setGender] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const currentUser = asRecord(currentUserData);
+  const avatarUrl = asString(currentUser.avatarUrl ?? currentUser.avatar_url);
 
   const dateOfBirthValue = useMemo(
     () => (dateOfBirth ? format(dateOfBirth, 'dd/MM/yyyy') : ''),
@@ -60,6 +65,29 @@ export default function PersonalInfoScreen() {
   useEffect(() => {
     void riderOnboardingProgressStorage.setCurrentRoute('/(auth)/profile-setup/personal-info');
   }, []);
+
+  useEffect(() => {
+    const user =
+      currentUserData && typeof currentUserData === 'object'
+        ? (currentUserData as Record<string, unknown>)
+        : {};
+    const firstName =
+      typeof user.firstName === 'string'
+        ? user.firstName
+        : typeof user.first_name === 'string'
+          ? user.first_name
+          : '';
+    const lastName =
+      typeof user.lastName === 'string'
+        ? user.lastName
+        : typeof user.last_name === 'string'
+          ? user.last_name
+          : '';
+    const combinedName = `${firstName} ${lastName}`.trim();
+    if (combinedName) {
+      setFullName(combinedName);
+    }
+  }, [currentUserData]);
 
   const handleBack = () => {
     router.back();
@@ -74,7 +102,30 @@ export default function PersonalInfoScreen() {
   };
 
   const handlePhotoUpload = () => {
-    // TODO: Implement photo upload
+    void (async () => {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.9,
+        aspect: [1, 1]
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const formData = new FormData();
+      formData.append(
+        'avatar',
+        {
+          uri: asset.uri,
+          name: asset.fileName ?? `avatar-${Date.now()}.jpg`,
+          type: asset.mimeType ?? 'image/jpeg'
+        } as any
+      );
+      await uploadAvatar.mutateAsync(formData);
+    })();
   };
 
   return (
@@ -109,11 +160,16 @@ export default function PersonalInfoScreen() {
         {/* Profile Photo */}
         <View style={styles.photoContainer}>
           <View style={[styles.photoPlaceholder, { backgroundColor: "#D9D9D9" }]}>
-            <PersonPlaceholder />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.photoImage} />
+            ) : (
+              <Ionicons name="person" size={56} color={colors.textMuted} />
+            )}
           </View>
           <Pressable
             onPress={handlePhotoUpload}
             style={[styles.cameraButton, { backgroundColor: colors.primary }]}
+            disabled={uploadAvatar.isPending}
           >
             <CameraOutline size={16} color={colors.buttonPrimaryText} />
           </Pressable>
@@ -124,20 +180,10 @@ export default function PersonalInfoScreen() {
           <TextInput
             labelTranslationKey="profile_setup.full_name"
             placeholderTranslationKey="profile_setup.full_name_placeholder"
-            leftIcon={<UserOutline />}
+            leftIcon={<Ionicons name="person-outline" size={20} color={colors.primary} />}
             value={fullName}
             onChangeText={setFullName}
             autoCapitalize="words"
-          />
-
-          <TextInput
-            labelTranslationKey="profile_setup.email"
-            placeholderTranslationKey="profile_setup.email_placeholder"
-            leftIcon={<EmailOutline />}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
           />
 
           <SelectInput
@@ -244,6 +290,11 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden'
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%'
   },
   cameraButton: {
     position: 'absolute',

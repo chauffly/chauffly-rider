@@ -1,39 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, View, Pressable, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import { Text } from "@/components/common/text";
 import { Button } from "@/components/common/button";
-import { Switch } from "@/components/common/switch";
 import { StackHeader } from "@/components/common/stack-header";
-import Check from "@/components/svg/Check";
 import { borderRadius, spacing } from "@/constants/spacing";
 import { useTheme } from "@/context/theme-context";
 import { useTranslation } from "@/context/language-context";
+import { useCurrentUser } from "@/api-client";
 import Temperature from "@/components/svg/Temperature";
 import Music from "@/components/svg/Music";
 import Message from "@/components/svg/Message";
 import Door from "@/components/svg/Door";
 import AmbientScent from "@/components/svg/AmbientScent";
-import Amenities from "@/components/svg/Amenities";
-import Security from "@/components/svg/Security";
+import {
+  defaultRidePreferencePreset,
+  RidePreferencePreset,
+  RidePreferenceValue,
+  ridePreferenceStorage
+} from "@/services/ride-preference-storage";
 
-type PillValue =
-  | "cool"
-  | "neutral"
-  | "warm"
-  | "no_music"
-  | "jazz"
-  | "classical"
-  | "afrobeats"
-  | "quiet"
-  | "minimal"
-  | "open"
-  | "scent_neutral"
-  | "citrus"
-  | "wood"
-  | "floral";
+type PillValue = RidePreferenceValue;
 
 interface PillOption {
   value: PillValue;
@@ -42,22 +31,32 @@ interface PillOption {
 
 
 const cabinOptions: PillOption[] = [
-  { value: "cool", labelKey: "booking.preference_cabin_cool" },
-  { value: "neutral", labelKey: "booking.preference_cabin_neutral" },
-  { value: "warm", labelKey: "booking.preference_cabin_warm" },
+  { value: "t_18_20", labelKey: "booking.preference_cabin_18_20" },
+  { value: "t_20_22", labelKey: "booking.preference_cabin_20_22" },
+  { value: "t_22_24", labelKey: "booking.preference_cabin_22_24" },
+  { value: "t_24_26", labelKey: "booking.preference_cabin_24_26" },
 ];
 
 const musicOptions: PillOption[] = [
-  { value: "no_music", labelKey: "booking.preference_music_none" },
+  { value: "fm", labelKey: "booking.preference_music_fm" },
   { value: "jazz", labelKey: "booking.preference_music_jazz" },
   { value: "classical", labelKey: "booking.preference_music_classical" },
   { value: "afrobeats", labelKey: "booking.preference_music_afrobeats" },
+  { value: "no_music", labelKey: "booking.preference_music_none" },
+  { value: "connect_device", labelKey: "booking.preference_music_connect_device" },
 ];
 
 const conversationOptions: PillOption[] = [
   { value: "quiet", labelKey: "booking.preference_conversation_quiet" },
   { value: "minimal", labelKey: "booking.preference_conversation_minimal" },
   { value: "open", labelKey: "booking.preference_conversation_open" },
+];
+
+const doorOptions: PillOption[] = [
+  { value: "door_always", labelKey: "booking.preference_door_always" },
+  { value: "door_pickup", labelKey: "booking.preference_door_pickup_only" },
+  { value: "door_dropoff", labelKey: "booking.preference_door_dropoff_only" },
+  { value: "door_none", labelKey: "booking.preference_door_none" },
 ];
 
 const scentOptions: PillOption[] = [
@@ -67,33 +66,62 @@ const scentOptions: PillOption[] = [
   { value: "floral", labelKey: "booking.preference_scent_floral" },
 ];
 
-const amenityOptions = [
-  { key: "water", labelKey: "booking.preference_amenity_water" },
-  { key: "mints", labelKey: "booking.preference_amenity_mints" },
-  { key: "newspaper", labelKey: "booking.preference_amenity_newspaper" },
-];
-
 export default function RidePreferenceScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const { data: currentUserData } = useCurrentUser();
 
-  const [cabinTemp, setCabinTemp] = useState<PillValue>("neutral");
-  const [musicGenre, setMusicGenre] = useState<PillValue>("jazz");
+  const [cabinTemp, setCabinTemp] = useState<PillValue>(defaultRidePreferencePreset.cabinTemp);
+  const [musicGenre, setMusicGenre] = useState<PillValue>(defaultRidePreferencePreset.musicGenre);
   const [conversationMode, setConversationMode] =
-    useState<PillValue>("minimal");
-  const [ambientScent, setAmbientScent] = useState<PillValue>("citrus");
-  const [doorEtiquette, setDoorEtiquette] = useState(false);
-  const [securityEscort, setSecurityEscort] = useState(false);
-  const [amenities, setAmenities] = useState<Record<string, boolean>>({
-    water: false,
-    mints: false,
-    newspaper: false,
-  });
+    useState<PillValue>(defaultRidePreferencePreset.conversationMode);
+  const [doorEtiquette, setDoorEtiquette] = useState<PillValue>(defaultRidePreferencePreset.doorEtiquette);
+  const [ambientScent, setAmbientScent] = useState<PillValue>(defaultRidePreferencePreset.ambientScent);
+  const [saving, setSaving] = useState(false);
+  const currentUserRecord =
+    currentUserData && typeof currentUserData === "object"
+      ? (currentUserData as Record<string, unknown>)
+      : {};
+  const preferenceOwnerKey =
+    (typeof currentUserRecord.id === "string" && currentUserRecord.id.trim()) ||
+    (typeof currentUserRecord.email === "string" && currentUserRecord.email.trim()) ||
+    null;
 
-  const toggleAmenity = (key: string) => {
-    setAmenities((prev) => ({ ...prev, [key]: !prev[key] }));
+  useEffect(() => {
+    const loadPreset = async () => {
+      const preset = await ridePreferenceStorage.get(preferenceOwnerKey);
+      setCabinTemp(preset.cabinTemp);
+      setMusicGenre(preset.musicGenre);
+      setConversationMode(preset.conversationMode);
+      setDoorEtiquette(preset.doorEtiquette);
+      setAmbientScent(preset.ambientScent);
+    };
+
+    void loadPreset();
+  }, [preferenceOwnerKey]);
+
+  const handleSave = async () => {
+    if (saving) {
+      return;
+    }
+
+    const preset: RidePreferencePreset = {
+      cabinTemp,
+      musicGenre,
+      conversationMode,
+      doorEtiquette,
+      ambientScent
+    };
+
+    setSaving(true);
+    try {
+      await ridePreferenceStorage.set(preferenceOwnerKey, preset);
+      router.back();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderPills = (
@@ -179,24 +207,15 @@ export default function RidePreferenceScreen() {
           setConversationMode,
         )}
 
-        <View style={styles.toggleRow}>
-          <View style={styles.labelWrapper}>
-            <Door color={colors.textPrimary} />
-            <Text
-              variant="label"
-              size={"lg"}
-              translationKey="booking.preference_door_etiquette"
-            />
-          </View>
-          <Switch
-            value={doorEtiquette}
-            onValueChange={setDoorEtiquette}
-            trackOn={colors.primary}
-            trackOff={colors.border}
-            thumbOn={colors.surface}
-            thumbOff={colors.surface}
+        <View style={styles.labelWrapper}>
+          <Door color={colors.textPrimary} />
+          <Text
+            variant="label"
+            size={"lg"}
+            translationKey="booking.preference_door_etiquette"
           />
         </View>
+        {renderPills(doorOptions, doorEtiquette, setDoorEtiquette)}
 
         <View style={styles.labelWrapper}>
           <AmbientScent color={colors.textPrimary} />
@@ -207,73 +226,14 @@ export default function RidePreferenceScreen() {
           />
         </View>
         {renderPills(scentOptions, ambientScent, setAmbientScent)}
-
-        <View style={styles.labelWrapper}>
-          <Amenities color={colors.textPrimary} />
-          <Text
-            variant="label"
-            size={"lg"}
-            translationKey="booking.preference_in_car_amenities"
-          />
-        </View>
-
-        <View style={styles.amenities}>
-          {amenityOptions.map((amenity) => {
-            const isSelected = amenities[amenity.key];
-            return (
-              <Pressable
-                key={amenity.key}
-                onPress={() => toggleAmenity(amenity.key)}
-                style={styles.amenityRow}
-                accessibilityRole="button"
-                accessibilityLabel={t(amenity.labelKey)}
-              >
-                <Text variant="bodySmall" color="muted">
-                  {t(amenity.labelKey)}
-                </Text>
-                <View
-                  style={[
-                    styles.checkbox,
-                    {
-                      borderColor: isSelected ? colors.primary : colors.border,
-                      backgroundColor: isSelected
-                        ? colors.primary
-                        : colors.surface,
-                    },
-                  ]}
-                >
-                  {isSelected && <Check color={colors.surface} />}
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.toggleRow}>
-          <View style={styles.labelWrapper}>
-            <Security color={colors.textPrimary} />
-            <Text
-              variant="label"
-              size={"lg"}
-              translationKey="booking.preference_security_escort"
-            />
-          </View>
-          <Switch
-            value={securityEscort}
-            onValueChange={setSecurityEscort}
-            trackOn={colors.primary}
-            trackOff={colors.border}
-            thumbOn={colors.surface}
-            thumbOff={colors.surface}
-          />
-        </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <Button
-          translationKey="common.save"
+          title={saving ? t("common.loading") : t("common.save")}
           fullWidth
-          onPress={() => router.back()}
+          onPress={handleSave}
+          disabled={saving}
         />
       </View>
     </View>
@@ -304,27 +264,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderWidth: 1,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  amenities: {
-    gap: spacing.sm,
-  },
-  amenityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: borderRadius.xs,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   footer: {
     paddingVertical: spacing.lg,

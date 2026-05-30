@@ -25,6 +25,10 @@ export interface RidesServerToClientEvents {
   }) => void;
   driver_arrived: (payload: { pin?: string | null }) => void;
   trip_started: (payload: { bookingId: string }) => void;
+  arrived_at_destination: (payload: {
+    bookingId: string;
+    fare: { tripFare: number; surgeFee: number; tax: number; total: number; currency: string };
+  }) => void;
   trip_completed: (payload: { fare_breakdown?: Record<string, unknown>; earnings?: Record<string, unknown> }) => void;
   booking_status_changed: (payload: {
     bookingId: string;

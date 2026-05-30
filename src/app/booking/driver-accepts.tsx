@@ -1,18 +1,20 @@
-import { StyleSheet, View, Pressable, Linking, Modal, TextInput } from 'react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, View, Pressable, Linking, Modal } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { useActiveBooking, useBookingById, useBookingUpdates, useDriverLocation as useLiveDriverLocation } from '@/api-client';
+import { useActiveBooking, useApiClient, useBookingById, useBookingUpdates, useDriverLocation as useLiveDriverLocation } from '@/api-client';
+import { JourneyHomeButton } from '@/components/common/journey-home-button';
 import { Text } from '@/components/common/text';
 import ChevronLeft from '@/components/svg/ChevronLeft';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { socketClient } from '@/runtime/rider-runtime';
-import { asNumber, asRecord, asString } from '@/utils/api-helpers';
+import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
+import { decodePolyline } from '@/utils/route';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -55,6 +57,7 @@ export default function DriverAcceptsScreen() {
     driverPhone?: string;
     driverRating?: string;
     driverVehicle?: string;
+    fromScheduledStart?: string;
   }>();
   const requestedBookingId = params.bookingId ?? '';
   const { data: activeBookingData } = useActiveBooking({
@@ -70,9 +73,11 @@ export default function DriverAcceptsScreen() {
     refetchInterval: 5000
   });
 
+  const api = useApiClient();
+  const initiatedRef = useRef(false);
+  const navigatedToJourneyRef = useRef(false);
   const [rideArrivalState, setRideArrivalState] = useState<RideArrivalState>('searching');
   const [showPinModal, setShowPinModal] = useState(false);
-  const [pin, setPin] = useState('');
   const [livePin, setLivePin] = useState('');
   const [liveAssignedDriver, setLiveAssignedDriver] = useState<Record<string, unknown> | null>(null);
   const [liveAssignedVehicle, setLiveAssignedVehicle] = useState<Record<string, unknown> | null>(null);
@@ -80,6 +85,13 @@ export default function DriverAcceptsScreen() {
     type: 'no_drivers' | 'cancelled';
     message: string;
   } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+  const [retriesLeft, setRetriesLeft] = useState(3);
+  const [retrying, setRetrying] = useState(false);
+  const [userInteracting, setUserInteracting] = useState(false);
+  const mapRef = useRef<MapView>(null);
+  const hasInitialFitRef = useRef(false);
 
   const driverLocation = useLiveDriverLocation(socketClient);
 
@@ -106,7 +118,7 @@ export default function DriverAcceptsScreen() {
 
       setTerminalState({
         type: 'cancelled',
-        message: payload.reason?.trim() || 'This booking was cancelled.'
+        message: payload.reason?.trim() || t('booking.booking_cancelled_message')
       });
     },
     onNoDrivers: (payload) => {
@@ -114,16 +126,17 @@ export default function DriverAcceptsScreen() {
         return;
       }
 
+      setRetriesLeft((prev) => Math.max(0, prev - 1));
       setTerminalState({
         type: 'no_drivers',
-        message: 'No nearby drivers are currently available for this trip.'
+        message: t('booking.no_drivers_message')
       });
     },
     onTripCompleted: () => {
-      if (!bookingId) {
+      if (!bookingId || navigatedToJourneyRef.current) {
         return;
       }
-
+      navigatedToJourneyRef.current = true;
       router.replace({
         pathname: '/booking/trip-arrived',
         params: {
@@ -149,7 +162,8 @@ export default function DriverAcceptsScreen() {
     if (status) {
       setRideArrivalState(mapBookingStatus(status));
     }
-    if (status === 'in_progress') {
+    if (status === 'in_progress' && !navigatedToJourneyRef.current) {
+      navigatedToJourneyRef.current = true;
       router.replace({
         pathname: '/booking/heading-destination',
         params: {
@@ -165,6 +179,15 @@ export default function DriverAcceptsScreen() {
     }
   }, [rideArrivalState]);
 
+  useEffect(() => {
+    if (params.fromScheduledStart !== 'true' || !bookingId || initiatedRef.current) return;
+    const detail = asRecord(bookingData);
+    const status = asString(asRecord(detail.booking).status, '');
+    if (!status || (status !== 'pending' && status !== 'no_drivers')) return;
+    initiatedRef.current = true;
+    api.bookingApi.initiateSearch(bookingId).catch(() => {});
+  }, [api.bookingApi, bookingData, bookingId, params.fromScheduledStart]);
+
   const detail = asRecord(bookingData);
   const booking = asRecord(detail.booking);
   const driver = Object.keys(liveAssignedDriver ?? {}).length > 0 ? liveAssignedDriver! : asRecord(detail.driver);
@@ -173,11 +196,11 @@ export default function DriverAcceptsScreen() {
       ? liveAssignedVehicle!
       : asRecord(driver.vehicle);
   const driverName =
-    params.driverName || `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Driver';
+    params.driverName || `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || t('booking.driver_fallback');
   const driverPhone = params.driverPhone || asString(driver.phoneNumber, '--');
   const driverRating = params.driverRating || asString(driver.rating, '--');
-  const driverVehicle =
-    params.driverVehicle || `${asString(vehicle.make)} ${asString(vehicle.model)}`.trim() || '--';
+  const driverVehicleRaw = `${asString(vehicle.make)} ${asString(vehicle.model)}`.trim();
+  const driverVehicle = params.driverVehicle || driverVehicleRaw || '--';
   const hasAssignedDriver =
     rideArrivalState !== 'searching' ||
     Object.keys(driver).length > 0 ||
@@ -194,30 +217,76 @@ export default function DriverAcceptsScreen() {
     [bookingPickupLatitude, bookingPickupLongitude, driverLocation.lat, driverLocation.lng]
   );
 
-  const mapRegion = useMemo(
-    () => ({
-      latitude: bookingPickupLatitude,
-      longitude: bookingPickupLongitude,
-      latitudeDelta: 0.035,
-      longitudeDelta: 0.035
-    }),
-    [bookingPickupLatitude, bookingPickupLongitude]
+  const stops = asArray<Record<string, unknown>>(detail.stops);
+  const lastStop = stops.length > 0 ? asRecord(stops[stops.length - 1]) : null;
+  const destCoordsRecord = lastStop ? asRecord(lastStop.coordinates) : null;
+  const destinationCoord = destCoordsRecord
+    ? { latitude: asNumber(destCoordsRecord.lat), longitude: asNumber(destCoordsRecord.lng) }
+    : null;
+
+  const encodedPolyline = asString(asRecord(detail.route).polyline);
+  const routeCoordinates = useMemo(
+    () => (encodedPolyline ? decodePolyline(encodedPolyline) : []),
+    [encodedPolyline]
   );
 
-  const handlePinConfirm = () => {
-    if (!pin.trim() || !bookingId) {
+  useEffect(() => {
+    if (hasInitialFitRef.current || userInteracting || !mapRef.current || routeCoordinates.length < 2) return;
+    mapRef.current.fitToCoordinates(routeCoordinates, {
+      edgePadding: { top: 80, right: 40, bottom: 340, left: 40 },
+      animated: true
+    });
+    hasInitialFitRef.current = true;
+  }, [routeCoordinates, userInteracting]);
+
+  const centerMap = () => {
+    if (!mapRef.current) return;
+    setUserInteracting(false);
+    const coords = routeCoordinates.length >= 2 ? routeCoordinates : [{ latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }];
+    mapRef.current.fitToCoordinates(coords, {
+      edgePadding: { top: 80, right: 40, bottom: 340, left: 40 },
+      animated: true
+    });
+  };
+
+  const handleCancelSearch = async () => {
+    if (!bookingId || cancelling) {
       return;
     }
 
-    setShowPinModal(false);
-    setPin('');
-    router.push({
-      pathname: '/booking/heading-destination',
-      params: {
-        bookingId
-      }
-    });
+    setCancelling(true);
+    setCancelError('');
+
+    try {
+      await api.bookingApi.cancel(bookingId, { reason: t('booking.cancel_reason_rider') });
+      setTerminalState({
+        type: 'cancelled',
+        message: t('booking.search_cancelled_message')
+      });
+    } catch (error) {
+      setCancelError(error instanceof Error ? error.message : t('booking.cancel_failed'));
+    } finally {
+      setCancelling(false);
+    }
   };
+
+  const handleRetrySearch = async () => {
+    if (!bookingId || retrying || retriesLeft <= 0) return;
+    setRetrying(true);
+    setCancelError('');
+    try {
+      await api.bookingApi.retrySearch(bookingId);
+      setRetriesLeft((n) => n - 1);
+      setTerminalState(null);
+      setRideArrivalState('searching');
+    } catch (error) {
+      setCancelError(error instanceof Error ? error.message : t('booking.cancel_failed'));
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const displayPin = livePin || asString(booking.confirmationPin, '');
 
   const statusTitle =
     rideArrivalState === 'searching'
@@ -239,10 +308,15 @@ export default function DriverAcceptsScreen() {
 
   const handleCallDriver = async () => {
     const sanitizedPhone = driverPhone.replace(/[^0-9+]/g, '');
-    const phoneUrl = `tel:${sanitizedPhone}`;
-    const supported = await Linking.canOpenURL(phoneUrl);
-    if (supported) {
-      await Linking.openURL(phoneUrl);
+    if (!sanitizedPhone) {
+      return;
+    }
+    try {
+      // Skip canOpenURL: on iOS it returns false unless `tel` is whitelisted
+      // in Info.plist's LSApplicationQueriesSchemes, but openURL itself works.
+      await Linking.openURL(`tel:${sanitizedPhone}`);
+    } catch {
+      // Dialer not available (e.g. iOS simulator); silently no-op.
     }
   };
 
@@ -284,26 +358,32 @@ export default function DriverAcceptsScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView style={styles.map} region={mapRegion}>
-        {hasAssignedDriver ? (
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        initialRegion={DEFAULT_REGION}
+        onPanDrag={() => setUserInteracting(true)}
+      >
+        {hasAssignedDriver && driverLocation.lat && driverLocation.lng ? (
           <Marker coordinate={markerCoordinates}>
             <View style={[styles.marker, { backgroundColor: colors.primary }]}>
               <MaterialCommunityIcons name="car" size={18} color={colors.textInverse} />
             </View>
           </Marker>
-        ) : (
-          <Marker coordinate={{ latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }}>
-            <View style={[styles.marker, { backgroundColor: colors.primary }]}>
-              <MaterialCommunityIcons name="map-marker" size={18} color={colors.textInverse} />
-            </View>
+        ) : null}
+        <Marker coordinate={{ latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }}>
+          <MaterialCommunityIcons name="map-marker" size={32} color={colors.primary} />
+        </Marker>
+        {destinationCoord && destinationCoord.latitude !== 0 ? (
+          <Marker coordinate={destinationCoord}>
+            <MaterialCommunityIcons name="map-marker" size={32} color="#e74c3c" />
           </Marker>
-        )}
-        {hasAssignedDriver ? (
+        ) : null}
+        {routeCoordinates.length >= 2 ? (
+          <Polyline coordinates={routeCoordinates} strokeColor={colors.primary} strokeWidth={5} />
+        ) : hasAssignedDriver && driverLocation.lat && driverLocation.lng ? (
           <Polyline
-            coordinates={[
-              markerCoordinates,
-              { latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }
-            ]}
+            coordinates={[markerCoordinates, { latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }]}
             strokeColor={colors.primary}
             strokeWidth={4}
           />
@@ -326,6 +406,15 @@ export default function DriverAcceptsScreen() {
         <ChevronLeft size={24} color={colors.textPrimary} />
       </Pressable>
 
+      <Pressable
+        onPress={centerMap}
+        style={[styles.centerButton, { top: insets.top + spacing.md, backgroundColor: colors.surface }]}
+      >
+        <MaterialCommunityIcons name="crosshairs-gps" size={20} color={colors.textPrimary} />
+      </Pressable>
+
+      <JourneyHomeButton />
+
       <View
         style={[
           styles.bottomCard,
@@ -343,7 +432,7 @@ export default function DriverAcceptsScreen() {
           {statusSubtitle}
         </Text>
         <Text variant="body" style={styles.vehicleText}>
-          {hasAssignedDriver ? driverVehicle : 'Matching your chauffeur'}
+          {hasAssignedDriver ? driverVehicle : t('booking.matching_chauffeur')}
         </Text>
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
@@ -398,14 +487,45 @@ export default function DriverAcceptsScreen() {
             </View>
             <View style={styles.driverInfo}>
               <Text variant="body" font="medium">
-                Looking for a chauffeur
+                {t('booking.looking_for_chauffeur')}
               </Text>
               <Text variant="bodySmall" color="muted">
-                You will see driver details here as soon as one accepts.
+                {t('booking.driver_details_pending')}
               </Text>
             </View>
           </View>
         )}
+
+        {!terminalState ? (
+          <>
+            {cancelError ? (
+              <Text variant="caption" color="error" style={styles.cancelErrorText}>
+                {cancelError}
+              </Text>
+            ) : hasAssignedDriver ? (
+              <Text variant="caption" color="muted" style={styles.cancelErrorText}>
+                {t('booking.cancel_fee_warning')}
+              </Text>
+            ) : null}
+            <Pressable
+              onPress={handleCancelSearch}
+              disabled={cancelling || !bookingId}
+              style={[
+                styles.cancelButton,
+                {
+                  borderColor: colors.error,
+                  opacity: cancelling || !bookingId ? 0.6 : 1
+                }
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={hasAssignedDriver ? t('booking.cancel_ride') : t('booking.cancel_search')}
+            >
+              <Text variant="body" weight="medium" style={{ color: colors.error }}>
+                {cancelling ? t('booking.cancelling') : t('booking.cancel_ride')}
+              </Text>
+            </Pressable>
+          </>
+        ) : null}
       </View>
 
       <Modal
@@ -417,20 +537,65 @@ export default function DriverAcceptsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
             <Text variant="h3" weight="medium" align="center">
-              {terminalState?.type === 'no_drivers' ? 'No drivers available' : 'Booking cancelled'}
+              {terminalState?.type === 'no_drivers' ? t('booking.no_drivers_title') : t('booking.booking_cancelled_title')}
             </Text>
             <Text variant="bodySmall" color="muted" align="center">
               {terminalState?.message ?? ''}
             </Text>
 
-            <Pressable
-              style={[styles.confirmButton, { backgroundColor: colors.primary }]}
-              onPress={handleTerminalDismiss}
-            >
-              <Text variant="body" weight="medium" color="inverse">
-                Go Home
+            {cancelError ? (
+              <Text variant="caption" color="error" align="center">
+                {cancelError}
               </Text>
-            </Pressable>
+            ) : null}
+
+            {terminalState?.type === 'no_drivers' && retriesLeft > 0 ? (
+              <>
+                <Text variant="caption" color="muted" align="center">
+                  {`${retriesLeft} search ${retriesLeft === 1 ? 'attempt' : 'attempts'} remaining`}
+                </Text>
+                <Pressable
+                  style={[styles.confirmButton, { backgroundColor: colors.primary, opacity: retrying ? 0.6 : 1 }]}
+                  onPress={handleRetrySearch}
+                  disabled={retrying}
+                >
+                  <Text variant="body" weight="medium" color="inverse">
+                    {retrying ? 'Searching...' : 'Search again'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.secondaryConfirmButton, { borderColor: colors.error }]}
+                  onPress={handleCancelSearch}
+                  disabled={cancelling}
+                >
+                  <Text variant="body" weight="medium" style={{ color: colors.error }}>
+                    {cancelling ? t('booking.cancelling') : t('booking.cancel_ride')}
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable
+                  style={[styles.confirmButton, { backgroundColor: colors.primary }]}
+                  onPress={handleTerminalDismiss}
+                >
+                  <Text variant="body" weight="medium" color="inverse">
+                    {t('booking.go_home')}
+                  </Text>
+                </Pressable>
+                {bookingId && terminalState?.type === 'no_drivers' ? (
+                  <Pressable
+                    style={[styles.secondaryConfirmButton, { borderColor: colors.error }]}
+                    onPress={handleCancelSearch}
+                    disabled={cancelling}
+                  >
+                    <Text variant="body" weight="medium" style={{ color: colors.error }}>
+                      {cancelling ? t('booking.cancelling') : t('booking.cancel_ride')}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -439,41 +604,41 @@ export default function DriverAcceptsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
             <Text variant="h3" weight="medium" align="center">
-              {t('booking.enter_trip_pin')}
+              {t('booking.share_pin_title')}
             </Text>
             <Text variant="bodySmall" color="muted" align="center">
-              {t('booking.pin_prompt')}
+              {t('booking.share_pin_subtitle')}
             </Text>
 
-            {livePin ? (
-              <Text variant="h2" weight="semiBold" align="center">
-                {livePin}
-              </Text>
-            ) : null}
-
-            <TextInput
-              value={pin}
-              onChangeText={setPin}
+            <View
               style={[
-                styles.pinInput,
+                styles.pinDisplay,
                 {
-                  borderColor: colors.border,
-                  color: colors.textPrimary
+                  backgroundColor: colors.accent,
+                  borderColor: colors.border
                 }
               ]}
-              placeholder="----"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="number-pad"
-              maxLength={4}
-              textAlign="center"
-            />
+            >
+              <Text
+                variant="h1"
+                weight="semiBold"
+                align="center"
+                style={[styles.pinDisplayText, { color: colors.primary }]}
+              >
+                {displayPin || '----'}
+              </Text>
+            </View>
+
+            <Text variant="caption" color="muted" align="center">
+              {t('booking.share_pin_hint')}
+            </Text>
 
             <Pressable
               style={[styles.confirmButton, { backgroundColor: colors.primary }]}
-              onPress={handlePinConfirm}
+              onPress={() => setShowPinModal(false)}
             >
               <Text variant="body" weight="medium" color="inverse">
-                {t('booking.confirm_pin')}
+                {t('common.done')}
               </Text>
             </Pressable>
           </View>
@@ -505,6 +670,20 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4
+  },
+  centerButton: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -582,16 +761,39 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.md
   },
-  pinInput: {
+  pinDisplay: {
     borderWidth: 1,
     borderRadius: borderRadius.md,
-    height: 56,
-    fontSize: 24
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  pinDisplayText: {
+    letterSpacing: 8,
+    fontSize: 36
   },
   confirmButton: {
     borderRadius: borderRadius.full,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  secondaryConfirmButton: {
+    borderRadius: borderRadius.full,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1
+  },
+  cancelButton: {
+    marginTop: spacing.md,
+    borderRadius: borderRadius.full,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1
+  },
+  cancelErrorText: {
+    marginTop: spacing.sm
   }
 });

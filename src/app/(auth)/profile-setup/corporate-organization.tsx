@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMutation } from '@tanstack/react-query';
 
+import { ApiClientError, useApiClient, useCorporateOrganization, useCurrentUser } from '@/api-client';
 import { Button } from '@/components/common/button';
 import { SelectInput } from '@/components/common/select-input';
 import { StackHeader } from '@/components/common/stack-header';
@@ -11,11 +14,12 @@ import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
 import CallOutline from '@/components/svg/CallOutline';
 import EmailOutline from '@/components/svg/EmailOutline';
-import UserOutline from '@/components/svg/UserOutline';
 import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
+import { accountRoleService } from '@/services/account-role';
 import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
+import { asRecord, asString } from '@/utils/api-helpers';
 
 const businessTypeOptions = [
   { label: 'Technology', value: 'technology', translationKey: 'profile_setup.corporate_business_type_technology' },
@@ -35,6 +39,17 @@ export default function CorporateOrganizationScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const api = useApiClient();
+  const { data: currentUserData } = useCurrentUser();
+  const currentUser = asRecord(currentUserData);
+  const currentUserRole = asString(currentUser.role);
+  const { data: organizationData } = useCorporateOrganization({
+    enabled: currentUserRole === 'corporate_admin'
+  });
+  const organization = useMemo(
+    () => asRecord(asRecord(organizationData).organization),
+    [organizationData]
+  );
 
   const [organizationName, setOrganizationName] = useState('');
   const [businessType, setBusinessType] = useState('');
@@ -42,16 +57,59 @@ export default function CorporateOrganizationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
   const [country, setCountry] = useState('nigeria');
+  const [generalError, setGeneralError] = useState('');
 
   useEffect(() => {
     void riderOnboardingProgressStorage.setCurrentRoute('/(auth)/profile-setup/corporate-organization');
   }, []);
 
+  useEffect(() => {
+    if (!organizationName && asString(organization.name)) {
+      setOrganizationName(asString(organization.name));
+    }
+    if (!companyEmail && asString(organization.contactEmail)) {
+      setCompanyEmail(asString(organization.contactEmail));
+    }
+    if (!phoneNumber && asString(organization.contactPhone)) {
+      setPhoneNumber(asString(organization.contactPhone));
+    }
+    if (!address && asString(organization.address)) {
+      setAddress(asString(organization.address));
+    }
+  }, [address, companyEmail, organization, organizationName, phoneNumber]);
+
+  const organizationMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        name: organizationName.trim(),
+        contact_email: companyEmail.trim().toLowerCase(),
+        contact_phone: phoneNumber.trim(),
+        address: address.trim(),
+        plan: 'business' as const
+      };
+
+      if (asString(organization.id)) {
+        return api.corporateApi.updateOrganization(payload);
+      }
+
+      return api.corporateApi.registerOrganization(payload);
+    },
+    onSuccess: async () => {
+      await accountRoleService.setRole('corporate');
+      router.push({
+        pathname: '/(auth)/profile-setup/corporate-admin-info',
+        params: { role: params.role ?? 'corporate' }
+      });
+    },
+    onError: (error) => {
+      const fallback = 'Could not save your organization details right now.';
+      setGeneralError(error instanceof ApiClientError ? error.message || fallback : error instanceof Error ? error.message || fallback : fallback);
+    }
+  });
+
   const handleContinue = () => {
-    router.push({
-      pathname: '/(auth)/profile-setup/corporate-admin-info',
-      params: { role: params.role ?? 'corporate' },
-    });
+    setGeneralError('');
+    void organizationMutation.mutateAsync();
   };
 
   return (
@@ -82,7 +140,7 @@ export default function CorporateOrganizationScreen() {
         <TextInput
           labelTranslationKey="profile_setup.corporate_organization_name"
           placeholderTranslationKey="profile_setup.corporate_organization_name_placeholder"
-          leftIcon={<UserOutline />}
+          leftIcon={<Ionicons name="person-outline" size={20} color={colors.primary} />}
           value={organizationName}
           onChangeText={setOrganizationName}
           autoCapitalize="words"
@@ -131,7 +189,20 @@ export default function CorporateOrganizationScreen() {
           onValueChange={setCountry}
         />
 
-        <Button translationKey="common.continue" fullWidth onPress={handleContinue} style={styles.button} />
+        {generalError ? (
+          <Text variant="bodySmall" color="error" style={styles.errorText}>
+            {generalError}
+          </Text>
+        ) : null}
+
+        <Button
+          translationKey="common.continue"
+          fullWidth
+          onPress={handleContinue}
+          style={styles.button}
+          loading={organizationMutation.isPending}
+          disabled={organizationMutation.isPending}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -148,4 +219,7 @@ const styles = StyleSheet.create({
   button: {
     marginTop: spacing.xl,
   },
+  errorText: {
+    marginTop: spacing.md,
+  }
 });

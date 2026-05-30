@@ -28,14 +28,12 @@ export default function PersonalInfoScreen() {
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setFirstName(asString(currentUser.firstName ?? currentUser.first_name));
     setLastName(asString(currentUser.lastName ?? currentUser.last_name));
-    setEmail(asString(currentUser.email));
     setPhone(asString(currentUser.phoneNumber ?? currentUser.phone_number));
   }, [currentUser]);
 
@@ -52,8 +50,7 @@ export default function PersonalInfoScreen() {
     try {
       await updateCurrentUser.mutateAsync({
         first_name: firstName.trim() || null,
-        last_name: lastName.trim() || null,
-        email: email.trim() || null
+        last_name: lastName.trim() || null
       });
       router.back();
     } finally {
@@ -109,17 +106,33 @@ export default function PersonalInfoScreen() {
             }
           ]}
         >
-          <Image
-            source={avatarUrl ? { uri: avatarUrl } : require('../../../assets/images/avatar.png')}
-            style={[
-              styles.avatar,
-              {
-                width: avatarSize,
-                height: avatarSize,
-                borderRadius: avatarSize / 2
-              }
-            ]}
-          />
+          {avatarUrl ? (
+            <Image
+              source={{ uri: avatarUrl }}
+              style={[
+                styles.avatar,
+                {
+                  width: avatarSize,
+                  height: avatarSize,
+                  borderRadius: avatarSize / 2
+                }
+              ]}
+            />
+          ) : (
+            <View
+              style={[
+                styles.avatarFallback,
+                {
+                  width: avatarSize,
+                  height: avatarSize,
+                  borderRadius: avatarSize / 2,
+                  backgroundColor: colors.border
+                }
+              ]}
+            >
+              <Ionicons name="person-outline" size={avatarSize * 0.42} color={colors.textMuted} />
+            </View>
+          )}
           <Pressable
             style={[
               styles.avatarEditButton,
@@ -152,16 +165,6 @@ export default function PersonalInfoScreen() {
         />
 
         <TextInput
-          labelTranslationKey="account.email_label"
-          placeholderTranslationKey="account.email_placeholder"
-          value={email}
-          onChangeText={setEmail}
-          leftIcon={<Ionicons name="mail-outline" size={20} color={colors.primary} />}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-
-        <TextInput
           labelTranslationKey="account.phone_number_label"
           placeholderTranslationKey="account.phone_placeholder"
           value={phone}
@@ -177,7 +180,7 @@ export default function PersonalInfoScreen() {
         fullWidth
         onPress={handleSave}
         disabled={submitting}
-        title={submitting ? t('common.loading') : undefined}
+        loading={submitting}
       />
     </View>
   );
@@ -200,6 +203,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm
   },
   avatar: {},
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   avatarEditButton: {
     position: 'absolute',
     right: 2,

@@ -39,10 +39,13 @@ export default function DriverInfoScreen() {
 
   const handleCallDriver = async () => {
     const cleanPhone = driverPhone.replace(/[^0-9+]/g, '');
-    const phoneUrl = `tel:${cleanPhone}`;
-    const supported = await Linking.canOpenURL(phoneUrl);
-    if (supported) {
-      await Linking.openURL(phoneUrl);
+    if (!cleanPhone) {
+      return;
+    }
+    try {
+      await Linking.openURL(`tel:${cleanPhone}`);
+    } catch {
+      // Dialer not available; no-op.
     }
   };
 

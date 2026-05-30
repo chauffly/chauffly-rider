@@ -1,18 +1,19 @@
-import { useMemo, useState } from 'react';
-import { Linking, Modal, Pressable, StyleSheet, TextInput as RNTextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-
+import { useState } from 'react';
 import {
-  useAddPaymentMethod,
-  useDeletePaymentMethod,
-  usePaymentMethods,
-  useSetDefaultPaymentMethod,
-  useWalletBalance,
-  useWalletTransactions,
-  useWalletTopUp
-} from '@/api-client';
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput as RNTextInput,
+  View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import WebView from 'react-native-webview';
+
+import { useWalletBalance, useWalletTopUp, useWalletTransactions, useWalletVerifyTopUp } from '@/api-client';
 import { Button } from '@/components/common/button';
 import { StackHeader } from '@/components/common/stack-header';
 import { Text } from '@/components/common/text';
@@ -20,278 +21,328 @@ import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { fontFamily } from '@/constants/typography';
-import { asArray, asBoolean, asRecord, asString } from '@/utils/api-helpers';
+import { asArray, asRecord, asString, parseDateTimeString } from '@/utils/api-helpers';
 import { formatNairaAmount, normalizeAmount } from '@/utils/currency';
 
-const presetAmounts = [5000, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 100000];
+const PRESET_AMOUNTS = [5000, 10000, 20000, 30000, 40000, 50000];
+
+const TRANSACTION_TYPE_LABELS: Record<string, string> = {
+  top_up: 'Top Up',
+  ride_payment: 'Ride Payment',
+  refund: 'Refund',
+  platform_fee: 'Platform Fee',
+  settlement: 'Settlement',
+  withdrawal: 'Withdrawal'
+};
+
+type Stage = 'idle' | 'checkout' | 'verifying' | 'success';
 
 export default function TopUpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const [amountRaw, setAmountRaw] = useState('');
-  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
-  const [authCode, setAuthCode] = useState('');
-  const [lastFour, setLastFour] = useState('');
 
-  const { data: walletData } = useWalletBalance();
-  const { data: walletTransactionsData } = useWalletTransactions({ limit: 10 });
-  const { data: paymentMethodsData } = usePaymentMethods();
+  const [amountRaw, setAmountRaw] = useState('');
+  const [stage, setStage] = useState<Stage>('idle');
+  const [paystackUrl, setPaystackUrl] = useState('');
+  const [paystackReference, setPaystackReference] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [verificationTriggered, setVerificationTriggered] = useState(false);
+
+  const { data: walletData, refetch: refetchBalance } = useWalletBalance();
+  const { data: walletTransactionsData, refetch: refetchTransactions } = useWalletTransactions({ limit: 5 });
   const topUpMutation = useWalletTopUp();
-  const addPaymentMethod = useAddPaymentMethod();
-  const deletePaymentMethod = useDeletePaymentMethod();
-  const setDefaultPaymentMethod = useSetDefaultPaymentMethod();
+  const verifyTopUpMutation = useWalletVerifyTopUp();
 
   const wallet = asRecord(walletData);
-  const methodsPayload = asRecord(paymentMethodsData);
+  const availableBalance = normalizeAmount(wallet.available_balance_kobo, 'kobo');
+
   const transactionsPayload = asRecord(walletTransactionsData);
-  const paymentMethods = asArray<Record<string, unknown>>(methodsPayload.items).length
-    ? asArray<Record<string, unknown>>(methodsPayload.items)
-    : asArray<Record<string, unknown>>(paymentMethodsData);
   const walletTransactions = asArray<Record<string, unknown>>(transactionsPayload.items).length
     ? asArray<Record<string, unknown>>(transactionsPayload.items)
     : asArray<Record<string, unknown>>(walletTransactionsData);
-  const availableBalance = normalizeAmount(
-    wallet.available_balance_kobo ?? wallet.availableBalanceKobo ?? wallet.available_balance ?? wallet.available_balance
-  );
 
-  const amountNumber = useMemo(() => Number(amountRaw || 0), [amountRaw]);
+  const amountNumber = Number(amountRaw || 0);
   const isPresetSelected = (amount: number) => amountNumber === amount;
 
   const handleAmountChange = (value: string) => {
-    const digitsOnly = value.replace(/[^\d]/g, '');
-    setAmountRaw(digitsOnly);
+    setAmountRaw(value.replace(/[^\d]/g, ''));
+    setErrorMessage('');
   };
 
   const handlePresetPress = (value: number) => {
     setAmountRaw(String(value));
+    setErrorMessage('');
   };
 
   const handleContinue = async () => {
-    if (!amountNumber || topUpMutation.isPending) {
-      return;
+    if (!amountNumber || topUpMutation.isPending) return;
+    setErrorMessage('');
+    try {
+      const response = await topUpMutation.mutateAsync({ amount: amountNumber });
+      const record = asRecord(response);
+      const authorizationUrl = (record.authorization_url ?? record.authorizationUrl) as string | undefined;
+      const reference = asString(record.reference);
+      if (authorizationUrl) {
+        setPaystackUrl(authorizationUrl);
+        setPaystackReference(reference);
+        setVerificationTriggered(false);
+        setStage('checkout');
+      } else {
+        setStage('success');
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Could not start payment. Try again.');
     }
-
-    const response = await topUpMutation.mutateAsync({ amount: amountNumber });
-    const record = asRecord(response);
-    const authorizationUrl = (record.authorization_url ?? record.authorizationUrl) as string | undefined;
-    if (authorizationUrl) {
-      await Linking.openURL(authorizationUrl);
-    }
-    setIsSuccessModalVisible(true);
   };
 
-  const handleAddPaymentMethod = async () => {
-    if (!authCode.trim() || !lastFour.trim()) {
+  const handleVerifyTopUp = async () => {
+    if (!paystackReference || verificationTriggered || verifyTopUpMutation.isPending) {
       return;
     }
-    await addPaymentMethod.mutateAsync({
-      type: 'card',
-      provider: 'paystack',
-      token: authCode.trim(),
-      last_four: lastFour.trim().slice(-4),
-      metadata: {}
-    });
-    setAuthCode('');
-    setLastFour('');
+
+    setVerificationTriggered(true);
+    setErrorMessage('');
+    setStage('verifying');
+
+    try {
+      await verifyTopUpMutation.mutateAsync(paystackReference);
+      await refetchBalance();
+      await refetchTransactions();
+      setPaystackUrl('');
+      setPaystackReference('');
+      setStage('success');
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Payment was received but could not be verified.'
+      );
+      setStage('idle');
+      setVerificationTriggered(false);
+    }
+  };
+
+  const handleWebViewNavigation = (event: { url: string }) => {
+    const url = event.url.toLowerCase();
+    const isCheckoutPage =
+      url.includes('checkout.paystack.com') || url.includes('standard.paystack.co/pay');
+    const isPostCheckout =
+      !isCheckoutPage &&
+      (url.includes('paystack') || url.includes('close') || url.includes('callback') || url.includes('reference='));
+    if (isPostCheckout) {
+      void handleVerifyTopUp();
+    }
+  };
+
+  const handleCloseCheckout = () => {
+    setStage('idle');
+    setPaystackUrl('');
+    setPaystackReference('');
+    setVerificationTriggered(false);
+  };
+
+  const handleSuccessDone = () => {
+    setStage('idle');
+    setAmountRaw('');
+    setPaystackUrl('');
+    setPaystackReference('');
+    setVerificationTriggered(false);
+    router.back();
   };
 
   return (
     <View
       style={[
         styles.container,
-        {
-          backgroundColor: colors.background,
-          paddingTop: insets.top + spacing.lg,
-          paddingBottom: insets.bottom + spacing.lg
-        }
+        { backgroundColor: colors.background, paddingTop: insets.top }
       ]}
     >
       <StackHeader translationKey="account.top_up_title" align="center" onBack={() => router.back()} />
 
-      <View style={[styles.amountCard, { backgroundColor: colors.surface }]}>
-        <View style={styles.amountRow}>
-          <Text variant="h1" weight="medium">
-            ₦
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Balance card */}
+        <View style={[styles.balanceCard, { backgroundColor: colors.surface }]}>
+          <Text variant="bodySmall" color="muted" align="center">
+            {t('account.available_balance')}
           </Text>
-          <RNTextInput
-            style={[
-              styles.amountInput,
-              {
-                color: colors.textPrimary,
-                fontFamily: fontFamily.medium
-              }
-            ]}
-            value={amountNumber ? amountNumber.toLocaleString('en-US') : ''}
-            onChangeText={handleAmountChange}
-            keyboardType="number-pad"
-            selectionColor={colors.primary}
-            autoFocus
-            accessibilityLabel={t('account.top_up_amount_input')}
-          />
+          <Text variant="h2" weight="semiBold" align="center">
+            {formatNairaAmount(availableBalance, { unit: 'naira' })}
+          </Text>
         </View>
-        <Text
-          variant="body"
-          color="muted"
-          translationKey="account.available_balance_with_value"
-          translationParams={{ amount: formatNairaAmount(availableBalance, { unit: 'naira' }) }}
-        />
-      </View>
 
-      <View style={styles.presetsGrid}>
-        {presetAmounts.map((preset) => (
-          <Pressable
-            key={preset}
-            style={[
-              styles.presetButton,
-              {
-                borderColor: isPresetSelected(preset) ? colors.primary : colors.border,
-                backgroundColor: isPresetSelected(preset) ? colors.accent : colors.surface
-              }
-            ]}
-            onPress={() => handlePresetPress(preset)}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('account.top_up_title')} ${formatNairaAmount(preset, { unit: 'naira' })}`}
-          >
-            <Text variant="body">{formatNairaAmount(preset, { unit: 'naira' })}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <View style={[styles.methodsCard, { backgroundColor: colors.surface }]}>
-        <Text variant="body" weight="medium">
-          {t('account.saved_payment_methods')}
-        </Text>
-        {paymentMethods.length === 0 ? (
+        {/* Amount input */}
+        <View style={[styles.amountCard, { backgroundColor: colors.surface }]}>
           <Text variant="bodySmall" color="muted">
-            {t('account.no_saved_payment_methods')}
+            {t('account.top_up_enter_amount')}
           </Text>
-        ) : (
-          paymentMethods.map((method) => {
-            const id = asString(method.id);
-            const provider = asString(method.provider, 'paystack');
-            const last4 = asString(method.lastFour ?? method.last_four, '----');
-            const isDefault = asBoolean(method.isDefault ?? method.is_default);
-            return (
-              <View key={id} style={[styles.methodRow, { borderColor: colors.border }]}>
-                <View style={{ flex: 1 }}>
-                  <Text variant="bodySmall" weight="medium">
-                    {provider.toUpperCase()} •••• {last4}
-                  </Text>
-                  <Text variant="caption" color="muted">
-                    {isDefault ? t('account.default') : t('account.not_default')}
-                  </Text>
-                </View>
-                {!isDefault ? (
-                  <Pressable onPress={() => setDefaultPaymentMethod.mutate({ id })}>
-                    <Ionicons name="star-outline" size={20} color={colors.primary} />
-                  </Pressable>
-                ) : null}
-                <Pressable onPress={() => deletePaymentMethod.mutate({ id })}>
-                  <Ionicons name="trash-outline" size={20} color={colors.error} />
-                </Pressable>
-              </View>
-            );
-          })
-        )}
-      </View>
+          <View style={styles.amountRow}>
+            <Text variant="h2" weight="semiBold" style={{ color: colors.textPrimary }}>
+              ₦
+            </Text>
+            <RNTextInput
+              style={[
+                styles.amountInput,
+                { color: colors.textPrimary, fontFamily: fontFamily.semiBold }
+              ]}
+              value={amountNumber ? amountNumber.toLocaleString('en-US') : ''}
+              onChangeText={handleAmountChange}
+              keyboardType="number-pad"
+              placeholder="0"
+              placeholderTextColor={colors.textMuted}
+              selectionColor={colors.primary}
+              accessibilityLabel={t('account.top_up_amount_input')}
+            />
+          </View>
+        </View>
 
-      <View style={[styles.methodsCard, { backgroundColor: colors.surface }]}>
-        <Text variant="body" weight="medium">
-          {t('account.add_payment_method')}
-        </Text>
-        <RNTextInput
-          style={[styles.paymentInput, { borderColor: colors.border, color: colors.textPrimary }]}
-          placeholder={t('account.authorization_code')}
-          placeholderTextColor={colors.textMuted}
-          value={authCode}
-          onChangeText={setAuthCode}
-        />
-        <RNTextInput
-          style={[styles.paymentInput, { borderColor: colors.border, color: colors.textPrimary }]}
-          placeholder={t('account.card_last_four')}
-          placeholderTextColor={colors.textMuted}
-          value={lastFour}
-          onChangeText={setLastFour}
-          keyboardType="number-pad"
-          maxLength={4}
-        />
-        <Button
-          title={addPaymentMethod.isPending ? t('common.loading') : t('account.add_payment_method')}
-          onPress={handleAddPaymentMethod}
-          disabled={addPaymentMethod.isPending}
-        />
-      </View>
+        {/* Preset amounts */}
+        <View style={styles.presetsGrid}>
+          {PRESET_AMOUNTS.map((preset) => (
+            <Pressable
+              key={preset}
+              style={[
+                styles.presetButton,
+                {
+                  borderColor: isPresetSelected(preset) ? colors.primary : colors.border,
+                  backgroundColor: isPresetSelected(preset) ? colors.accent : colors.surface
+                }
+              ]}
+              onPress={() => handlePresetPress(preset)}
+              accessibilityRole="button"
+            >
+              <Text
+                variant="bodySmall"
+                weight={isPresetSelected(preset) ? 'semiBold' : 'regular'}
+                style={{ color: isPresetSelected(preset) ? colors.primary : colors.textPrimary }}
+              >
+                {formatNairaAmount(preset, { unit: 'naira' })}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
-      <View style={[styles.methodsCard, { backgroundColor: colors.surface }]}>
-        <Text variant="body" weight="medium">
-          Recent transactions
-        </Text>
-        {walletTransactions.length === 0 ? (
-          <Text variant="bodySmall" color="muted">
-            No transactions yet.
+        {/* Error */}
+        {errorMessage ? (
+          <Text variant="bodySmall" color="error" style={styles.errorText}>
+            {errorMessage}
           </Text>
-        ) : (
-          walletTransactions.slice(0, 5).map((transaction) => {
-            const id = asString(transaction.id);
-            const type = asString(transaction.type, 'transaction');
-            const status = asString(transaction.status, 'pending');
-            const createdAt = asString(transaction.createdAt ?? transaction.created_at);
-            const amount = normalizeAmount(
-              transaction.amount_kobo ?? transaction.amountKobo ?? transaction.amount
-            );
-            return (
-              <View key={id} style={[styles.methodRow, { borderColor: colors.border }]}>
-                <View style={{ flex: 1 }}>
-                  <Text variant="bodySmall" weight="medium">
-                    {type.replace(/_/g, ' ')}
-                  </Text>
-                  <Text variant="caption" color="muted">
-                    {createdAt ? new Date(createdAt).toLocaleString() : '--'}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text variant="bodySmall" weight="medium">
-                    {formatNairaAmount(amount, { unit: 'naira' })}
-                  </Text>
-                  <Text variant="caption" color="muted">
-                    {status}
-                  </Text>
-                </View>
-              </View>
-            );
-          })
-        )}
-      </View>
+        ) : null}
 
-      <View style={styles.footer}>
+        {/* Recent transactions */}
+        {walletTransactions.length > 0 ? (
+          <View style={[styles.transactionsCard, { backgroundColor: colors.surface }]}>
+            <Text variant="body" weight="semiBold">
+              {t('account.recent_transactions')}
+            </Text>
+            {walletTransactions.map((tx) => {
+              const id = asString(tx.id);
+              const type = asString(tx.type, 'transaction');
+              const status = asString(tx.status, 'pending');
+              const createdAt = asString(tx.createdAt ?? tx.created_at);
+              const amount = normalizeAmount(tx.amountKobo ?? tx.amount_kobo ?? tx.amount, 'kobo');
+              const isCredit = type === 'top_up' || type === 'refund';
+              return (
+                <View key={id} style={[styles.txRow, { borderTopColor: colors.border }]}>
+                  <View style={styles.txLeft}>
+                    <Text variant="bodySmall" weight="medium">
+                      {TRANSACTION_TYPE_LABELS[type] ?? type.replace(/_/g, ' ')}
+                    </Text>
+                    <Text variant="caption" color="muted">
+                      {createdAt ? (parseDateTimeString(createdAt)?.toLocaleDateString() ?? '--') : '--'}
+                    </Text>
+                  </View>
+                  <View style={styles.txRight}>
+                    <Text
+                      variant="bodySmall"
+                      weight="semiBold"
+                      style={{ color: isCredit ? colors.success : colors.textPrimary }}
+                    >
+                      {isCredit ? '+' : '-'}{formatNairaAmount(amount, { unit: 'naira' })}
+                    </Text>
+                    <Text variant="caption" color="muted">
+                      {status}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {/* Continue button pinned above keyboard */}
+      <View
+        style={[
+          styles.footer,
+          { backgroundColor: colors.background, paddingBottom: insets.bottom + spacing.md }
+        ]}
+      >
         <Button
-          translationKey="common.continue"
+          title={topUpMutation.isPending ? t('account.top_up_processing') : t('account.top_up_pay_with_paystack')}
           fullWidth
           onPress={handleContinue}
           disabled={!amountNumber || topUpMutation.isPending}
-          title={topUpMutation.isPending ? t('common.loading') : undefined}
         />
       </View>
 
+      {/* Paystack WebView checkout */}
+      {(stage === 'checkout' || stage === 'verifying') && paystackUrl ? (
+        <Modal visible animationType="slide" onRequestClose={handleCloseCheckout}>
+          <View style={[styles.webContainer, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+            <View style={[styles.webHeader, { borderBottomColor: colors.border }]}>
+              <Pressable
+                onPress={handleCloseCheckout}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t('account.top_up_close_payment')}
+              >
+                <MaterialCommunityIcons name="close" size={26} color={colors.textPrimary} />
+              </Pressable>
+              <Text variant="body" weight="semiBold">
+                {t('account.top_up_pay_with_paystack')}
+              </Text>
+              <View style={{ width: 26 }} />
+            </View>
+            <WebView
+              source={{ uri: paystackUrl }}
+              onNavigationStateChange={handleWebViewNavigation}
+              scrollEnabled={stage !== 'verifying'}
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.webLoading}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+              )}
+            />
+            <View style={styles.checkoutFooter}>
+              <Button
+                title={verifyTopUpMutation.isPending ? 'Verifying payment...' : 'I have completed payment'}
+                fullWidth
+                onPress={handleVerifyTopUp}
+                disabled={verifyTopUpMutation.isPending}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+
+      {/* Success modal */}
       <Modal
         transparent
         animationType="fade"
-        visible={isSuccessModalVisible}
-        onRequestClose={() => setIsSuccessModalVisible(false)}
+        visible={stage === 'success'}
+        onRequestClose={handleSuccessDone}
       >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setIsSuccessModalVisible(false)}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.cancel')}
-        >
-          <Pressable style={[styles.modalCard, { backgroundColor: colors.surface }]} onPress={() => {}}>
-            <View style={[styles.iconWrap, { backgroundColor: colors.textPrimary }]}>
-              <Ionicons name="checkmark" size={48} color={colors.white} />
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <View style={[styles.iconWrap, { backgroundColor: colors.primary }]}>
+              <Ionicons name="checkmark" size={40} color={colors.white} />
             </View>
-            <Text variant="h3" weight="medium" align="center" translationKey="account.top_up_success_title" />
+            <Text variant="h3" weight="semiBold" align="center" translationKey="account.top_up_success_title" />
             <Text
               variant="body"
               color="muted"
@@ -300,16 +351,9 @@ export default function TopUpScreen() {
               translationParams={{ amount: formatNairaAmount(amountNumber, { unit: 'naira' }) }}
               style={styles.modalMessage}
             />
-            <Button
-              translationKey="account.got_it"
-              fullWidth
-              onPress={() => {
-                setIsSuccessModalVisible(false);
-                router.back();
-              }}
-            />
-          </Pressable>
-        </Pressable>
+            <Button translationKey="account.got_it" fullWidth onPress={handleSuccessDone} />
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -317,70 +361,105 @@ export default function TopUpScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    paddingHorizontal: spacing.lg
+    flex: 1
+  },
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    gap: spacing.md
+  },
+  balanceCard: {
+    borderRadius: borderRadius.xxl,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.xs
   },
   amountCard: {
     borderRadius: borderRadius.xxl,
-    paddingVertical: spacing.xxxl,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-    gap: spacing.lg
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    gap: spacing.xs
   },
   amountRow: {
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
+    gap: spacing.xs
   },
   amountInput: {
+    flex: 1,
     fontSize: 32,
-    lineHeight: 40,
-    marginLeft: spacing.xs
+    lineHeight: 40
   },
   presetsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginTop: spacing.xxl
+    gap: spacing.sm
   },
   presetButton: {
     width: '31%',
-    minHeight: 50,
+    paddingVertical: spacing.md,
     borderRadius: borderRadius.full,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center'
   },
-  methodsCard: {
+  errorText: {
+    textAlign: 'center'
+  },
+  transactionsCard: {
     borderRadius: borderRadius.xl,
     padding: spacing.md,
-    marginTop: spacing.lg,
-    gap: spacing.sm
+    gap: spacing.xs
   },
-  methodRow: {
-    borderWidth: 1,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+  txRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm
+    justifyContent: 'space-between',
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth
   },
-  paymentInput: {
-    borderWidth: 1,
-    borderRadius: borderRadius.md,
-    minHeight: 44,
-    paddingHorizontal: spacing.sm
+  txLeft: {
+    flex: 1,
+    gap: 2
+  },
+  txRight: {
+    alignItems: 'flex-end',
+    gap: 2
   },
   footer: {
-    marginTop: 'auto',
-    paddingTop: spacing.xl
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md
+  },
+  webContainer: {
+    flex: 1
+  },
+  webHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth
+  },
+  webLoading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  checkoutFooter: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md
   },
   modalBackdrop: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: spacing.lg
   },
   modalCard: {
@@ -392,14 +471,13 @@ const styles = StyleSheet.create({
     gap: spacing.lg
   },
   iconWrap: {
-    width: 84,
-    height: 84,
+    width: 72,
+    height: 72,
     borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center'
   },
   modalMessage: {
-    marginTop: -spacing.xs,
-    marginBottom: spacing.sm
+    marginBottom: spacing.xs
   }
 });

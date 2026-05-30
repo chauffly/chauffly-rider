@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Calendar } from 'react-native-calendars';
-import { addMinutes, format } from 'date-fns';
+import { addMinutes, format, isBefore } from 'date-fns';
 
 import { Text } from '@/components/common/text';
 import { Button } from '@/components/common/button';
@@ -49,6 +49,7 @@ export default function SelectPickupTimeScreen() {
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [selectedTime, setSelectedTime] = useState(initialTime);
   const [draftTime, setDraftTime] = useState(initialTime);
+  const [timeError, setTimeError] = useState<string | null>(null);
 
   const pickupDateDisplay = format(selectedDate, 'dd MMM yyyy');
   const pickupTimeDisplay = format(selectedTime, 'h:mm a');
@@ -64,6 +65,8 @@ export default function SelectPickupTimeScreen() {
     ? Number(params.estimatedDurationMinutes)
     : 45;
   const dropoffTimeDisplay = format(addMinutes(pickupDateTime, durationMinutes), 'h:mm a');
+
+  const isPickupTooSoon = () => isBefore(pickupDateTime, addMinutes(new Date(), 10));
 
   const openDatePopover = () => {
     dateButtonRef.current?.measureInWindow((x, y, width, height) => {
@@ -125,6 +128,11 @@ export default function SelectPickupTimeScreen() {
         </View>
 
         <Text variant="caption" color="muted" style={styles.note} translationKey="booking.timezone_note" />
+        {timeError && (
+          <Text variant="caption" style={[styles.note, { color: colors.error ?? '#E53E3E' }]}>
+            {timeError}
+          </Text>
+        )}
       </View>
 
       <View style={[styles.separator, { backgroundColor: colors.border }]} />
@@ -139,7 +147,12 @@ export default function SelectPickupTimeScreen() {
           translationKey="booking.personalize_ride"
           variant="outline"
           fullWidth
-          onPress={() =>
+          onPress={() => {
+            if (isPickupTooSoon()) {
+              setTimeError('Please select a time at least 10 minutes from now.');
+              return;
+            }
+            setTimeError(null);
             router.push({
               pathname: '/booking/personalization',
               params: {
@@ -149,13 +162,18 @@ export default function SelectPickupTimeScreen() {
                 estimatedDurationMinutes: durationMinutes.toString(),
                 fromSchedule: 'true',
               },
-            })
-          }
+            });
+          }}
         />
         <Button
           translationKey="booking.schedule_ride"
           fullWidth
-          onPress={() =>
+          onPress={() => {
+            if (isPickupTooSoon()) {
+              setTimeError('Please select a time at least 10 minutes from now.');
+              return;
+            }
+            setTimeError(null);
             router.push({
               pathname: '/booking/ride-summary',
               params: {
@@ -163,10 +181,10 @@ export default function SelectPickupTimeScreen() {
                 pickupDate: format(selectedDate, 'yyyy-MM-dd'),
                 pickupTime: format(selectedTime, 'HH:mm'),
                 estimatedDurationMinutes: durationMinutes.toString(),
-                bookingType: 'scheduled'
+                bookingType: 'scheduled',
               },
-            })
-          }
+            });
+          }}
         />
       </View>
 

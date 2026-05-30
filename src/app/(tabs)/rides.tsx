@@ -1,21 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 
-import { useBookings } from '@/api-client';
+import { useBookings, useCorporateRides, useCurrentUser } from '@/api-client';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
 import SearchIcon from '@/components/svg/SearchIcon';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
+import { accountRoleService } from '@/services/account-role';
 import { asArray, asRecord, asString, parseDateTimeString } from '@/utils/api-helpers';
 import { formatNairaAmount } from '@/utils/currency';
 
+
 type RideTabKey = 'past' | 'upcoming' | 'ongoing' | 'canceled';
+
+const tabToDetailScreen: Record<RideTabKey, string> = {
+  upcoming: '/booking/schedule-detail',
+  ongoing: '/booking/ongoing-detail',
+  past: '/booking/ride-detail',
+  canceled: '/booking/cancelled-detail'
+};
 
 const rideTabs: Array<{ key: RideTabKey; translationKey: string }> = [
   { key: 'upcoming', translationKey: 'rides.tabs.upcoming' },
@@ -45,6 +54,8 @@ const statusLabel = (status: string): string => {
       return 'Driver arrived';
     case 'in_progress':
       return 'In progress';
+    case 'pending_payment':
+      return 'Payment due';
     case 'completed':
       return 'Completed';
     case 'cancelled':
@@ -56,19 +67,62 @@ const statusLabel = (status: string): string => {
   }
 };
 
+const getDestinationLabel = (item: Record<string, unknown>): string => {
+  const destination = asRecord(item.destination);
+  const destinationName =
+    asString(item.destinationName) ||
+    asString(item.destination_name) ||
+    asString(destination.name, '');
+  const destinationAddress =
+    asString(item.destinationAddress) ||
+    asString(item.destination_address) ||
+    asString(destination.address, '');
+
+  if (destinationName && destinationAddress && destinationName !== destinationAddress) {
+    return `${destinationName} • ${destinationAddress}`;
+  }
+
+  return destinationName || destinationAddress || 'Destination';
+};
+
 export default function RidesScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { data: currentUserData } = useCurrentUser();
+  const currentUser = asRecord(currentUserData);
+  const [isCorporate, setIsCorporate] = useState(false);
 
   const [activeTab, setActiveTab] = useState<RideTabKey>('upcoming');
   const [search, setSearch] = useState('');
 
+  useEffect(() => {
+    let active = true;
+    const syncRole = async () => {
+      const storedRole = await accountRoleService.getRole();
+      const nextRole = accountRoleService.resolveRole(asString(currentUser.role, ''), storedRole);
+      if (active) {
+        setIsCorporate(nextRole === 'corporate');
+      }
+    };
+
+    void syncRole();
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
+
   const { data: bookingsData } = useBookings({
     tab: mapTabToApi(activeTab)
   });
-  const bookingItems = asArray<Record<string, unknown>>(asRecord(bookingsData).items);
+  const { data: corporateRidesData } = useCorporateRides(
+    { tab: mapTabToApi(activeTab) },
+    { enabled: isCorporate }
+  );
+  const bookingItems = asArray<Record<string, unknown>>(
+    asRecord(isCorporate ? corporateRidesData : bookingsData).items
+  );
 
   const filteredBookings = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -79,10 +133,11 @@ export default function RidesScreen() {
     return bookingItems.filter((item) => {
       const rideOption = asRecord(item.rideOption);
       const driver = asRecord(item.driver);
+      const destination = getDestinationLabel(item).toLowerCase();
       const driverName = `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim().toLowerCase();
       const pickup = asString(item.pickupAddress).toLowerCase();
       const rideName = asString(rideOption.name).toLowerCase();
-      return pickup.includes(query) || driverName.includes(query) || rideName.includes(query);
+      return pickup.includes(query) || driverName.includes(query) || rideName.includes(query) || destination.includes(query);
     });
   }, [bookingItems, search]);
 
@@ -154,47 +209,62 @@ export default function RidesScreen() {
           filteredBookings.map((item) => {
             const rideOption = asRecord(item.rideOption);
             const driver = asRecord(item.driver);
+            const rider = asRecord(item.rider);
             const bookingId = asString(item.id);
             const pickupAddress = asString(item.pickupAddress, '--');
             const pickupName = asString(item.pickupName, pickupAddress);
             const driverName =
               `${asString(driver.firstName)} ${asString(driver.lastName)}`.trim() || 'Awaiting driver';
+            const riderName =
+              `${asString(rider.firstName)} ${asString(rider.lastName)}`.trim() || 'Assigned rider';
+            const destinationName = getDestinationLabel(item);
+            const scheduledAtRaw = asString(item.scheduledAt ?? item.scheduled_at);
             const createdAt = asString(item.createdAt);
-            const parsedCreatedAt = parseDateTimeString(createdAt);
-            const createdAtLabel = parsedCreatedAt ? format(parsedCreatedAt, 'EEE, MMM d • h:mm a') : '--';
-            const fareTotal = formatNairaAmount(item.fareTotal);
+            const dateRaw = activeTab === 'upcoming' && scheduledAtRaw ? scheduledAtRaw : createdAt;
+            const parsedDate = parseDateTimeString(dateRaw);
+            const dateLabel = parsedDate ? format(parsedDate, 'EEE, MMM d • h:mm a') : '--';
+            const fareTotal = formatNairaAmount(Number(item.fareTotal ?? 0));
             const status = asString(item.status, '--');
             const statusText = statusLabel(status);
+
+            const isPendingPayment = status === 'pending_payment' || status === 'in_progress';
 
             return (
               <Pressable
                 key={bookingId}
-                onPress={() =>
+                onPress={() => {
                   router.push({
-                    pathname: activeTab === 'upcoming' ? '/booking/schedule-detail' : '/booking/ride-detail',
-                    params: {
-                      bookingId,
-                      rideStatus: statusText
-                    }
-                  })
-                }
+                    pathname: tabToDetailScreen[activeTab] as any,
+                    params: { bookingId, rideStatus: statusText }
+                  });
+                }}
                 style={[styles.rideCard, { backgroundColor: colors.surface }]}
               >
                 <View style={styles.cardTopRow}>
                   <View style={styles.driverIdentityRow}>
                     <View style={[styles.avatarWrap, { backgroundColor: colors.border }]}>
                       <MaterialCommunityIcons
-                        name="account"
+                        name={activeTab === 'upcoming' ? 'calendar-clock' : 'account'}
                         size={28}
-                        color={colors.textSecondary}
+                        color={activeTab === 'upcoming' ? colors.primary : colors.textSecondary}
                       />
                     </View>
                     <View style={styles.driverMeta}>
                       <Text variant="body" weight="medium">
-                        {driverName}
+                        {activeTab === 'upcoming'
+                          ? parsedDate
+                            ? format(parsedDate, 'EEE, MMM d')
+                            : 'Scheduled'
+                          : isCorporate
+                            ? riderName
+                            : driverName}
                       </Text>
                       <Text variant="caption" color="secondary">
-                        {asString(rideOption.name, 'Ride')}
+                        {activeTab === 'upcoming'
+                          ? (parsedDate ? `Scheduled for ${format(parsedDate, 'h:mm a')}` : asString(rideOption.name, 'Ride'))
+                          : isCorporate
+                            ? `${asString(rideOption.name, 'Ride')} • ${driverName}`
+                            : asString(rideOption.name, 'Ride')}
                       </Text>
                     </View>
                   </View>
@@ -210,22 +280,62 @@ export default function RidesScreen() {
 
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-                <View style={styles.locationRow}>
-                  <View style={styles.pinColumn}>
+                <View style={styles.routeContainer}>
+                  <View style={styles.routeIconColumn}>
                     <MaterialCommunityIcons name="map-marker" size={22} color={colors.primary} />
+                    <View
+                      style={[
+                        styles.routeLine,
+                        { backgroundColor: colors.textSecondary, opacity: 0.35 }
+                      ]}
+                    />
+                    <MaterialCommunityIcons name="map-marker-check" size={22} color={colors.error} />
                   </View>
-                  <View style={styles.locationTextWrap}>
-                    <Text variant="bodySmall" weight="medium">
-                      {pickupName}
-                    </Text>
-                    <Text variant="caption" color="secondary" numberOfLines={1}>
-                      {pickupAddress}
-                    </Text>
+                  <View style={styles.routeDetails}>
+                    <View style={styles.routeStop}>
+                      <View style={styles.routeStopText}>
+                        <Text variant="bodySmall" weight="medium">
+                          {pickupName}
+                        </Text>
+                        <Text variant="caption" color="secondary" numberOfLines={1}>
+                          {pickupAddress}
+                        </Text>
+                      </View>
+                      <Text variant="caption" color="secondary">
+                        {dateLabel}
+                      </Text>
+                    </View>
+
+                    <View style={styles.routeStop}>
+                      <View style={styles.routeStopText}>
+                        <Text variant="bodySmall" weight="medium">
+                          {destinationName}
+                        </Text>
+                      </View>
+                      <Text variant="caption" color="secondary">
+                        {fareTotal}
+                      </Text>
+                    </View>
                   </View>
-                  <Text variant="caption" color="secondary">
-                    {createdAtLabel}
-                  </Text>
                 </View>
+
+                {isPendingPayment ? (
+                  <Pressable
+                    style={[styles.payNowButton, { backgroundColor: colors.primary }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      router.push({
+                        pathname: '/booking/ongoing-detail',
+                        params: { bookingId, autoPayment: '1' }
+                      });
+                    }}
+                  >
+                    <MaterialCommunityIcons name="credit-card-outline" size={16} color="#fff" />
+                    <Text variant="bodySmall" weight="semiBold" color="inverse">
+                      Pay Now · {fareTotal}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </Pressable>
             );
           })
@@ -294,24 +404,49 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: spacing.md
   },
-  locationRow: {
+  routeContainer: {
+    flexDirection: 'row',
+    gap: spacing.md
+  },
+  routeIconColumn: {
+    alignItems: 'center',
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs
+  },
+  routeLine: {
+    width: 2,
+    flexGrow: 1,
+    minHeight: 24,
+    borderRadius: 999,
+    marginVertical: spacing.xs
+  },
+  routeDetails: {
+    flex: 1,
+    gap: spacing.md
+  },
+  routeStop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: spacing.sm
   },
-  pinColumn: {
-    width: 24,
-    alignItems: 'center',
-    paddingTop: 2
-  },
-  locationTextWrap: {
-    flex: 1,
-    gap: 2
+  routeStopText: {
+    flex: 1
   },
   emptyCard: {
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     alignItems: 'center',
     gap: spacing.sm
+  },
+  payNowButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.lg
   }
 });

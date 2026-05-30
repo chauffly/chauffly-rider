@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useCreateBooking, useEstimateFare, useRideOptions } from '@/api-client';
+import { useCreateBooking, useCurrentUser, useEstimateFare, useRideOptions } from '@/api-client';
 import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
 import { StackHeader } from '@/components/common/stack-header';
@@ -15,6 +15,7 @@ import { rideOptions } from '@/constants/ride-options';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
+import { ridePreferenceStorage } from '@/services/ride-preference-storage';
 import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
 import { formatNairaAmount } from '@/utils/currency';
 
@@ -54,6 +55,7 @@ export default function RideSummaryScreen() {
   const estimateFareMutation = useEstimateFare();
   const createBooking = useCreateBooking();
   const { data: rideOptionsData } = useRideOptions();
+  const { data: currentUserData } = useCurrentUser();
   const { mutateAsync: estimateFareAsync, data: estimateFareData } = estimateFareMutation;
   const params = useLocalSearchParams<{
     originName?: string;
@@ -233,7 +235,6 @@ export default function RideSummaryScreen() {
   const surgeFee = formatNairaAmount(surgeFeeValue, { unit: 'naira' });
   const tax = formatNairaAmount(taxValue, { unit: 'naira' });
   const total = formatNairaAmount(totalValue, { unit: 'naira' });
-
   const handleCreateBooking = async () => {
     if (!params.originAddress || !pickupLat || !pickupLng || destinations.length === 0) {
       setBookingError('Missing route details. Please set pickup and destination again.');
@@ -251,6 +252,10 @@ export default function RideSummaryScreen() {
         bookingType === 'scheduled'
           ? format(pickupDateTime, "yyyy-MM-dd'T'HH:mm:ssxxx")
           : undefined;
+      const currentUser = asRecord(currentUserData);
+      const preferenceOwnerKey =
+        asString(currentUser.id).trim() || asString(currentUser.email).trim() || '';
+      const savedRidePreference = await ridePreferenceStorage.get(preferenceOwnerKey);
 
       const bookingResponse = await createBooking.mutateAsync({
         input: {
@@ -272,7 +277,16 @@ export default function RideSummaryScreen() {
           })),
           ride_option_id: rideOptionIdForApi,
           booking_type: bookingType,
-          scheduled_at: scheduledAt
+          scheduled_at: scheduledAt,
+          preferences: {
+            ride_preference: {
+              cabin_temperature: savedRidePreference.cabinTemp,
+              music_genre: savedRidePreference.musicGenre,
+              conversation_mode: savedRidePreference.conversationMode,
+              door_etiquette: savedRidePreference.doorEtiquette,
+              ambient_scent: savedRidePreference.ambientScent
+            }
+          }
         },
         idempotencyKey: generateIdempotencyKey()
       });
@@ -427,6 +441,7 @@ export default function RideSummaryScreen() {
             <MaterialCommunityIcons name="chevron-double-right" size={24} color={colors.primary} />
           </Pressable>
         </View>
+
         {bookingError ? (
           <Text variant="bodySmall" color="error">
             {bookingError}
@@ -493,6 +508,21 @@ const styles = StyleSheet.create({
   },
   premiumCardWrapper: {
     marginTop: spacing.sm
+  },
+  paymentOptions: {
+    gap: spacing.sm,
+    marginTop: spacing.sm
+  },
+  paymentOption: {
+    borderWidth: 1,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    gap: spacing.xs
+  },
+  paymentOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
   },
   shimmerOverlay: {
     position: 'absolute',

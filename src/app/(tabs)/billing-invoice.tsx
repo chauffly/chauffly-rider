@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 
 import { useCorporateInvoices } from '@/api-client';
 import { Text } from '@/components/common/text';
+import { TextInput } from '@/components/common/text-input';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
@@ -21,13 +22,30 @@ export default function BillingInvoiceTabScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [filter, setFilter] = useState<BillingFilter>('paid');
+  const [search, setSearch] = useState('');
 
   const { data: invoicesData } = useCorporateInvoices();
   const invoices = asArray<Record<string, unknown>>(asRecord(invoicesData).items);
 
   const filteredInvoices = useMemo(
-    () => invoices.filter((invoice) => asString(invoice.status) === filter),
-    [filter, invoices]
+    () =>
+      invoices.filter((invoice) => {
+        const status = asString(invoice.status).toLowerCase();
+        const matchesFilter = filter === 'paid' ? status === 'paid' : status !== 'paid';
+        if (!matchesFilter) {
+          return false;
+        }
+
+        const query = search.trim().toLowerCase();
+        if (!query) {
+          return true;
+        }
+
+        const invoiceId = asString(invoice.id).toLowerCase();
+        const amount = asString(invoice.totalAmount ?? invoice.total_amount).toLowerCase();
+        return invoiceId.includes(query) || amount.includes(query) || status.includes(query);
+      }),
+    [filter, invoices, search]
   );
 
   return (
@@ -71,6 +89,13 @@ export default function BillingInvoiceTabScreen() {
           </Pressable>
         </View>
 
+        <TextInput
+          label="Search"
+          placeholder="Search invoices"
+          value={search}
+          onChangeText={setSearch}
+        />
+
         <View style={styles.invoiceList}>
           {filteredInvoices.map((invoice) => {
             const invoiceId = asString(invoice.id);
@@ -111,18 +136,25 @@ export default function BillingInvoiceTabScreen() {
                     {amount}
                   </Text>
                   {filter === 'paid' ? (
-                    <Text variant="caption" color="muted">
+                  <Text variant="caption" color="muted">
                       {t('corporate.billing.completed')}
                     </Text>
                   ) : (
-                    <Text variant="caption" color="error">
-                      {t('corporate.billing.cancelled')}
+                    <Text variant="caption" color={asString(invoice.status).toLowerCase() === 'overdue' ? 'error' : 'muted'}>
+                      {asString(invoice.status, 'pending').replace(/_/g, ' ')}
                     </Text>
                   )}
                 </View>
               </Pressable>
             );
           })}
+          {filteredInvoices.length === 0 ? (
+            <View style={[styles.emptyState, { borderColor: colors.border }]}>
+              <Text variant="body" color="muted">
+                No invoices found for this filter.
+              </Text>
+            </View>
+          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -141,6 +173,11 @@ const styles = StyleSheet.create({
     borderWidth: 1
   },
   invoiceList: { gap: 0 },
+  emptyState: {
+    borderWidth: 1,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg
+  },
   invoiceRow: {
     flexDirection: 'row',
     alignItems: 'center',

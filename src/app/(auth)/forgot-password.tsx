@@ -16,12 +16,11 @@ import { ApiClientError, useApiClient } from '@/api-client';
 import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
-import CallOutline from '@/components/svg/CallOutline';
+import EmailOutline from '@/components/svg/EmailOutline';
 import { spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { authFlowStorage } from '@/services/auth-flow-storage';
-import { normalizeNigerianPhoneNumber } from '@/utils/phone';
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof ApiClientError) {
@@ -42,31 +41,31 @@ export default function ForgotPasswordScreen() {
   const { t } = useTranslation();
   const api = useApiClient();
 
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [phoneError, setPhoneError] = useState('');
+  const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [generalError, setGeneralError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSendResetCode = async () => {
-    const normalizedPhoneNumber = normalizeNigerianPhoneNumber(phoneNumber);
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!normalizedPhoneNumber) {
-      setPhoneError('Use a valid Nigerian number (e.g. 08012345678 or +2348012345678).');
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setEmailError('Enter a valid email address.');
       return;
     }
 
     setSubmitting(true);
     setGeneralError('');
-    setPhoneError('');
+    setEmailError('');
 
     try {
       await api.authApi.forgotPassword({
-        phone_number: normalizedPhoneNumber
+        email: normalizedEmail
       });
 
       await authFlowStorage.set({
         mode: 'reset_password',
-        phoneNumber: normalizedPhoneNumber
+        email: normalizedEmail
       });
 
       router.push('/(auth)/verify-otp');
@@ -107,17 +106,19 @@ export default function ForgotPasswordScreen() {
 
         <View style={styles.form}>
           <TextInput
-            labelTranslationKey="auth.phone_number"
-            placeholder={'08012345678'}
-            leftIcon={<CallOutline />}
-            keyboardType="phone-pad"
-            value={phoneNumber}
+            labelTranslationKey="auth.email"
+            placeholder="name@example.com"
+            leftIcon={<EmailOutline />}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
             onChangeText={(text) => {
-              setPhoneNumber(text);
-              if (phoneError) setPhoneError('');
+              setEmail(text);
+              if (emailError) setEmailError('');
               if (generalError) setGeneralError('');
             }}
-            error={phoneError}
+            error={emailError}
           />
 
           {generalError ? (
@@ -133,7 +134,7 @@ export default function ForgotPasswordScreen() {
             onPress={handleSendResetCode}
             style={styles.submitButton}
             disabled={submitting}
-            title={submitting ? 'Please wait...' : undefined}
+            loading={submitting}
           />
         </View>
 

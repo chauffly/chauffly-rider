@@ -45,10 +45,22 @@ export default function TabLayout() {
   }, []);
 
   useEffect(() => {
-    const role = String((currentUser as Record<string, unknown> | undefined)?.role ?? '');
-    const nextRole: AccountRole = role === 'corporate_admin' ? 'corporate' : 'rider';
-    setAccountRole(nextRole);
-    void accountRoleService.setRole(nextRole);
+    let active = true;
+    const syncRole = async () => {
+      const storedRole = await accountRoleService.getRole();
+      const apiRole = String((currentUser as Record<string, unknown> | undefined)?.role ?? '');
+      const nextRole = accountRoleService.resolveRole(apiRole, storedRole);
+      if (!active) {
+        return;
+      }
+      setAccountRole(nextRole);
+      await accountRoleService.setRole(nextRole);
+    };
+
+    void syncRole();
+    return () => {
+      active = false;
+    };
   }, [currentUser]);
 
   if (pendingRoute === undefined) {

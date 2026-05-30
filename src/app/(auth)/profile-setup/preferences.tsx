@@ -20,12 +20,6 @@ import { spacing } from '@/constants/spacing';
 import { StackHeader } from '@/components/common/stack-header';
 import { riderOnboardingProgressStorage } from '@/services/rider-onboarding-progress';
 
-const chauffeurOptions = [
-  { label: 'Any Available', value: 'any' },
-  { label: 'Male Chauffeur', value: 'male' },
-  { label: 'Female Chauffeur', value: 'female' },
-];
-
 const rideStyleOptions = [
   { label: 'Go', value: 'go', translationKey: 'profile_setup.ride_style_go' },
   { label: 'Plus', value: 'plus', translationKey: 'profile_setup.ride_style_plus' },
@@ -47,7 +41,6 @@ export default function PreferencesScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  const [preferredChauffeur, setPreferredChauffeur] = useState('');
   const [rideStyle, setRideStyle] = useState('');
   const [accessibility, setAccessibility] = useState('');
 
@@ -102,14 +95,6 @@ export default function PreferencesScreen() {
             options={rideStyleOptions}
             value={rideStyle}
             onValueChange={setRideStyle}
-          />
-
-          <SelectInput
-            labelTranslationKey="profile_setup.preferred_chauffeurs"
-            placeholderTranslationKey="profile_setup.preferred_chauffeurs_placeholder"
-            options={chauffeurOptions}
-            value={preferredChauffeur}
-            onValueChange={setPreferredChauffeur}
           />
 
           <SelectInput

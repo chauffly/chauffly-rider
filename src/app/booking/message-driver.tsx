@@ -20,6 +20,24 @@ type ChatMessageVm = {
   fromDriver: boolean;
 };
 
+// Server input-sanitization escapes free-text fields. Reverse the encoding
+// for display so a message like `I'm on the way.` doesn't render as `I&#39;m`.
+const decodeHtmlEntities = (value: string): string =>
+  value
+    .replace(/&#39;/g, "'")
+    .replace(/&#96;/g, '`')
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+
+const safeFormatTime = (value: unknown): string => {
+  if (typeof value !== 'string' || !value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return format(date, 'h:mm a');
+};
+
 export default function MessageDriverScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -38,21 +56,18 @@ export default function MessageDriverScreen() {
   const sendMessageFallback = useSendChatMessage(bookingId);
   const socketChat = useChatMessagesSocket(socketClient, bookingId);
 
-  const restMessages = asArray<Record<string, unknown>>(asRecord(messagesData).items).map((record) => {
-    const createdAt = asString(record.createdAt ?? record.created_at);
-    return {
-      id: asString(record.id),
-      text: asString(record.text ?? record.message),
-      time: createdAt ? format(new Date(createdAt), 'h:mm a') : '--',
-      fromDriver: asString(record.senderType ?? record.sender_type) === 'driver',
-      isRead: asBoolean(record.isRead ?? record.is_read)
-    };
-  });
+  const restMessages = asArray<Record<string, unknown>>(asRecord(messagesData).items).map((record) => ({
+    id: asString(record.id),
+    text: decodeHtmlEntities(asString(record.text ?? record.message)),
+    time: safeFormatTime(record.createdAt ?? record.created_at),
+    fromDriver: asString(record.senderType ?? record.sender_type) === 'driver',
+    isRead: asBoolean(record.isRead ?? record.is_read)
+  }));
 
   const liveMessages = socketChat.messages.map((record) => ({
     id: asString(record.id),
-    text: asString(record.text),
-    time: record.createdAt ? format(new Date(record.createdAt), 'h:mm a') : '--',
+    text: decodeHtmlEntities(asString(record.text)),
+    time: safeFormatTime(record.createdAt),
     fromDriver: record.senderType === 'driver',
     isRead: record.isRead
   }));

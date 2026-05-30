@@ -25,7 +25,8 @@ import {
   RIDER_ONBOARDING_START_ROUTE,
   riderOnboardingProgressStorage
 } from '@/services/rider-onboarding-progress';
-import { normalizeNigerianPhoneNumber } from '@/utils/phone';
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof ApiClientError) {
@@ -49,8 +50,23 @@ export default function VerifyOtpScreen() {
   const [otpCode, setOtpCode] = useState('');
   const [otpError, setOtpError] = useState('');
   const [generalError, setGeneralError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [flowState, setFlowState] = useState<AuthFlowState | null>(null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setResendCooldown((current) => (current > 0 ? current - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   useEffect(() => {
     let mounted = true;
@@ -84,18 +100,19 @@ export default function VerifyOtpScreen() {
     setSubmitting(true);
     setOtpError('');
     setGeneralError('');
+    setSuccessMessage('');
 
     try {
-      const normalizedPhoneNumber = normalizeNigerianPhoneNumber(flowState.phoneNumber);
+      const normalizedEmail = flowState.email.trim().toLowerCase();
 
-      if (!normalizedPhoneNumber) {
-        setGeneralError('Invalid phone number. Please start registration again.');
+      if (!normalizedEmail) {
+        setGeneralError('Invalid email address. Please start registration again.');
         return;
       }
 
       if (flowState.mode === 'register') {
         const session = await api.authApi.verifyOtp({
-          phone_number: normalizedPhoneNumber,
+          email: normalizedEmail,
           otp: otpCode
         });
         await api.session.setTokens(session.tokens);
@@ -109,7 +126,7 @@ export default function VerifyOtpScreen() {
       router.push({
         pathname: '/(auth)/create-new-password',
         params: {
-          phone_number: normalizedPhoneNumber,
+          email: normalizedEmail,
           otp: otpCode
         }
       });
@@ -121,29 +138,40 @@ export default function VerifyOtpScreen() {
   };
 
   const handleResendCode = async () => {
-    if (!flowState || submitting) {
+    if (!flowState || submitting || resending || resendCooldown > 0) {
       return;
     }
 
     setGeneralError('');
+    setSuccessMessage('');
+    setResending(true);
     try {
-      const normalizedPhoneNumber = normalizeNigerianPhoneNumber(flowState.phoneNumber);
+      const normalizedEmail = flowState.email.trim().toLowerCase();
 
-      if (!normalizedPhoneNumber) {
-        setGeneralError('Invalid phone number. Please start password reset again.');
+      if (!normalizedEmail) {
+        setGeneralError('Invalid email address. Please start password reset again.');
         return;
       }
 
       if (flowState.mode === 'reset_password') {
-        await api.authApi.forgotPassword({
-          phone_number: normalizedPhoneNumber
+        const result = await api.authApi.forgotPassword({
+          email: normalizedEmail
         });
+        setSuccessMessage(result.message);
+        setResendCooldown(RESEND_COOLDOWN_SECONDS);
         return;
       }
 
-      setGeneralError('OTP resend for registration is temporarily unavailable. Please retry registration.');
+      const result = await api.authApi.resendOtp({
+        email: normalizedEmail,
+        purpose: 'registration'
+      });
+      setSuccessMessage(result.message);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (error) {
       setGeneralError(extractErrorMessage(error, 'Unable to resend code right now.'));
+    } finally {
+      setResending(false);
     }
   };
 
@@ -171,7 +199,7 @@ export default function VerifyOtpScreen() {
             {t('auth.enter_otp')}
           </Text>
           <Text variant="body" color="muted" align="center">
-            {t('auth.verify_your_number')}
+            Verify your email
           </Text>
           <Text variant="body" color="muted" align="center">
             {t('auth.otp_subtitle')}
@@ -189,15 +217,37 @@ export default function VerifyOtpScreen() {
               setOtpCode(text);
               if (otpError) setOtpError('');
               if (generalError) setGeneralError('');
+              if (successMessage) setSuccessMessage('');
             }}
             error={otpError}
           />
 
-          <Pressable onPress={handleResendCode} style={styles.resendCode} disabled={submitting}>
-            <Text variant="bodySmall" weight="medium" style={{ color: colors.primary }}>
-              {t('auth.resend_code')}
+          <Pressable
+            onPress={handleResendCode}
+            style={styles.resendCode}
+            disabled={submitting || resending || resendCooldown > 0}
+          >
+            <Text
+              variant="bodySmall"
+              weight="medium"
+              style={{
+                color:
+                  submitting || resending || resendCooldown > 0 ? colors.textSecondary : colors.primary
+              }}
+            >
+              {resending
+                ? 'Resending...'
+                : resendCooldown > 0
+                  ? `Resend code in ${resendCooldown}s`
+                  : t('auth.resend_code')}
             </Text>
           </Pressable>
+
+          {successMessage ? (
+            <Text variant="bodySmall" color="success" style={styles.successText}>
+              {successMessage}
+            </Text>
+          ) : null}
 
           {generalError ? (
             <Text variant="bodySmall" color="error" style={styles.errorText}>
@@ -212,7 +262,7 @@ export default function VerifyOtpScreen() {
             onPress={handleConfirmCode}
             style={styles.submitButton}
             disabled={submitting}
-            title={submitting ? 'Please wait...' : undefined}
+            loading={submitting}
           />
         </View>
 
@@ -267,6 +317,9 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   errorText: {
+    marginBottom: spacing.md
+  },
+  successText: {
     marginBottom: spacing.md
   }
 });

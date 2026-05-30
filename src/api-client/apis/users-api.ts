@@ -50,7 +50,7 @@ export interface UsersApi {
     limit?: number;
   }): Promise<PaginatedResponse<Record<string, unknown>>>;
   markNotificationRead(id: string): Promise<Record<string, unknown>>;
-  markAllNotificationsRead(): Promise<{ updated: number }>;
+  markAllNotificationsRead(): Promise<{ updatedCount: number }>;
 
   getNotificationPreferences(): Promise<Record<string, unknown>>;
   updateNotificationPreferences(input: NotificationPreferencesInput): Promise<Record<string, unknown>>;
@@ -59,6 +59,8 @@ export interface UsersApi {
 
   listSessions(params?: { cursor?: string; limit?: number }): Promise<PaginatedResponse<Record<string, unknown>>>;
   revokeSession(id: string): Promise<{ message: string }>;
+
+  registerPushToken(token: string | null): Promise<{ success: boolean }>;
 }
 
 export const createUsersApi = (http: HttpClient): UsersApi => {
@@ -145,6 +147,10 @@ export const createUsersApi = (http: HttpClient): UsersApi => {
 
     revokeSession(id) {
       return http.delete(`/users/me/sessions/${id}`);
+    },
+
+    registerPushToken(token) {
+      return http.post('/users/me/push-token', { token }) as Promise<{ success: boolean }>;
     }
   };
 };

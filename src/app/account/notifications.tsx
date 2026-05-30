@@ -35,35 +35,51 @@ const defaultSettings: NotificationSettings = {
   payment_alerts: true
 };
 
+const mapPreferencesToSettings = (value: Record<string, unknown>): NotificationSettings => ({
+  push_enabled: asBoolean(value.pushEnabled ?? value.push_enabled, true),
+  sms_enabled: asBoolean(value.smsEnabled ?? value.sms_enabled, true),
+  email_enabled: asBoolean(value.emailEnabled ?? value.email_enabled, true),
+  ride_updates: asBoolean(value.rideUpdates ?? value.ride_updates, true),
+  promotions: asBoolean(value.promotions, false),
+  payment_alerts: asBoolean(value.paymentAlerts ?? value.payment_alerts, true)
+});
+
+const areSettingsEqual = (left: NotificationSettings, right: NotificationSettings): boolean =>
+  left.push_enabled === right.push_enabled &&
+  left.sms_enabled === right.sms_enabled &&
+  left.email_enabled === right.email_enabled &&
+  left.ride_updates === right.ride_updates &&
+  left.promotions === right.promotions &&
+  left.payment_alerts === right.payment_alerts;
+
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  const { data: preferencesData } = useNotificationPreferences();
+  const { data: preferencesData, isLoading: preferencesLoading } = useNotificationPreferences();
   const updatePreferences = useUpdateNotificationPreferences();
   const markAllRead = useMarkAllNotificationsRead();
 
   const [settings, setSettings] = useState<NotificationSettings>(defaultSettings);
+  const [initialSettings, setInitialSettings] = useState<NotificationSettings>(defaultSettings);
   const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   useEffect(() => {
     const record = asRecord(preferencesData);
     if (Object.keys(record).length === 0) {
       return;
     }
-    setSettings({
-      push_enabled: asBoolean(record.pushEnabled ?? record.push_enabled, true),
-      sms_enabled: asBoolean(record.smsEnabled ?? record.sms_enabled, true),
-      email_enabled: asBoolean(record.emailEnabled ?? record.email_enabled, true),
-      ride_updates: asBoolean(record.rideUpdates ?? record.ride_updates, true),
-      promotions: asBoolean(record.promotions, false),
-      payment_alerts: asBoolean(record.paymentAlerts ?? record.payment_alerts, true)
-    });
+    const nextSettings = mapPreferencesToSettings(record);
+    setSettings(nextSettings);
+    setInitialSettings(nextSettings);
+    setStatus('idle');
   }, [preferencesData]);
 
   const handleToggle = (key: keyof NotificationSettings, value: boolean) => {
+    setStatus('idle');
     setSettings((prev) => ({
       ...prev,
       [key]: value
@@ -71,16 +87,23 @@ export default function NotificationsScreen() {
   };
 
   const handleSave = async () => {
-    if (saving) {
+    if (saving || areSettingsEqual(settings, initialSettings)) {
       return;
     }
     setSaving(true);
+    setStatus('idle');
     try {
       await updatePreferences.mutateAsync(settings);
+      setInitialSettings(settings);
+      setStatus('success');
+    } catch {
+      setStatus('error');
     } finally {
       setSaving(false);
     }
   };
+
+  const hasChanges = !areSettingsEqual(settings, initialSettings);
 
   return (
     <View
@@ -170,17 +193,39 @@ export default function NotificationsScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
+        {preferencesLoading ? (
+          <Text variant="bodySmall" color="muted">
+            {t('account.notifications_loading_preferences')}
+          </Text>
+        ) : null}
+        {status === 'success' ? (
+          <Text variant="bodySmall" color="success">
+            {t('account.notifications_save_success')}
+          </Text>
+        ) : null}
+        {status === 'error' || updatePreferences.isError ? (
+          <Text variant="bodySmall" color="error">
+            {t('account.notifications_save_error')}
+          </Text>
+        ) : null}
         <Button
-          title={saving ? t('common.loading') : t('common.save')}
+          title={
+            saving
+              ? t('account.notifications_saving')
+              : hasChanges
+                ? t('common.save')
+                : t('account.notifications_saved')
+          }
           fullWidth
           onPress={handleSave}
-          disabled={saving}
+          disabled={saving || preferencesLoading || !hasChanges}
         />
         <Button
           title={t('account.notifications_mark_all_read')}
           fullWidth
           variant="outline"
           onPress={() => markAllRead.mutate()}
+          disabled={markAllRead.isPending}
         />
       </View>
     </View>

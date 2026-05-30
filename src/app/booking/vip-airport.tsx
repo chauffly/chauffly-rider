@@ -36,7 +36,6 @@ export default function VipAirportCoordinationScreen() {
         <Text variant="label" translationKey="booking.lounge_pickup_coordination" />
         <TextInput placeholderTranslationKey="booking.airport_name_placeholder" />
         <TextInput placeholderTranslationKey="booking.terminal_information_placeholder" />
-        <TextInput placeholderTranslationKey="booking.lounge_name_placeholder" />
         <TextInput placeholderTranslationKey="booking.preferred_pickup_location_placeholder" />
 
         <Text variant="label" translationKey="booking.flight_tracking" />

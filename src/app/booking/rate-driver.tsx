@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { useBookingById, useBookingRate } from '@/api-client';
+import { ApiClientError, useBookingById, useBookingRate } from '@/api-client';
+import { JourneyHomeButton } from '@/components/common/journey-home-button';
 import { Text } from '@/components/common/text';
 import { borderRadius, spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
@@ -26,6 +27,7 @@ export default function RateDriverScreen() {
   const bookingId = params.bookingId ?? '';
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const rateBooking = useBookingRate();
   const { data: bookingData } = useBookingById(bookingId, {
     enabled: Boolean(bookingId)
@@ -39,23 +41,38 @@ export default function RateDriverScreen() {
     [params.selectedRideId]
   );
 
-  const tripFare = formatNairaAmount(fare.tripFare ?? 0);
-  const tax = formatNairaAmount(fare.tax ?? 0);
-  const total = formatNairaAmount(fare.total ?? 0);
+  const tripFareValue = Math.round(Number(fare.tripFare ?? 0));
+  const surgeFeeValue = Math.round(Number(fare.surgeFee ?? 0));
+  const taxValue = Math.round(Number(fare.tax ?? 0));
+  const computedTotalValue = tripFareValue + surgeFeeValue + taxValue;
+  const totalValue = Math.round(Number(fare.total ?? computedTotalValue));
+  const tripFare = formatNairaAmount(tripFareValue);
+  const surgeFee = formatNairaAmount(surgeFeeValue);
+  const tax = formatNairaAmount(taxValue);
+  const total = formatNairaAmount(totalValue);
   const selectedRideTitle = selectedRide?.nameKey ? t(selectedRide.nameKey) : 'Chauffly Go';
+  const commentPlaceholder = t('booking.add_comment_optional');
 
   const handleSubmitRating = async () => {
     if (!bookingId || rating === 0 || rateBooking.isPending) {
       return;
     }
 
-    await rateBooking.mutateAsync({
-      bookingId,
-      rating,
-      comment: comment.trim() || undefined
-    });
-
-    router.replace('/booking/rating-thank-you');
+    setErrorMessage('');
+    try {
+      await rateBooking.mutateAsync({
+        bookingId,
+        rating,
+        comment: comment.trim() || undefined
+      });
+      router.replace('/booking/rating-thank-you');
+    } catch (error) {
+      const message =
+        error instanceof ApiClientError || error instanceof Error
+          ? error.message
+          : 'Unable to submit your rating. Please try again.';
+      setErrorMessage(message);
+    }
   };
 
   return (
@@ -68,6 +85,8 @@ export default function RateDriverScreen() {
       <Pressable onPress={() => router.back()} style={styles.closeButton}>
         <MaterialCommunityIcons name="close" size={28} color={colors.textPrimary} />
       </Pressable>
+
+      <JourneyHomeButton />
 
       <Image source={require('../../../assets/images/avatar.png')} style={styles.avatar} />
 
@@ -96,7 +115,11 @@ export default function RateDriverScreen() {
 
       <TextInput
         style={[styles.commentInput, { borderColor: colors.border, color: colors.textPrimary }]}
-        placeholder={t('booking.add_comment_optional')}
+        placeholder={
+          commentPlaceholder === 'booking.add_comment_optional'
+            ? 'Add a comment (optional)'
+            : commentPlaceholder
+        }
         placeholderTextColor={colors.textMuted}
         value={comment}
         onChangeText={setComment}
@@ -125,12 +148,22 @@ export default function RateDriverScreen() {
       <View style={[styles.fareCard, { borderColor: colors.border }]}>
         <View style={styles.row}>
           <Text variant="bodySmall" color="muted">
-            {t('booking.trip_earning_x2')}
+            {t('booking.trip_fare')}
           </Text>
           <Text variant="bodySmall" color="muted">
             {tripFare}
           </Text>
         </View>
+        {surgeFeeValue > 0 ? (
+          <View style={styles.row}>
+            <Text variant="bodySmall" color="muted">
+              {t('booking.surge_fee')}
+            </Text>
+            <Text variant="bodySmall" color="muted">
+              {surgeFee}
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.row}>
           <Text variant="bodySmall" color="muted">
             {t('booking.tax')}
@@ -149,6 +182,12 @@ export default function RateDriverScreen() {
           </Text>
         </View>
       </View>
+
+      {errorMessage ? (
+        <Text variant="bodySmall" color="error" align="center" style={styles.errorText}>
+          {errorMessage}
+        </Text>
+      ) : null}
 
       <Button
         title={rateBooking.isPending ? t('common.loading') : t('booking.assign_ranking')}
@@ -225,5 +264,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  errorText: {
+    marginTop: spacing.md
   }
 });
