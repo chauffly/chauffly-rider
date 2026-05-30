@@ -16,9 +16,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Chauffly needs your location to provide ride services even when the app is in the background.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "config": {
-        "googleMapsApiKey": "AIzaSyC4ClbG_GZXQxSlPKCIcB4iM9378vDdVYQ"
-      }
+      "config": {}
     },
     "android": {
       "package": "com.chauffly.rider",
@@ -37,11 +35,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyC4ClbG_GZXQxSlPKCIcB4iM9378vDdVYQ"
-        }
-      }
+      "config": {}
     },
     "web": {
       "output": "static",
@@ -70,6 +64,15 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Chauffly needs your location to provide ride services."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#c29d59",
+          "defaultChannel": "ride-updates",
+          "sounds": []
         }
       ]
     ],
