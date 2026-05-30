@@ -1,0 +1,378 @@
+import { useRef, useState } from 'react';
+import { StyleSheet, View, Pressable, Platform, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Calendar } from 'react-native-calendars';
+import { addMinutes, format, isBefore } from 'date-fns';
+
+import { Text } from '@/components/common/text';
+import { Button } from '@/components/common/button';
+import { StackHeader } from '@/components/common/stack-header';
+import { spacing, borderRadius } from '@/constants/spacing';
+import { useTheme } from '@/context/theme-context';
+import { useTranslation } from '@/context/language-context';
+
+export default function SelectPickupTimeScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+  const [isDateOpen, setIsDateOpen] = useState(false);
+  const [isTimeOpen, setIsTimeOpen] = useState(false);
+  const dateButtonRef = useRef<View>(null);
+  const timeButtonRef = useRef<View>(null);
+  const [dateAnchor, setDateAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [timeAnchor, setTimeAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const params = useLocalSearchParams<{
+    originName?: string;
+    originAddress?: string;
+    originLat?: string;
+    originLng?: string;
+    destinations?: string;
+    selectedRideId?: string;
+    selectedRideTier?: string;
+    bookingType?: string;
+    pickupDate?: string;
+    pickupTime?: string;
+    estimatedDurationMinutes?: string;
+  }>();
+
+  const initialDate = params.pickupDate
+    ? new Date(`${params.pickupDate}T00:00:00`)
+    : new Date();
+  const initialTime = params.pickupTime
+    ? new Date(`${format(new Date(), 'yyyy-MM-dd')}T${params.pickupTime}:00`)
+    : new Date();
+
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [selectedTime, setSelectedTime] = useState(initialTime);
+  const [draftTime, setDraftTime] = useState(initialTime);
+  const [timeError, setTimeError] = useState<string | null>(null);
+
+  const pickupDateDisplay = format(selectedDate, 'dd MMM yyyy');
+  const pickupTimeDisplay = format(selectedTime, 'h:mm a');
+
+  const pickupDateTime = new Date(
+    selectedDate.getFullYear(),
+    selectedDate.getMonth(),
+    selectedDate.getDate(),
+    selectedTime.getHours(),
+    selectedTime.getMinutes()
+  );
+  const durationMinutes = params.estimatedDurationMinutes
+    ? Number(params.estimatedDurationMinutes)
+    : 45;
+  const dropoffTimeDisplay = format(addMinutes(pickupDateTime, durationMinutes), 'h:mm a');
+
+  const isPickupTooSoon = () => isBefore(pickupDateTime, addMinutes(new Date(), 10));
+
+  const openDatePopover = () => {
+    dateButtonRef.current?.measureInWindow((x, y, width, height) => {
+      setDateAnchor({ x, y, width, height });
+      setIsDateOpen(true);
+    });
+  };
+
+  const openTimePopover = () => {
+    timeButtonRef.current?.measureInWindow((x, y, width, height) => {
+      setTimeAnchor({ x, y, width, height });
+      setDraftTime(selectedTime);
+      setIsTimeOpen(true);
+    });
+  };
+
+  const getPopoverLeft = (anchorX: number, popoverWidth: number) => {
+    const minLeft = spacing.lg;
+    const maxLeft = screenWidth - popoverWidth - spacing.lg;
+    return Math.min(Math.max(anchorX, minLeft), maxLeft);
+  };
+  const TIME_POPOVER_WIDTH = 260;
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.lg }]}>
+      <StackHeader
+        translationKey="booking.select_pickup_time_title"
+        leftIcon="close"
+        onBack={() => router.back()}
+        titleVariant="h2"
+      />
+      <Text variant="caption" color="muted" style={styles.subtitle} translationKey="booking.select_pickup_time_subtitle" />
+
+      <View style={styles.section}>
+        <View style={styles.row}>
+          <Text variant="body" font="medium" translationKey="booking.date_label" />
+          <Pressable
+            ref={dateButtonRef}
+            onPress={openDatePopover}
+            style={[styles.valuePill, { backgroundColor: colors.accent }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('booking.date_label')}
+          >
+            <Text variant="bodySmall">{pickupDateDisplay}</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.row}>
+          <Text variant="body" font="medium" translationKey="booking.pickup_time_label" />
+          <Pressable
+            ref={timeButtonRef}
+            onPress={openTimePopover}
+            style={[styles.valuePill, { backgroundColor: colors.accent }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('booking.pickup_time_label')}
+          >
+            <Text variant="bodySmall">{pickupTimeDisplay}</Text>
+          </Pressable>
+        </View>
+
+        <Text variant="caption" color="muted" style={styles.note} translationKey="booking.timezone_note" />
+        {timeError && (
+          <Text variant="caption" style={[styles.note, { color: colors.error ?? '#E53E3E' }]}>
+            {timeError}
+          </Text>
+        )}
+      </View>
+
+      <View style={[styles.separator, { backgroundColor: colors.border }]} />
+
+      <View style={styles.estimateRow}>
+        <Text variant="bodySmall" color="muted" translationKey="booking.estimated_dropoff" />
+        <Text variant="bodySmall" font="medium">{dropoffTimeDisplay}</Text>
+      </View>
+
+      <View style={styles.footer}>
+        <Button
+          translationKey="booking.personalize_ride"
+          variant="outline"
+          fullWidth
+          onPress={() => {
+            if (isPickupTooSoon()) {
+              setTimeError('Please select a time at least 10 minutes from now.');
+              return;
+            }
+            setTimeError(null);
+            router.push({
+              pathname: '/booking/personalization',
+              params: {
+                ...params,
+                pickupDate: format(selectedDate, 'yyyy-MM-dd'),
+                pickupTime: format(selectedTime, 'HH:mm'),
+                estimatedDurationMinutes: durationMinutes.toString(),
+                fromSchedule: 'true',
+              },
+            });
+          }}
+        />
+        <Button
+          translationKey="booking.schedule_ride"
+          fullWidth
+          onPress={() => {
+            if (isPickupTooSoon()) {
+              setTimeError('Please select a time at least 10 minutes from now.');
+              return;
+            }
+            setTimeError(null);
+            router.push({
+              pathname: '/booking/ride-summary',
+              params: {
+                ...params,
+                pickupDate: format(selectedDate, 'yyyy-MM-dd'),
+                pickupTime: format(selectedTime, 'HH:mm'),
+                estimatedDurationMinutes: durationMinutes.toString(),
+                bookingType: 'scheduled',
+              },
+            });
+          }}
+        />
+      </View>
+
+      {isDateOpen && dateAnchor && (
+        <View style={styles.popoverOverlay} pointerEvents="box-none">
+          <Pressable style={styles.popoverBackdrop} onPress={() => setIsDateOpen(false)} />
+          <View
+            style={[
+              styles.popoverCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                shadowColor: colors.textPrimary,
+                left: getPopoverLeft(dateAnchor.x, 320),
+                top: dateAnchor.y + dateAnchor.height + spacing.sm,
+                width: 320,
+              },
+            ]}
+          >
+            <Calendar
+              current={format(selectedDate, 'yyyy-MM-dd')}
+              onDayPress={(day) => {
+                setSelectedDate(new Date(`${day.dateString}T00:00:00`));
+                setIsDateOpen(false);
+              }}
+              minDate={format(new Date(), 'yyyy-MM-dd')}
+              markedDates={{
+                [format(selectedDate, 'yyyy-MM-dd')]: {
+                  selected: true,
+                  selectedColor: colors.primary,
+                  selectedTextColor: colors.textInverse,
+                },
+              }}
+              theme={{
+                backgroundColor: colors.surface,
+                calendarBackground: colors.surface,
+                textSectionTitleColor: colors.textSecondary,
+                selectedDayBackgroundColor: colors.primary,
+                selectedDayTextColor: colors.textInverse,
+                todayTextColor: colors.primary,
+                dayTextColor: colors.textPrimary,
+                monthTextColor: colors.textPrimary,
+                arrowColor: colors.textPrimary,
+              }}
+            />
+          </View>
+        </View>
+      )}
+
+      {isTimeOpen && timeAnchor && (
+        <View style={styles.popoverOverlay} pointerEvents="box-none">
+          <Pressable style={styles.popoverBackdrop} onPress={() => setIsTimeOpen(false)} />
+          <View
+            style={[
+              styles.popoverCard,
+              styles.timePopoverCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                shadowColor: colors.textPrimary,
+                left: getPopoverLeft(timeAnchor.x, TIME_POPOVER_WIDTH),
+                top: timeAnchor.y + timeAnchor.height + spacing.sm,
+                width: TIME_POPOVER_WIDTH,
+              },
+            ]}
+          >
+          <DateTimePicker
+            value={draftTime}
+            mode="time"
+            display={Platform.OS === 'ios' ? 'spinner' : 'spinner'}
+            minuteInterval={5}
+            onChange={(event, date) => {
+              if (event?.type === 'dismissed') {
+                setIsTimeOpen(false);
+                return;
+              }
+              if (date) {
+                setDraftTime(date);
+              }
+            }}
+            textColor={colors.textPrimary}
+            accentColor={colors.primary}
+            style={styles.picker}
+          />
+          <View style={styles.timeActions}>
+            <Pressable
+              onPress={() => setIsTimeOpen(false)}
+              style={[styles.timeActionButton, { backgroundColor: colors.accent }]}
+            >
+              <Text variant="bodySmall" color="muted">{t('common.cancel')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setSelectedTime(draftTime);
+                setIsTimeOpen(false);
+              }}
+              style={[styles.timeActionButton, { backgroundColor: colors.primary }]}
+            >
+              <Text variant="bodySmall" color="inverse">{t('booking.set_time')}</Text>
+            </Pressable>
+          </View>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+  },
+  subtitle: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
+  },
+  section: {
+    gap: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  valuePill: {
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  popoverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+  },
+  popoverBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  popoverCard: {
+    position: 'absolute',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    padding: spacing.md,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  timePopoverCard: {
+    paddingHorizontal: 0,
+    paddingVertical: spacing.md,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  picker: {
+    height: 160,
+    width: 260,
+    alignSelf: 'center',
+  },
+  timeActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  timeActionButton: {
+    flex: 1,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  note: {
+    marginTop: spacing.xs,
+  },
+  separator: {
+    height: 1,
+    marginVertical: spacing.lg,
+  },
+  estimateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  footer: {
+    marginTop: 'auto',
+    gap: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+});
