@@ -6,25 +6,24 @@ import { QuickLocationChip } from '@/components/common/quick-location-chip';
 import LocationPinOutline from '@/components/svg/LocationPinOutline';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
-import { SavedLocation } from '@/services/location-history';
 
-interface QuickLocation {
-  key: string;
-  translationKey: string;
+export interface QuickDestination {
+  id: string;
+  name: string;
+  address: string;
+  coordinates: { latitude: number; longitude: number };
 }
 
 interface HomeContentProps {
-  quickLocations: QuickLocation[];
-  savedLocations: SavedLocation[];
+  quickDestinations: QuickDestination[];
   onEnterLocationPress: () => void;
-  onQuickLocationPress: (location: SavedLocation) => void;
+  onQuickDestinationPress: (destination: QuickDestination) => void;
 }
 
 export function HomeContent({
-  quickLocations,
-  savedLocations,
+  quickDestinations,
   onEnterLocationPress,
-  onQuickLocationPress,
+  onQuickDestinationPress,
 }: HomeContentProps) {
   const { colors } = useTheme();
 
@@ -45,37 +44,21 @@ export function HomeContent({
         isEditable={false}
       />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.quickLocationsContainer}
-      >
-        {quickLocations.map((loc) => {
-          const savedLoc = savedLocations.find((s) => s.label === loc.key);
-          return (
+      {quickDestinations.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.quickLocationsContainer}
+        >
+          {quickDestinations.map((dest) => (
             <QuickLocationChip
-              key={loc.key}
-              translationKey={loc.translationKey}
-              onPress={() => {
-                if (savedLoc) {
-                  onQuickLocationPress(savedLoc);
-                } else {
-                  onEnterLocationPress();
-                }
-              }}
-            />
-          );
-        })}
-        {savedLocations
-          .filter((s) => !['home', 'office', 'apartment'].includes(s.label))
-          .map((loc) => (
-            <QuickLocationChip
-              key={loc.id}
-              label={loc.name}
-              onPress={() => onQuickLocationPress(loc)}
+              key={dest.id}
+              label={dest.name}
+              onPress={() => onQuickDestinationPress(dest)}
             />
           ))}
-      </ScrollView>
+        </ScrollView>
+      ) : null}
     </>
   );
 }

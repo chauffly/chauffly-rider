@@ -16,17 +16,17 @@ export const rideOptions: RideOption[] = [
     image: require('@assets/images/ride-options/plus.png')
   },
   {
-    id: 'luxe',
-    nameKey: 'booking.ride_option_luxe',
-    subtitleKey: 'booking.ride_option_subtitle_luxe',
-    priceKey: 'booking.ride_option_price_luxe',
-    image: require('@assets/images/ride-options/luxe.png')
-  },
-  {
     id: 'black',
     nameKey: 'booking.ride_option_black',
     subtitleKey: 'booking.ride_option_subtitle_black',
     priceKey: 'booking.ride_option_price_black',
     image: require('@assets/images/ride-options/black.png')
+  },
+  {
+    id: 'luxe',
+    nameKey: 'booking.ride_option_luxe',
+    subtitleKey: 'booking.ride_option_subtitle_luxe',
+    priceKey: 'booking.ride_option_price_luxe',
+    image: require('@assets/images/ride-options/luxe.png')
   }
 ];

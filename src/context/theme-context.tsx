@@ -65,10 +65,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme(newTheme);
   }, [isDark, setTheme]);
 
-  if (!isLoaded) {
-    return null;
-  }
-
   return (
     <ThemeContext.Provider
       value={{

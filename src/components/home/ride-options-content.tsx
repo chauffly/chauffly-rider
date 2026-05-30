@@ -20,7 +20,6 @@ interface RideOptionsContentProps {
   defaultEtaMinutes?: number;
   isLoading?: boolean;
   hasError?: boolean;
-  paymentLabel?: string;
 }
 
 export function RideOptionsContent({
@@ -32,8 +31,7 @@ export function RideOptionsContent({
   etaMinutes,
   defaultEtaMinutes = 3,
   isLoading,
-  hasError,
-  paymentLabel = '**** **** **** ****'
+  hasError
 }: RideOptionsContentProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -124,20 +122,6 @@ export function RideOptionsContent({
         })}
       </ScrollView>
 
-      <View style={styles.paymentRow}>
-        <Text variant="body" font="medium" translationKey="booking.payment" />
-        <View style={styles.paymentMethod}>
-          <ExpoImage
-            source={require('../../../assets/images/master-card.png')}
-            style={{ width: 32, height: 24 }}
-            contentFit="contain"
-          />
-          <Text variant="bodySmall" weight="medium">
-            {paymentLabel}
-          </Text>
-        </View>
-      </View>
-
       <View style={styles.proceedRow}>
         <Button
           translationKey="booking.proceed"
@@ -220,18 +204,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(49, 141, 91, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  paymentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  paymentMethod: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
   },
   proceedRow: {
     flexDirection: 'row',

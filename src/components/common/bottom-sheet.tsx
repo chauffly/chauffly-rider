@@ -7,6 +7,8 @@ import {
   Animated,
   Dimensions,
   PanResponder,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import { useTheme } from '@/context/theme-context';
@@ -114,20 +116,26 @@ export function BottomSheet({
           />
         </Pressable>
 
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.background,
-              maxHeight,
-              transform: [{ translateY }],
-            },
-          ]}
-          {...panResponder.panHandlers}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          pointerEvents="box-none"
+          style={styles.keyboardWrap}
         >
-          <View style={[styles.handle, { backgroundColor: colors.border }]} />
-          <View style={styles.content}>{children}</View>
-        </Animated.View>
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.background,
+                maxHeight,
+                transform: [{ translateY }],
+              },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
+            <View style={styles.content}>{children}</View>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -143,6 +151,9 @@ const styles = StyleSheet.create({
   },
   backdropOverlay: {
     flex: 1,
+  },
+  keyboardWrap: {
+    width: '100%',
   },
   sheet: {
     borderTopLeftRadius: borderRadius.xl,

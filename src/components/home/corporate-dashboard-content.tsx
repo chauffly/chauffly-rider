@@ -20,10 +20,17 @@ const periodButtons: { key: CorporatePeriodKey; translationKey: string }[] = [
   { key: 'last_30_days', translationKey: 'corporate.dashboard.period_last_30_days' }
 ];
 
+const roundUpToHundred = (n: number): number => Math.ceil(n / 100) * 100;
+
 const getUsageTicks = (values: number[]): number[] => {
-  const max = Math.max(...values, 1);
-  const step = Math.max(1, Math.ceil(max / 4));
-  return [0, step, step * 2, step * 3, step * 4];
+  const max = Math.max(...values, 0);
+  if (max === 0) {
+    return [0, 100, 200, 300, 400];
+  }
+  const rawStep = max / 4;
+  const step = Math.max(100, roundUpToHundred(rawStep));
+  const topTick = step * 4;
+  return [0, step, step * 2, step * 3, topTick];
 };
 
 export function CorporateDashboardContent() {
@@ -158,7 +165,7 @@ export function CorporateDashboardContent() {
         <View style={styles.actionRow}>
           <Pressable
             style={[styles.actionChip, { backgroundColor: colors.textPrimary }]}
-            onPress={() => router.push('/corporate/travel-policies')}
+            onPress={() => router.push('/account/travel-limit')}
           >
             <MaterialCommunityIcons name="arrow-top-right" size={18} color={colors.textInverse} />
             <Text variant="bodySmall" color="inverse" weight="medium">
@@ -184,22 +191,35 @@ export function CorporateDashboardContent() {
           <View style={styles.chartRow}>
             <View style={styles.yAxisWrap}>
               {[...yTicks].reverse().map((tick) => (
-                <Text key={tick} variant="caption" color="muted">
-                  {tick}
+                <Text key={tick} variant="caption" color="muted" style={styles.yAxisLabel}>
+                  {tick >= 1000 ? `${(tick / 1000).toFixed(tick % 1000 === 0 ? 0 : 1)}k` : `${tick}`}
                 </Text>
               ))}
             </View>
 
             <View style={styles.chartAndXAxis}>
               <View style={styles.chartWrap}>
+                {yTicks.slice(1).map((tick) => (
+                  <View
+                    key={`grid-${tick}`}
+                    style={[
+                      styles.gridLine,
+                      {
+                        bottom: `${(tick / maxTick) * 100}%`,
+                        backgroundColor: colors.border
+                      }
+                    ]}
+                  />
+                ))}
                 {usagePoints.map((point, index) => (
                   <View key={`${point.label}-${index}`} style={styles.barSlot}>
                     <View
                       style={[
                         styles.bar,
                         {
-                          height: `${(point.value / maxTick) * 100}%`,
-                          backgroundColor: index % 2 === 0 ? colors.border : colors.primary
+                          height: `${Math.max((point.value / maxTick) * 100, point.value > 0 ? 2 : 0)}%`,
+                          backgroundColor: colors.primary,
+                          opacity: index % 2 === 0 ? 1 : 0.55
                         }
                       ]}
                     />
@@ -284,15 +304,19 @@ const styles = StyleSheet.create({
   usageCard: { borderRadius: borderRadius.xxl, padding: spacing.md, gap: spacing.md },
   chartRow: { flexDirection: 'row', gap: spacing.sm },
   yAxisWrap: {
-    width: 34,
-    height: 150,
+    width: 38,
+    height: 160,
     justifyContent: 'space-between',
-    alignItems: 'flex-start'
+    alignItems: 'flex-end'
+  },
+  yAxisLabel: {
+    fontSize: 9
   },
   chartAndXAxis: { flex: 1, gap: spacing.xs },
-  chartWrap: { height: 150, flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  chartWrap: { height: 160, flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, position: 'relative' },
+  gridLine: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth },
   barSlot: { flex: 1, height: '100%', justifyContent: 'flex-end' },
-  bar: { width: '100%', borderRadius: borderRadius.md },
+  bar: { width: '100%', borderRadius: borderRadius.sm },
   xAxisWrap: { flexDirection: 'row', gap: spacing.sm },
   xAxisLabel: { flex: 1 }
 });

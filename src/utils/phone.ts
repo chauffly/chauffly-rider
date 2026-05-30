@@ -1,5 +1,3 @@
-const onlyDigits = (value: string): string => value.replace(/\D/g, '');
-
 export const normalizeNigerianPhoneNumber = (input: string): string | null => {
   const trimmed = input.trim();
 
@@ -7,27 +5,19 @@ export const normalizeNigerianPhoneNumber = (input: string): string | null => {
     return null;
   }
 
-  const digits = onlyDigits(trimmed);
+  const normalized = trimmed.replace(/[\s()-]+/g, '');
 
-  if (!digits) {
+  if (!normalized) {
     return null;
   }
 
-  let localDigits: string;
+  const digitsOnly = normalized.startsWith('+') ? normalized.slice(1) : normalized;
 
-  if (digits.startsWith('234')) {
-    localDigits = digits.slice(3);
-  } else if (digits.startsWith('0')) {
-    localDigits = digits.slice(1);
-  } else {
-    localDigits = digits;
-  }
-
-  if (!/^\d{10}$/.test(localDigits)) {
+  if (!/^\d+$/.test(digitsOnly)) {
     return null;
   }
 
-  return `+234${localDigits}`;
+  return normalized;
 };
 
 export const isValidNigerianPhoneInput = (input: string): boolean => {

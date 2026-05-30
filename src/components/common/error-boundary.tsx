@@ -1,6 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { StyleSheet, View, Pressable } from 'react-native';
-import { Text } from './text';
+import { StyleSheet, View, Pressable, Text } from 'react-native';
 
 interface Props {
   children: ReactNode;
@@ -39,16 +38,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <View style={styles.container}>
-          <Text variant="h2" align="center">
-            Something went wrong
-          </Text>
-          <Text variant="body" color="muted" align="center" style={styles.subtitle}>
+          <Text style={styles.title}>Something went wrong</Text>
+          <Text style={[styles.subtitle, styles.muted]}>
             An unexpected error occurred. Please try again.
           </Text>
           <Pressable style={styles.retryButton} onPress={this.handleRetry}>
-            <Text variant="body" color="primary">
-              Tap to retry
-            </Text>
+            <Text style={styles.retryText}>Tap to retry</Text>
           </Pressable>
         </View>
       );
@@ -65,13 +60,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   subtitle: {
     marginTop: 8,
     marginBottom: 24,
+    textAlign: 'center',
+  },
+  muted: {
+    color: '#888',
   },
   retryButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
+  },
+  retryText: {
+    color: '#007AFF',
   },
 });

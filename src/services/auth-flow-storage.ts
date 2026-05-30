@@ -6,7 +6,8 @@ export type AuthFlowMode = 'register' | 'reset_password';
 
 export interface AuthFlowState {
   mode: AuthFlowMode;
-  phoneNumber: string;
+  email: string;
+  phoneNumber?: string;
 }
 
 export const authFlowStorage = {
@@ -18,7 +19,7 @@ export const authFlowStorage = {
       }
 
       const parsed = JSON.parse(raw) as AuthFlowState;
-      if (!parsed?.mode || !parsed?.phoneNumber) {
+      if (!parsed?.mode || !parsed?.email) {
         return null;
       }
 

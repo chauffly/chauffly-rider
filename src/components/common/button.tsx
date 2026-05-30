@@ -1,4 +1,5 @@
 import {
+  ActivityIndicator,
   Pressable,
   PressableProps,
   StyleSheet,
@@ -24,6 +25,7 @@ export interface ButtonProps extends Omit<PressableProps, 'children'> {
   fullWidth?: boolean;
   navigateTo?: string;
   navigateParams?: Record<string, string | number | boolean | undefined>;
+  loading?: boolean;
 }
 
 export function Button({
@@ -38,6 +40,7 @@ export function Button({
   onPress,
   navigateTo,
   navigateParams,
+  loading = false,
   ...rest
 }: ButtonProps) {
   const router = useRouter();
@@ -45,7 +48,7 @@ export function Button({
   const { t } = useTranslation();
 
   const getBackgroundColor = (): string => {
-    if (disabled) {
+    if (disabled || loading) {
       return colors.textDisabled;
     }
     switch (variant) {
@@ -62,7 +65,7 @@ export function Button({
   };
 
   const getTextColor = (): string => {
-    if (disabled) {
+    if (disabled || loading) {
       return colors.textSecondary;
     }
     switch (variant) {
@@ -113,6 +116,10 @@ export function Button({
   const buttonText = translationKey ? t(translationKey) : title;
 
   const handlePress: PressableProps['onPress'] = (event) => {
+    if (loading) {
+      return;
+    }
+
     onPress?.(event);
     if (navigateTo) {
       router.push({
@@ -137,11 +144,19 @@ export function Button({
         style as ViewStyle,
       ]}
       onPress={handlePress}
-      disabled={disabled}
+      disabled={disabled || loading}
       accessibilityRole="button"
       accessibilityLabel={buttonText}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       {...rest}
     >
+      {loading ? (
+        <ActivityIndicator
+          size="small"
+          color={getTextColor()}
+          style={buttonText ? styles.spinner : undefined}
+        />
+      ) : null}
       <Text
         variant="button"
         style={[{ color: getTextColor() }, textStyle as TextStyle,]}
@@ -161,5 +176,8 @@ const styles = StyleSheet.create({
   },
   fullWidth: {
     width: '100%',
+  },
+  spinner: {
+    marginRight: spacing.sm
   },
 });

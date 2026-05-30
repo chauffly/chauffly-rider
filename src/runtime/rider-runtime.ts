@@ -8,6 +8,7 @@ import {
   queryKeys
 } from '@/api-client';
 import { env } from '@/config/env';
+import { accountRoleService } from '@/services/account-role';
 
 const buildRequestId = (): string => {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
@@ -86,6 +87,7 @@ export const socketClient = new ChaufflySocketClient({
 const clearRuntimeState = async (): Promise<void> => {
   socketClient.disconnectAll();
   await tokenStorage.clearTokens();
+  await accountRoleService.clearRole();
   queryClient.clear();
 };
 

@@ -7,8 +7,18 @@ export const asArray = <T = Record<string, unknown>>(value: unknown): T[] =>
 export const asString = (value: unknown, fallback = ''): string =>
   typeof value === 'string' ? value : fallback;
 
-export const asNumber = (value: unknown, fallback = 0): number =>
-  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+export const asNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+};
 
 export const asBoolean = (value: unknown, fallback = false): boolean =>
   typeof value === 'boolean' ? value : fallback;
@@ -16,10 +26,23 @@ export const asBoolean = (value: unknown, fallback = false): boolean =>
 export const toNaira = (amount: number): string => `₦${Math.round(amount).toLocaleString()}`;
 
 export const fullName = (user: Record<string, unknown>): string => {
-  const firstName = asString(user.first_name ?? user.firstName);
-  const lastName = asString(user.last_name ?? user.lastName);
-  const combined = `${firstName} ${lastName}`.trim();
-  return combined || asString(user.full_name, 'Driver');
+  const firstName = asString(user.first_name ?? user.firstName).trim();
+  const lastName = asString(user.last_name ?? user.lastName).trim();
+  const normalizedFirst = firstName.replace(/\s+/g, ' ');
+  const normalizedLast = lastName.replace(/\s+/g, ' ');
+
+  if (normalizedFirst && normalizedLast) {
+    const firstLower = normalizedFirst.toLowerCase();
+    const lastLower = normalizedLast.toLowerCase();
+
+    if (firstLower === lastLower || firstLower.endsWith(` ${lastLower}`)) {
+      return normalizedFirst;
+    }
+
+    return `${normalizedFirst} ${normalizedLast}`.trim();
+  }
+
+  return normalizedFirst || normalizedLast || asString(user.full_name, 'Rider');
 };
 
 export const parseDateTimeString = (dateString: string): Date | null => {
