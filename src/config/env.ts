@@ -25,7 +25,7 @@ export const env = {
     process.env.EXPO_PUBLIC_SOCKET_BASE_URL ?? process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:4000'
   ),
   socketPath: process.env.EXPO_PUBLIC_SOCKET_PATH ?? '/socket.io',
-  requestTimeoutMs: parseNumber(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT_MS, 15_000),
+  requestTimeoutMs: parseNumber(process.env.EXPO_PUBLIC_REQUEST_TIMEOUT_MS, 60_000),
   enableApiLogs: parseBoolean(process.env.EXPO_PUBLIC_ENABLE_API_LOGS, false),
   enableSocketDebug: parseBoolean(process.env.EXPO_PUBLIC_ENABLE_SOCKET_DEBUG, false),
   googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
