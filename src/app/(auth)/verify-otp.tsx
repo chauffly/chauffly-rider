@@ -16,7 +16,7 @@ import { ApiClientError, useApiClient } from '@/api-client';
 import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
-import { spacing } from '@/constants/spacing';
+import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { connectRiderSockets } from '@/runtime/rider-runtime';
@@ -295,7 +295,8 @@ const styles = StyleSheet.create({
   },
   logo: {
     width: 100,
-    height: 100
+    height: 100,
+    borderRadius: borderRadius.full
   },
   title: {
     marginBottom: spacing.sm

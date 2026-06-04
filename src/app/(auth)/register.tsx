@@ -22,7 +22,7 @@ import { TextInput } from '@/components/common/text-input';
 import CallOutline from '@/components/svg/CallOutline';
 import EmailOutline from '@/components/svg/EmailOutline';
 import Password from '@/components/svg/Password';
-import { spacing } from '@/constants/spacing';
+import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { authFlowStorage } from '@/services/auth-flow-storage';
@@ -305,6 +305,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 80,
     height: 80,
+    borderRadius: borderRadius.full,
     marginBottom: spacing.xl
   },
   title: {

@@ -17,7 +17,7 @@ import { Button } from '@/components/common/button';
 import { Text } from '@/components/common/text';
 import { TextInput } from '@/components/common/text-input';
 import EmailOutline from '@/components/svg/EmailOutline';
-import { spacing } from '@/constants/spacing';
+import { borderRadius, spacing } from '@/constants/spacing';
 import { useTranslation } from '@/context/language-context';
 import { useTheme } from '@/context/theme-context';
 import { authFlowStorage } from '@/services/auth-flow-storage';
@@ -168,7 +168,8 @@ const styles = StyleSheet.create({
   },
   logo: {
     width: 100,
-    height: 100
+    height: 100,
+    borderRadius: borderRadius.full
   },
   title: {
     marginBottom: spacing.sm
