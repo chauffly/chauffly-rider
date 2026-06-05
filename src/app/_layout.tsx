@@ -22,6 +22,8 @@ import { LanguageProvider } from '@/context/language-context';
 import { LocationProvider } from '@/context/location-context';
 import { RiderRuntimeProvider } from '@/runtime/rider-runtime-provider';
 import { ErrorBoundary } from '@/components/common/error-boundary';
+import { ForceUpdateGate } from '@/components/force-update-gate';
+import { useOtaUpdates } from '@/hooks/use-ota-updates';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -38,6 +40,8 @@ export default function RootLayout() {
     Outfit_900Black,
   });
 
+  useOtaUpdates();
+
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
@@ -49,17 +53,19 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <ErrorBoundary>
-          <RiderRuntimeProvider>
-            <LocationProvider>
-              <RootLayoutNav />
-            </LocationProvider>
-          </RiderRuntimeProvider>
-        </ErrorBoundary>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ForceUpdateGate>
+      <ThemeProvider>
+        <LanguageProvider>
+          <ErrorBoundary>
+            <RiderRuntimeProvider>
+              <LocationProvider>
+                <RootLayoutNav />
+              </LocationProvider>
+            </RiderRuntimeProvider>
+          </ErrorBoundary>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ForceUpdateGate>
   );
 }
 
