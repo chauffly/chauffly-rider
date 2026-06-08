@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useActiveBooking, useApiClient, useBookingById, useBookingUpdates, useDriverLocation as useLiveDriverLocation } from '@/api-client';
 import { JourneyHomeButton } from '@/components/common/journey-home-button';
+import { MapUnavailable } from '@/components/common/map-unavailable';
 import { Text } from '@/components/common/text';
 import ChevronLeft from '@/components/svg/ChevronLeft';
 import { borderRadius, spacing } from '@/constants/spacing';
@@ -14,6 +15,7 @@ import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { socketClient } from '@/runtime/rider-runtime';
 import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
+import { hasConfiguredAndroidGoogleMapsKey } from '@/utils/google-maps';
 import { decodePolyline } from '@/utils/route';
 
 const DEFAULT_REGION = {
@@ -358,37 +360,41 @@ export default function DriverAcceptsScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        initialRegion={DEFAULT_REGION}
-        onPanDrag={() => setUserInteracting(true)}
-      >
-        {hasAssignedDriver && driverLocation.lat && driverLocation.lng ? (
-          <Marker coordinate={markerCoordinates}>
-            <View style={[styles.marker, { backgroundColor: colors.primary }]}>
-              <MaterialCommunityIcons name="car" size={18} color={colors.textInverse} />
-            </View>
+      {hasConfiguredAndroidGoogleMapsKey ? (
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          initialRegion={DEFAULT_REGION}
+          onPanDrag={() => setUserInteracting(true)}
+        >
+          {hasAssignedDriver && driverLocation.lat && driverLocation.lng ? (
+            <Marker coordinate={markerCoordinates}>
+              <View style={[styles.marker, { backgroundColor: colors.primary }]}>
+                <MaterialCommunityIcons name="car" size={18} color={colors.textInverse} />
+              </View>
+            </Marker>
+          ) : null}
+          <Marker coordinate={{ latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }}>
+            <MaterialCommunityIcons name="map-marker" size={32} color={colors.primary} />
           </Marker>
-        ) : null}
-        <Marker coordinate={{ latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }}>
-          <MaterialCommunityIcons name="map-marker" size={32} color={colors.primary} />
-        </Marker>
-        {destinationCoord && destinationCoord.latitude !== 0 ? (
-          <Marker coordinate={destinationCoord}>
-            <MaterialCommunityIcons name="map-marker" size={32} color="#e74c3c" />
-          </Marker>
-        ) : null}
-        {routeCoordinates.length >= 2 ? (
-          <Polyline coordinates={routeCoordinates} strokeColor={colors.primary} strokeWidth={5} />
-        ) : hasAssignedDriver && driverLocation.lat && driverLocation.lng ? (
-          <Polyline
-            coordinates={[markerCoordinates, { latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }]}
-            strokeColor={colors.primary}
-            strokeWidth={4}
-          />
-        ) : null}
-      </MapView>
+          {destinationCoord && destinationCoord.latitude !== 0 ? (
+            <Marker coordinate={destinationCoord}>
+              <MaterialCommunityIcons name="map-marker" size={32} color="#e74c3c" />
+            </Marker>
+          ) : null}
+          {routeCoordinates.length >= 2 ? (
+            <Polyline coordinates={routeCoordinates} strokeColor={colors.primary} strokeWidth={5} />
+          ) : hasAssignedDriver && driverLocation.lat && driverLocation.lng ? (
+            <Polyline
+              coordinates={[markerCoordinates, { latitude: bookingPickupLatitude, longitude: bookingPickupLongitude }]}
+              strokeColor={colors.primary}
+              strokeWidth={4}
+            />
+          ) : null}
+        </MapView>
+      ) : (
+        <MapUnavailable style={styles.map} />
+      )}
 
       <Pressable
         onPress={() => router.back()}

@@ -7,12 +7,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useBookingById, useBookingUpdates, useDriverLocation as useLiveDriverLocation } from '@/api-client';
 import { JourneyHomeButton } from '@/components/common/journey-home-button';
+import { MapUnavailable } from '@/components/common/map-unavailable';
 import { PaymentModal } from '@/components/booking/payment-modal';
 import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { socketClient } from '@/runtime/rider-runtime';
 import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
+import { hasConfiguredAndroidGoogleMapsKey } from '@/utils/google-maps';
 import { decodePolyline } from '@/utils/route';
 
 type ArrivedFare = { tripFare: number; surgeFee: number; tax: number; total: number; currency: string };
@@ -177,26 +179,30 @@ export default function HeadingDestinationScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        initialRegion={DEFAULT_REGION}
-        onPanDrag={() => setUserInteracting(true)}
-      >
-        <Marker coordinate={markerCoordinates}>
-          <MaterialCommunityIcons name="car" size={24} color={colors.textPrimary} />
-        </Marker>
-
-        {destinationCoord && destinationCoord.latitude !== 0 && (
-          <Marker coordinate={destinationCoord}>
-            <MaterialCommunityIcons name="map-marker" size={32} color="#e74c3c" />
+      {hasConfiguredAndroidGoogleMapsKey ? (
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          initialRegion={DEFAULT_REGION}
+          onPanDrag={() => setUserInteracting(true)}
+        >
+          <Marker coordinate={markerCoordinates}>
+            <MaterialCommunityIcons name="car" size={24} color={colors.textPrimary} />
           </Marker>
-        )}
 
-        {routeCoordinates.length >= 2 && (
-          <Polyline coordinates={routeCoordinates} strokeColor={colors.primary} strokeWidth={5} />
-        )}
-      </MapView>
+          {destinationCoord && destinationCoord.latitude !== 0 && (
+            <Marker coordinate={destinationCoord}>
+              <MaterialCommunityIcons name="map-marker" size={32} color="#e74c3c" />
+            </Marker>
+          )}
+
+          {routeCoordinates.length >= 2 && (
+            <Polyline coordinates={routeCoordinates} strokeColor={colors.primary} strokeWidth={5} />
+          )}
+        </MapView>
+      ) : (
+        <MapUnavailable style={styles.map} />
+      )}
 
       <Pressable
         onPress={() => router.back()}

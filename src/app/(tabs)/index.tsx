@@ -22,6 +22,7 @@ import { rideOptions } from '@/constants/ride-options';
 import { useActiveBooking, useApiClient, useCurrentUser, useRideOptions, useSavedAddresses } from '@/api-client';
 import type { QuickDestination } from '@/components/home/home-content';
 import { ResumeJourneyButton } from '@/components/common/resume-journey-button';
+import { MapUnavailable } from '@/components/common/map-unavailable';
 import { accountRoleService, type AccountRole } from '@/services/account-role';
 import { journeyStateService } from '@/services/journey-state';
 import {
@@ -32,6 +33,7 @@ import { estimateDurationMinutes, getRouteDistanceKm } from '@/utils/route';
 import { googleDirectionsService } from '@/services/google-directions';
 import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
 import { formatNairaAmount } from '@/utils/currency';
+import { hasConfiguredAndroidGoogleMapsKey } from '@/utils/google-maps';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -762,82 +764,86 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.mapContainer}>
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          initialRegion={mapRegion}
-          onMapReady={() => setIsMapReady(true)}
-          mapType="standard"
-          showsBuildings
-          showsIndoors
-          showsPointsOfInterest
-          showsUserLocation={permissionStatus === "granted"}
-          showsMyLocationButton={false}
-          showsCompass={false}
-        >
-          {/* Route Polyline - only in set-location mode */}
-          {viewMode !== "home" && routeCoordinatesToDraw.length >= 2 && (
-            <Polyline
-              coordinates={routeCoordinatesToDraw}
-              strokeColor={colors.primary}
-              strokeWidth={4}
-              lineDashPattern={[0]}
-            />
-          )}
+        {hasConfiguredAndroidGoogleMapsKey ? (
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            initialRegion={mapRegion}
+            onMapReady={() => setIsMapReady(true)}
+            mapType="standard"
+            showsBuildings
+            showsIndoors
+            showsPointsOfInterest
+            showsUserLocation={permissionStatus === "granted"}
+            showsMyLocationButton={false}
+            showsCompass={false}
+          >
+            {/* Route Polyline - only in set-location mode */}
+            {viewMode !== "home" && routeCoordinatesToDraw.length >= 2 && (
+              <Polyline
+                coordinates={routeCoordinatesToDraw}
+                strokeColor={colors.primary}
+                strokeWidth={4}
+                lineDashPattern={[0]}
+              />
+            )}
 
-          {/* Origin Marker with user image - only in set-location mode */}
-          {viewMode !== "home" && origin && (
-            <Marker coordinate={origin.coordinates} anchor={{ x: 0.5, y: 0.5 }}>
-              <View style={styles.userMarkerContainer}>
-                <View
-                  style={[
-                    styles.userMarkerOuter,
-                    { borderColor: colors.primary },
-                  ]}
-                >
-                  <Ionicons name="person" size={22} color={colors.primary} />
-                </View>
-                <View
-                  style={[
-                    styles.userMarkerPulse,
-                    { backgroundColor: colors.primary },
-                  ]}
-                />
-              </View>
-            </Marker>
-          )}
-
-          {/* Destination Markers - only in set-location mode */}
-          {viewMode !== "home" &&
-            destinations.map((dest) => (
-              <Marker
-                key={dest.id}
-                coordinate={dest.coordinates}
-                anchor={{ x: 0.5, y: 1 }}
-              >
-                <View style={styles.destinationMarkerContainer}>
-                  <Ionicons name="location" size={34} color="#E53935" />
+            {/* Origin Marker with user image - only in set-location mode */}
+            {viewMode !== "home" && origin && (
+              <Marker coordinate={origin.coordinates} anchor={{ x: 0.5, y: 0.5 }}>
+                <View style={styles.userMarkerContainer}>
+                  <View
+                    style={[
+                      styles.userMarkerOuter,
+                      { borderColor: colors.primary },
+                    ]}
+                  >
+                    <Ionicons name="person" size={22} color={colors.primary} />
+                  </View>
+                  <View
+                    style={[
+                      styles.userMarkerPulse,
+                      { backgroundColor: colors.primary },
+                    ]}
+                  />
                 </View>
               </Marker>
-            ))}
+            )}
 
-          {/* Current location marker - only in home mode */}
-          {viewMode === "home" && currentLocation && (
-            <Marker
-              coordinate={currentLocation.coordinates}
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <View
-                style={[
-                  styles.currentLocationMarker,
-                  { backgroundColor: colors.primary },
-                ]}
+            {/* Destination Markers - only in set-location mode */}
+            {viewMode !== "home" &&
+              destinations.map((dest) => (
+                <Marker
+                  key={dest.id}
+                  coordinate={dest.coordinates}
+                  anchor={{ x: 0.5, y: 1 }}
+                >
+                  <View style={styles.destinationMarkerContainer}>
+                    <Ionicons name="location" size={34} color="#E53935" />
+                  </View>
+                </Marker>
+              ))}
+
+            {/* Current location marker - only in home mode */}
+            {viewMode === "home" && currentLocation && (
+              <Marker
+                coordinate={currentLocation.coordinates}
+                anchor={{ x: 0.5, y: 0.5 }}
               >
-                <View style={styles.currentLocationDot} />
-              </View>
-            </Marker>
-          )}
-        </MapView>
+                <View
+                  style={[
+                    styles.currentLocationMarker,
+                    { backgroundColor: colors.primary },
+                  ]}
+                >
+                  <View style={styles.currentLocationDot} />
+                </View>
+              </Marker>
+            )}
+          </MapView>
+        ) : (
+          <MapUnavailable style={styles.map} />
+        )}
 
         {viewMode === "home" && (
           <Pressable

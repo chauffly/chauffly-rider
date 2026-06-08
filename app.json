@@ -25,15 +25,16 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Chauffly needs your location to provide ride services even when the app is in the background.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "config": {}
+      "config": {
+        "googleMapsApiKey": "AIzaSyC4ClbG_GZXQxSlPKCIcB4iM9378vDdVYQ"
+      }
     },
     "android": {
       "package": "com.chauffly.rider",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/icon.png",
+        "monochromeImage": "./assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -44,7 +45,11 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "config": {}
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyC4ClbG_GZXQxSlPKCIcB4iM9378vDdVYQ"
+        }
+      }
     },
     "web": {
       "output": "static",
@@ -55,18 +60,6 @@
         "expo-router",
         {
           "root": "./src/app"
-        }
-      ],
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-image.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#09111c"
-          }
         }
       ],
       [

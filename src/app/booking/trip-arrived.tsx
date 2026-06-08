@@ -7,12 +7,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useBookingById } from '@/api-client';
 import { JourneyHomeButton } from '@/components/common/journey-home-button';
+import { MapUnavailable } from '@/components/common/map-unavailable';
 import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { Button } from '@/components/common/button';
 import { asArray, asRecord, asString } from '@/utils/api-helpers';
+import { hasConfiguredAndroidGoogleMapsKey } from '@/utils/google-maps';
 
 const DEFAULT_REGION = {
   latitude: 9.0579,
@@ -58,7 +60,11 @@ export default function TripArrivedScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView style={styles.map} initialRegion={DEFAULT_REGION} />
+      {hasConfiguredAndroidGoogleMapsKey ? (
+        <MapView style={styles.map} initialRegion={DEFAULT_REGION} />
+      ) : (
+        <MapUnavailable style={styles.map} />
+      )}
 
       <View style={[styles.overlay, { backgroundColor: 'rgba(255,255,255,0.70)' }]} />
 

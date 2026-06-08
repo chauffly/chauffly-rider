@@ -11,10 +11,12 @@ import {
   RiderOnboardingRoute,
   riderOnboardingProgressStorage
 } from "@/services/rider-onboarding-progress";
+import { useStartup } from "@/context/startup-context";
 
 export default function TabLayout() {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const { markRouteResolved } = useStartup();
   const [accountRole, setAccountRole] = useState<AccountRole>("rider");
   const [pendingRoute, setPendingRoute] = useState<RiderOnboardingRoute | null | undefined>(undefined);
   const { data: currentUser } = useCurrentUser();
@@ -32,9 +34,15 @@ export default function TabLayout() {
   useEffect(() => {
     let active = true;
     const loadPendingOnboardingRoute = async () => {
-      const route = await riderOnboardingProgressStorage.getPendingRoute();
-      if (active) {
-        setPendingRoute(route);
+      try {
+        const route = await riderOnboardingProgressStorage.getPendingRoute();
+        if (active) {
+          setPendingRoute(route);
+        }
+      } catch {
+        if (active) {
+          setPendingRoute(null);
+        }
       }
     };
 
@@ -43,6 +51,14 @@ export default function TabLayout() {
       active = false;
     };
   }, []);
+
+  // This is the deepest gate on the /(tabs) cold-start path; once it settles the
+  // first real screen is ready, so release the splash overlay.
+  useEffect(() => {
+    if (pendingRoute !== undefined) {
+      markRouteResolved();
+    }
+  }, [pendingRoute, markRouteResolved]);
 
   useEffect(() => {
     let active = true;

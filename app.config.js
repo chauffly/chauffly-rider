@@ -7,19 +7,53 @@ if (process.env.APP_ENV === 'production') {
   require('dotenv').config({ path: '.env.production', override: true });
 }
 
+const normalizeGoogleMapsApiKey = (value) => {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  const keyStart = trimmed.indexOf('AIza');
+  return keyStart >= 0 ? trimmed.slice(keyStart) : trimmed;
+};
+
+const GOOGLE_MAPS_API_KEY = normalizeGoogleMapsApiKey(process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY);
+
 module.exports = ({ config }) => ({
   ...config,
+  plugins: [
+    ...(config.plugins ?? []),
+    [
+      // Native splash is intentionally minimal — just the dark background
+      // color. The image points at a transparent PNG because the
+      // expo-splash-screen Android plugin always emits a reference to
+      // @drawable/splashscreen_logo and resource linking fails without it.
+      // The full-screen branded splash is rendered by <LaunchOverlay /> in
+      // src/app/_layout.tsx using assets/images/full-splash-image.png.
+      'expo-splash-screen',
+      {
+        image: './assets/images/transparent-splash.png',
+        resizeMode: 'contain',
+        backgroundColor: '#04070F',
+        dark: {
+          image: './assets/images/transparent-splash.png',
+          backgroundColor: '#04070F',
+        },
+      },
+    ],
+    'expo-font',
+    'expo-localization',
+    'expo-secure-store',
+    'expo-web-browser',
+    '@react-native-community/datetimepicker'
+  ],
   ios: {
     ...config.ios,
     config: {
-      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+      googleMapsApiKey: GOOGLE_MAPS_API_KEY
     }
   },
   android: {
     ...config.android,
     config: {
       googleMaps: {
-        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+        apiKey: GOOGLE_MAPS_API_KEY
       }
     }
   },
@@ -32,7 +66,7 @@ module.exports = ({ config }) => ({
     requestTimeoutMs: process.env.EXPO_PUBLIC_REQUEST_TIMEOUT_MS,
     enableApiLogs: process.env.EXPO_PUBLIC_ENABLE_API_LOGS,
     enableSocketDebug: process.env.EXPO_PUBLIC_ENABLE_SOCKET_DEBUG,
-    googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     paystackPublicKey: process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY
   }
 });
