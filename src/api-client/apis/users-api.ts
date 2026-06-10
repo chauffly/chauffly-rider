@@ -38,6 +38,10 @@ export interface UsersApi {
   updateCurrentUser(input: UpdateUserProfileInput): Promise<Record<string, unknown>>;
   uploadAvatar(formData: FormData): Promise<Record<string, unknown>>;
   deleteCurrentUser(): Promise<{ message: string }>;
+  requestAccountDeletion(input: {
+    source: 'rider' | 'driver';
+    reason?: string;
+  }): Promise<Record<string, unknown>>;
 
   listAddresses(): Promise<Array<Record<string, unknown>>>;
   createAddress(input: SavedAddressInput): Promise<Record<string, unknown>>;
@@ -83,6 +87,10 @@ export const createUsersApi = (http: HttpClient): UsersApi => {
 
     deleteCurrentUser() {
       return http.delete('/users/me');
+    },
+
+    requestAccountDeletion(input) {
+      return http.post('/account-deletion/me', input);
     },
 
     listAddresses() {

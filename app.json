@@ -3,6 +3,8 @@
     "name": "Chauffly",
     "slug": "chauffly",
     "version": "1.0.0",
+    "platforms": ["ios", "android"],
+    "backgroundColor": "#04070F",
     "runtimeVersion": {
       "policy": "appVersion"
     },

@@ -75,6 +75,21 @@ export const useDeleteCurrentUser = (
   });
 };
 
+export const useRequestAccountDeletion = (
+  options?: UseMutationOptions<
+    Record<string, unknown>,
+    unknown,
+    { source: 'rider' | 'driver'; reason?: string }
+  >
+) => {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: (input: { source: 'rider' | 'driver'; reason?: string }) =>
+      api.usersApi.requestAccountDeletion(input),
+    ...options
+  });
+};
+
 export const useSavedAddresses = (
   options?: Omit<UseQueryOptions<Array<UnknownRecord>>, 'queryKey' | 'queryFn'>
 ) => {

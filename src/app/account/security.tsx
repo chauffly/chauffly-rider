@@ -8,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import {
   useApiClient,
   useChangePassword,
-  useDeleteCurrentUser,
+  useRequestAccountDeletion,
   useRevokeSession,
   useUserSessions
 } from '@/api-client';
@@ -33,7 +33,7 @@ export default function AccountSecurityScreen() {
   const { data: sessionsData } = useUserSessions();
   const changePassword = useChangePassword();
   const revokeSession = useRevokeSession();
-  const deleteAccount = useDeleteCurrentUser();
+  const deleteAccount = useRequestAccountDeletion();
 
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -79,7 +79,8 @@ export default function AccountSecurityScreen() {
 
     setSubmitting(true);
     try {
-      await deleteAccount.mutateAsync();
+      // Submit a deletion request for admin review, then sign the user out.
+      await deleteAccount.mutateAsync({ source: 'rider' });
       try {
         await api.authApi.logout();
       } catch {
