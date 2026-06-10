@@ -35,8 +35,7 @@
       "package": "com.chauffly.rider",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/icon.png",
-        "monochromeImage": "./assets/images/icon.png"
+        "foregroundImage": "./assets/images/logo-sm.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

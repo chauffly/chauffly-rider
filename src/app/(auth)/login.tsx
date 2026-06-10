@@ -220,57 +220,57 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg
+    paddingHorizontal: spacing.lg,
   },
   header: {
-    alignItems: 'center',
-    marginBottom: spacing.xxxl
+    alignItems: "center",
+    marginBottom: spacing.xxxl,
   },
   logo: {
     width: 100,
     height: 100,
-    borderRadius: borderRadius.full
+    borderRadius: borderRadius.full,
   },
   title: {
-    marginBottom: spacing.sm
+    marginBottom: spacing.sm,
   },
   form: {
-    marginBottom: spacing.xxl
+    marginBottom: spacing.xxl,
   },
   forgotPassword: {
-    alignSelf: 'flex-start',
-    marginBottom: spacing.xl
+    alignSelf: "flex-start",
+    marginBottom: spacing.xl,
   },
   loginButton: {
-    marginTop: spacing.md
+    marginTop: spacing.md,
   },
   dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xxl
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.xxl,
   },
   dividerLine: {
     flex: 1,
-    height: 1
+    height: 1,
   },
   dividerText: {
-    marginHorizontal: spacing.lg
+    marginHorizontal: spacing.lg,
   },
   socialButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.lg,
-    marginBottom: spacing.xxxl
+    marginBottom: spacing.xxxl,
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center'
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
   errorText: {
-    marginBottom: spacing.md
-  }
+    marginBottom: spacing.md,
+  },
 });

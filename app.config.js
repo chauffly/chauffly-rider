@@ -20,23 +20,23 @@ module.exports = ({ config }) => ({
   plugins: [
     ...(config.plugins ?? []),
     [
-      // Native splash is intentionally just the dark #04070F background — its
-      // image is a transparent pixel, so no logo/icon ever flashes before the
-      // full splash. The full-screen branded splash (<LaunchOverlay /> in
-      // src/app/_layout.tsx, assets/images/full-splash-image.png) renders on top
-      // of that same background as the first visible frame; SplashScreen.hideAsync()
-      // is gated on that image decoding, so the handoff is seamless and the user
-      // perceives the full splash appearing immediately on launch.
-      // NOTE: the native splashscreen_logo drawables under android/.../res are
-      // also overwritten with this transparent pixel so a non-prebuild gradle
-      // build shows no logo. Re-run prebuild if regenerating native from scratch.
+      // The native splash IS the full branded splash image (full-bleed via
+      // resizeMode 'cover'), so the very first frame the OS paints on launch is
+      // already the full splash — no logo flash and no dark gap/lag before it.
+      // <LaunchOverlay /> (src/app/_layout.tsx) then renders the same
+      // full-splash-image.png on top for a seamless handoff and holds it for the
+      // brand-minimum time before fading into the app.
+      // NOTE on Android 12+: the OS system splash can only center an icon (it has
+      // no true full-bleed mode), so there it shows the image centered on #04070F
+      // and the JS overlay fills the screen; iOS and Android <=11 are full-bleed
+      // immediately.
       'expo-splash-screen',
       {
-        image: './assets/images/transparent-splash.png',
-        resizeMode: 'contain',
+        image: './assets/images/full-splash-image.png',
+        resizeMode: 'cover',
         backgroundColor: '#04070F',
         dark: {
-          image: './assets/images/transparent-splash.png',
+          image: './assets/images/full-splash-image.png',
           backgroundColor: '#04070F',
         },
       },

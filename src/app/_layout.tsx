@@ -29,9 +29,9 @@ import { useOtaUpdates } from '@/hooks/use-ota-updates';
 
 SplashScreen.preventAutoHideAsync();
 
-// Minimum time the branded overlay stays up, so a fast cold start still reads as
-// an intentional splash rather than a flash.
-const MIN_LAUNCH_OVERLAY_MS = 1400;
+// Minimum time the branded overlay stays up so the full splash is held for a
+// deliberate ~3s and never flashes by, even on a fast cold start.
+const MIN_LAUNCH_OVERLAY_MS = 3000;
 // Hard ceiling: never trap the user behind the overlay if a startup gate stalls.
 const MAX_LAUNCH_OVERLAY_MS = 8000;
 
@@ -46,8 +46,6 @@ export default function RootLayout() {
 function RootLayoutBoot() {
   const { isRouteResolved } = useStartup();
   const [showLaunchOverlay, setShowLaunchOverlay] = useState(true);
-  const [nativeSplashHidden, setNativeSplashHidden] = useState(false);
-  const [overlayImageLoaded, setOverlayImageLoaded] = useState(false);
   const [bootStartedAt] = useState(() => Date.now());
   const [fontsLoaded, fontError] = useFonts({
     Outfit_100Thin,
@@ -65,28 +63,27 @@ function RootLayoutBoot() {
 
   const fontsReady = fontsLoaded || fontError;
 
-  // Hand the screen from the native splash to the JS overlay only once the
-  // overlay's logo has actually decoded, so the gold mark never blinks to a bare
-  // background mid-handoff. The overlay mirrors the native splash pixel-for-pixel.
+  // Hide the native system splash as soon as JS is running — do NOT wait on the
+  // overlay image to decode. The activity windowBackground is the full splash
+  // image (see android .../res/drawable/splashscreen_window + styles.xml), so the
+  // instant the system splash hides the full splash is already on screen
+  // natively, with no dark gap and no image-decode lag. The JS overlay then
+  // layers the identical image on top for the timed hold and fade.
   useEffect(() => {
-    if (overlayImageLoaded && !nativeSplashHidden) {
-      SplashScreen.hideAsync().finally(() => {
-        setNativeSplashHidden(true);
-      });
-    }
-  }, [overlayImageLoaded, nativeSplashHidden]);
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
-  // Dismiss the overlay only when the app is truly ready: fonts loaded, the
-  // initial route resolved, and the native splash already handed off — then
-  // honour the minimum brand time.
+  // Dismiss the overlay only when the app is truly ready (fonts loaded + initial
+  // route resolved), and never before the minimum brand time so the full splash
+  // is held for a deliberate ~3s rather than flashing by.
   useEffect(() => {
-    if (fontsReady && isRouteResolved && nativeSplashHidden) {
+    if (fontsReady && isRouteResolved) {
       const elapsed = Date.now() - bootStartedAt;
       const remaining = Math.max(MIN_LAUNCH_OVERLAY_MS - elapsed, 0);
       const timeout = setTimeout(() => setShowLaunchOverlay(false), remaining);
       return () => clearTimeout(timeout);
     }
-  }, [bootStartedAt, fontsReady, isRouteResolved, nativeSplashHidden]);
+  }, [bootStartedAt, fontsReady, isRouteResolved]);
 
   // Safety net: force the overlay down if any gate never settles.
   useEffect(() => {
@@ -109,7 +106,7 @@ function RootLayoutBoot() {
           </LanguageProvider>
         </ThemeProvider>
       </ForceUpdateGate>
-      <LaunchOverlay visible={showLaunchOverlay} onImageLoaded={() => setOverlayImageLoaded(true)} />
+      <LaunchOverlay visible={showLaunchOverlay} />
     </>
   );
 }

@@ -3,13 +3,14 @@ import { Animated, Image, StyleSheet } from 'react-native';
 
 const FADE_DURATION_MS = 320;
 
-// The native splash is intentionally just the dark #04070F background — its
-// image is a transparent pixel (see app.json), so there is no logo to "jump"
-// from. This overlay renders the full branded splash on top of that same
-// background, so the handoff from the native splash is invisible; only the final
-// fade-out to the app is ever perceptible. The handoff is gated on the image
-// actually decoding (onLoadEnd) so the branded art never blinks in over a bare
-// background.
+// The activity's native windowBackground is already the full branded splash
+// image (Android: res/drawable/splashscreen_window + styles.xml; iOS: the launch
+// storyboard), so the full splash is on screen the instant the system splash
+// dismisses — no JS, no image decode, no lag. This overlay just layers the
+// identical full-splash image on top so we can control the brand-minimum hold
+// and the fade-out into the app. Its container is transparent (not a dark fill)
+// so that while this overlay's own copy of the image is still decoding, the
+// native windowBackground shows through unchanged rather than flashing dark.
 export function LaunchOverlay({
   visible,
   onImageLoaded
@@ -65,7 +66,7 @@ export function LaunchOverlay({
 const styles = StyleSheet.create({
   fill: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#04070F',
+    backgroundColor: 'transparent',
     width: '100%',
     height: '100%'
   }
