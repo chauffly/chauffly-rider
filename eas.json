@@ -16,7 +16,21 @@
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_APP_NAME": "Chauffly",
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_API_BASE_URL": "https://chauffly-server.onrender.com",
+        "EXPO_PUBLIC_API_PREFIX": "/api/v1",
+        "EXPO_PUBLIC_SOCKET_BASE_URL": "https://chauffly-server.onrender.com",
+        "EXPO_PUBLIC_SOCKET_PATH": "/socket.io",
+        "EXPO_PUBLIC_REQUEST_TIMEOUT_MS": "60000",
+        "EXPO_PUBLIC_ENABLE_API_LOGS": "false",
+        "EXPO_PUBLIC_ENABLE_SOCKET_DEBUG": "false",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyC4ClbG_GZXQxSlPKCIcB4iM9378vDdVYQ",
+        "EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY": "pk_test_748c2fb0485856749f381330403813b24ab07810"
+      }
     },
     "production": {
       "channel": "production"

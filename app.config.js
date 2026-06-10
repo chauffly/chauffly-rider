@@ -20,18 +20,23 @@ module.exports = ({ config }) => ({
   plugins: [
     ...(config.plugins ?? []),
     [
-      // Native splash shows the gold brand logo centered on the dark #04070F
-      // background, so the first frame is already branded (no blank/dark gap
-      // before JS starts). The full-screen branded splash (<LaunchOverlay /> in
-      // src/app/_layout.tsx, assets/images/full-splash-image.png) then fades in
-      // on top of the same background for a seamless handoff.
+      // Native splash is intentionally just the dark #04070F background — its
+      // image is a transparent pixel, so no logo/icon ever flashes before the
+      // full splash. The full-screen branded splash (<LaunchOverlay /> in
+      // src/app/_layout.tsx, assets/images/full-splash-image.png) renders on top
+      // of that same background as the first visible frame; SplashScreen.hideAsync()
+      // is gated on that image decoding, so the handoff is seamless and the user
+      // perceives the full splash appearing immediately on launch.
+      // NOTE: the native splashscreen_logo drawables under android/.../res are
+      // also overwritten with this transparent pixel so a non-prebuild gradle
+      // build shows no logo. Re-run prebuild if regenerating native from scratch.
       'expo-splash-screen',
       {
-        image: './assets/images/logo-sm.png',
+        image: './assets/images/transparent-splash.png',
         resizeMode: 'contain',
         backgroundColor: '#04070F',
         dark: {
-          image: './assets/images/logo-sm.png',
+          image: './assets/images/transparent-splash.png',
           backgroundColor: '#04070F',
         },
       },
