@@ -41,6 +41,9 @@ module.exports = ({ config }) => ({
         },
       },
     ],
+    // Must come after expo-splash-screen: paints the full splash as the native
+    // windowBackground, blanks the Android 12+ system-splash icon, drops x86 ABIs.
+    './plugins/withChaufflyAndroid',
     'expo-font',
     'expo-localization',
     'expo-secure-store',
