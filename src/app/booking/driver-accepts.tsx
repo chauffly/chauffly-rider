@@ -11,11 +11,13 @@ import { MapUnavailable } from '@/components/common/map-unavailable';
 import { Text } from '@/components/common/text';
 import ChevronLeft from '@/components/svg/ChevronLeft';
 import { borderRadius, spacing } from '@/constants/spacing';
+import { useLocation } from '@/context/location-context';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { socketClient } from '@/runtime/rider-runtime';
 import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
 import { hasConfiguredAndroidGoogleMapsKey } from '@/utils/google-maps';
+import { regionFromCurrentLocation } from '@/utils/map-region';
 import { decodePolyline } from '@/utils/route';
 
 const DEFAULT_REGION = {
@@ -92,8 +94,13 @@ export default function DriverAcceptsScreen() {
   const [retriesLeft, setRetriesLeft] = useState(3);
   const [retrying, setRetrying] = useState(false);
   const [userInteracting, setUserInteracting] = useState(false);
+  const { currentLocation } = useLocation();
   const mapRef = useRef<MapView>(null);
   const hasInitialFitRef = useRef(false);
+  const hasCenteredOnUserRef = useRef(false);
+
+  // Default the map to the rider's live location, never a hard-coded place.
+  const initialRegion = useMemo(() => regionFromCurrentLocation(currentLocation), [currentLocation]);
 
   const driverLocation = useLiveDriverLocation(socketClient);
 
@@ -241,6 +248,15 @@ export default function DriverAcceptsScreen() {
     hasInitialFitRef.current = true;
   }, [routeCoordinates, userInteracting]);
 
+  // Until the route track is available, keep the map on the rider's live
+  // location (loads after the map first mounts) instead of the fallback region.
+  useEffect(() => {
+    if (hasCenteredOnUserRef.current || hasInitialFitRef.current || userInteracting) return;
+    if (!mapRef.current || !currentLocation || routeCoordinates.length >= 2) return;
+    mapRef.current.animateToRegion(initialRegion, 500);
+    hasCenteredOnUserRef.current = true;
+  }, [currentLocation, initialRegion, routeCoordinates, userInteracting]);
+
   const centerMap = () => {
     if (!mapRef.current) return;
     setUserInteracting(false);
@@ -364,7 +380,8 @@ export default function DriverAcceptsScreen() {
         <MapView
           ref={mapRef}
           style={styles.map}
-          initialRegion={DEFAULT_REGION}
+          initialRegion={initialRegion}
+          showsUserLocation
           onPanDrag={() => setUserInteracting(true)}
         >
           {hasAssignedDriver && driverLocation.lat && driverLocation.lng ? (

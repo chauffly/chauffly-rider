@@ -11,20 +11,15 @@ import { MapUnavailable } from '@/components/common/map-unavailable';
 import { PaymentModal } from '@/components/booking/payment-modal';
 import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
+import { useLocation } from '@/context/location-context';
 import { useTheme } from '@/context/theme-context';
 import { socketClient } from '@/runtime/rider-runtime';
 import { asArray, asNumber, asRecord, asString } from '@/utils/api-helpers';
 import { hasConfiguredAndroidGoogleMapsKey } from '@/utils/google-maps';
+import { FALLBACK_MAP_REGION, regionFromCurrentLocation } from '@/utils/map-region';
 import { decodePolyline } from '@/utils/route';
 
 type ArrivedFare = { tripFare: number; surgeFee: number; tax: number; total: number; currency: string };
-
-const DEFAULT_REGION = {
-  latitude: 9.0579,
-  longitude: 7.4951,
-  latitudeDelta: 0.25,
-  longitudeDelta: 0.25
-};
 
 export default function HeadingDestinationScreen() {
   const { colors } = useTheme();
@@ -34,8 +29,13 @@ export default function HeadingDestinationScreen() {
     bookingId?: string;
   }>();
   const bookingId = params.bookingId ?? '';
+  const { currentLocation } = useLocation();
   const mapRef = useRef<MapView>(null);
   const hasInitialFitRef = useRef(false);
+  const hasCenteredOnUserRef = useRef(false);
+
+  // Default the map to the rider's live location, never a hard-coded place.
+  const initialRegion = useMemo(() => regionFromCurrentLocation(currentLocation), [currentLocation]);
 
   const { data: bookingData } = useBookingById(bookingId, {
     enabled: Boolean(bookingId),
@@ -136,10 +136,10 @@ export default function HeadingDestinationScreen() {
 
   const markerCoordinates = useMemo(
     () => ({
-      latitude: driverLocation.lat ?? 9.22,
-      longitude: driverLocation.lng ?? 7.45
+      latitude: driverLocation.lat ?? currentLocation?.coordinates.latitude ?? FALLBACK_MAP_REGION.latitude,
+      longitude: driverLocation.lng ?? currentLocation?.coordinates.longitude ?? FALLBACK_MAP_REGION.longitude
     }),
-    [driverLocation.lat, driverLocation.lng]
+    [driverLocation.lat, driverLocation.lng, currentLocation]
   );
 
   // Decode the pre-computed road route from the booking
@@ -167,6 +167,16 @@ export default function HeadingDestinationScreen() {
     hasInitialFitRef.current = true;
   }, [routeCoordinates, userInteracting]);
 
+  // Until the route track is available, keep the map on the rider's live
+  // location (it loads asynchronously, after the map first mounts) instead of
+  // the fallback region, so the rider is never shown a hard-coded place.
+  useEffect(() => {
+    if (hasCenteredOnUserRef.current || hasInitialFitRef.current || userInteracting) return;
+    if (!mapRef.current || !currentLocation || routeCoordinates.length >= 2) return;
+    mapRef.current.animateToRegion(initialRegion, 500);
+    hasCenteredOnUserRef.current = true;
+  }, [currentLocation, initialRegion, routeCoordinates, userInteracting]);
+
   const centerMap = () => {
     if (!mapRef.current) return;
     setUserInteracting(false);
@@ -183,12 +193,15 @@ export default function HeadingDestinationScreen() {
         <MapView
           ref={mapRef}
           style={styles.map}
-          initialRegion={DEFAULT_REGION}
+          initialRegion={initialRegion}
+          showsUserLocation
           onPanDrag={() => setUserInteracting(true)}
         >
-          <Marker coordinate={markerCoordinates}>
-            <MaterialCommunityIcons name="car" size={24} color={colors.textPrimary} />
-          </Marker>
+          {driverLocation.lat != null && driverLocation.lng != null && (
+            <Marker coordinate={markerCoordinates}>
+              <MaterialCommunityIcons name="car" size={24} color={colors.textPrimary} />
+            </Marker>
+          )}
 
           {destinationCoord && destinationCoord.latitude !== 0 && (
             <Marker coordinate={destinationCoord}>

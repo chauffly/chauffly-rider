@@ -10,18 +10,13 @@ import { JourneyHomeButton } from '@/components/common/journey-home-button';
 import { MapUnavailable } from '@/components/common/map-unavailable';
 import { Text } from '@/components/common/text';
 import { spacing } from '@/constants/spacing';
+import { useLocation } from '@/context/location-context';
 import { useTheme } from '@/context/theme-context';
 import { useTranslation } from '@/context/language-context';
 import { Button } from '@/components/common/button';
 import { asArray, asRecord, asString } from '@/utils/api-helpers';
 import { hasConfiguredAndroidGoogleMapsKey } from '@/utils/google-maps';
-
-const DEFAULT_REGION = {
-  latitude: 9.0579,
-  longitude: 7.4951,
-  latitudeDelta: 0.25,
-  longitudeDelta: 0.25
-};
+import { regionFromCurrentLocation } from '@/utils/map-region';
 
 const MOOD_OPTIONS = [
   { key: 'very_bad', icon: 'emoticon-sad-outline' },
@@ -39,6 +34,8 @@ export default function TripArrivedScreen() {
     bookingId?: string;
   }>();
   const bookingId = params.bookingId ?? '';
+  const { currentLocation } = useLocation();
+  const initialRegion = useMemo(() => regionFromCurrentLocation(currentLocation), [currentLocation]);
 
   const { data: bookingData } = useBookingById(bookingId, {
     enabled: Boolean(bookingId)
@@ -61,7 +58,7 @@ export default function TripArrivedScreen() {
   return (
     <View style={styles.container}>
       {hasConfiguredAndroidGoogleMapsKey ? (
-        <MapView style={styles.map} initialRegion={DEFAULT_REGION} />
+        <MapView style={styles.map} initialRegion={initialRegion} />
       ) : (
         <MapUnavailable style={styles.map} />
       )}
