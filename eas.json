@@ -9,9 +9,6 @@
       "channel": "development",
       "env": {
         "APP_ENV": "production"
-      },
-      "ios": {
-        "simulator": true
       }
     },
     "preview": {

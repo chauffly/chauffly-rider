@@ -24,7 +24,6 @@
       "bundleIdentifier": "com.chauffly.rider",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Chauffly needs your location to show nearby drivers and calculate routes.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Chauffly needs your location to provide ride services even when the app is in the background.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
@@ -42,7 +41,6 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
@@ -66,7 +64,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Chauffly needs your location to provide ride services."
+          "locationWhenInUsePermission": "Chauffly needs your location to provide ride services."
         }
       ],
       [
