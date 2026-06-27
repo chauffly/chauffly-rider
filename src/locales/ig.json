@@ -170,8 +170,7 @@
   "location": {
     "enable_location": "Kwado Ọnọdụ",
     "enable_location_description": "Iji nwee ike iji ọrụ a, anyị chọrọ ikike ịnweta ọnọdụ gị.",
-    "grant_permission": "Nye Ikike",
-    "maybe_later": "Eleghị anya Emechaa",
+    "continue": "Gaa n'ihu",
     "where_to": "Ebee ka ị na-aga?",
     "enter_location": "Tinye Ọnọdụ",
     "your_route": "Ụzọ gị?",

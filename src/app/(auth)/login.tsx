@@ -7,6 +7,7 @@ import {
   StyleSheet,
   View
 } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -50,6 +51,49 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState('');
   const [generalError, setGeneralError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const handleAppleLogin = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        setGeneralError('Apple sign-in failed. Please try again.');
+        return;
+      }
+
+      setSubmitting(true);
+      setGeneralError('');
+
+      const session = await api.authApi.appleLogin({
+        identity_token: credential.identityToken,
+        email: credential.email,
+        first_name: credential.fullName?.givenName ?? null,
+        last_name: credential.fullName?.familyName ?? null,
+        role: 'rider',
+      });
+
+      await api.session.setTokens(session.tokens);
+      await accountRoleService.setRole('rider');
+      await connectRiderSockets();
+      const nextRoute = await riderOnboardingProgressStorage.resolvePostAuthRoute({
+        id: session.user.id,
+        status: session.user.status
+      });
+      router.replace(nextRoute);
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'ERR_REQUEST_CANCELED') {
+        return;
+      }
+      setGeneralError(extractErrorMessage(err, 'Apple sign-in failed. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -193,7 +237,7 @@ export default function LoginScreen() {
 
         <View style={styles.socialButtons}>
           <SocialButton provider="google" onPress={() => {}} />
-          <SocialButton provider="apple" onPress={() => {}} />
+          <SocialButton provider="apple" onPress={handleAppleLogin} />
         </View>
 
         <View style={styles.footer}>

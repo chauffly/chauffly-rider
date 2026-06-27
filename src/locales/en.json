@@ -563,8 +563,7 @@
   "location": {
     "enable_location": "Enable Location",
     "enable_location_description": "To be able to use the service, we require permission to access your location.",
-    "grant_permission": "Grant Permission",
-    "maybe_later": "Maybe Later",
+    "continue": "Continue",
     "where_to": "Where to?",
     "enter_location": "Enter Location",
     "your_route": "Your route?",

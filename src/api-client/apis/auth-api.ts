@@ -15,10 +15,19 @@ export interface RegisterResult {
   message: string;
 }
 
+export interface AppleLoginInput {
+  identity_token: string;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  role?: 'rider' | 'driver';
+}
+
 export interface AuthApi {
   register(input: RegisterInput): Promise<RegisterResult>;
   verifyOtp(input: VerifyOtpInput): Promise<AuthSession>;
   login(input: LoginInput): Promise<AuthSession>;
+  appleLogin(input: AppleLoginInput): Promise<AuthSession>;
   refresh(input: RefreshInput): Promise<AuthSession>;
   forgotPassword(input: ForgotPasswordInput): Promise<{ message: string }>;
   resendOtp(input: ResendOtpInput): Promise<{ message: string }>;
@@ -38,6 +47,10 @@ export const createAuthApi = (http: HttpClient): AuthApi => {
 
     login(input) {
       return http.post<AuthSession>('/auth/login', input);
+    },
+
+    appleLogin(input) {
+      return http.post<AuthSession>('/auth/apple', input);
     },
 
     refresh(input) {

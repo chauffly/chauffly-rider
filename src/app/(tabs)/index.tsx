@@ -341,12 +341,7 @@ export default function HomeScreen() {
     await requestPermission();
   };
 
-  const handleMaybeLater = () => {
-    setShowPermissionModal(false);
-    setHasAskedPermission(true);
-  };
-
-  const handleEnterLocationPress = () => {
+const handleEnterLocationPress = () => {
     router.push("/your-route");
   };
 
@@ -922,9 +917,7 @@ export default function HomeScreen() {
 
       <LocationPermissionModal
         visible={showPermissionModal}
-        onClose={() => setShowPermissionModal(false)}
         onGrantPermission={handleGrantPermission}
-        onMaybeLater={handleMaybeLater}
       />
 
       <ResumeJourneyButton />

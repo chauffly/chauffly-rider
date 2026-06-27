@@ -170,8 +170,7 @@
   "location": {
     "enable_location": "Mu Ipo Ṣiṣẹ",
     "enable_location_description": "Lati le lo iṣẹ yii, a nilo igbanilaaye lati wọle si ipo rẹ.",
-    "grant_permission": "Fun ni Igbanilaaye",
-    "maybe_later": "Boya Nigbamii",
+    "continue": "Tẹsiwaju",
     "where_to": "Si ibi wo?",
     "enter_location": "Tẹ Ipo sii",
     "your_route": "Ipa-ọna rẹ?",

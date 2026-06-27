@@ -9,21 +9,17 @@ import LocationPinFilled from '@/components/svg/LocationPinFilled';
 
 interface LocationPermissionModalProps {
   visible: boolean;
-  onClose: () => void;
   onGrantPermission: () => void;
-  onMaybeLater: () => void;
 }
 
 export function LocationPermissionModal({
   visible,
-  onClose,
   onGrantPermission,
-  onMaybeLater,
 }: LocationPermissionModalProps) {
   const { colors } = useTheme();
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <BottomSheet visible={visible} onClose={onGrantPermission}>
       <View style={styles.container}>
         <View style={[styles.iconContainer, { backgroundColor: colors.accent }]}>
           <LocationPinFilled size={32} color={colors.primary} />
@@ -47,20 +43,12 @@ export function LocationPermissionModal({
 
         <View style={styles.buttonsContainer}>
           <Button
-            translationKey="location.grant_permission"
+            translationKey="location.continue"
             variant="primary"
             size="lg"
             fullWidth
             onPress={onGrantPermission}
             style={styles.primaryButton}
-          />
-
-          <Button
-            translationKey="location.maybe_later"
-            variant="outline"
-            size="lg"
-            fullWidth
-            onPress={onMaybeLater}
           />
         </View>
       </View>
