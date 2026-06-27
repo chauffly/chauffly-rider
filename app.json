@@ -2,7 +2,7 @@
   "expo": {
     "name": "Chauffly",
     "slug": "chauffly",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "platforms": ["ios", "android"],
     "backgroundColor": "#04070F",
     "runtimeVersion": {
@@ -22,6 +22,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.chauffly.rider",
+      "buildNumber": "2",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Chauffly needs your location to show nearby drivers and calculate routes.",
